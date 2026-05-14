@@ -220,10 +220,11 @@ function showPreview(keyword, field, evt) {
         el.onclick = null;
     }
 
-    // ★ preview-body 직접 스크롤 처리 — 외부 페이지 스크롤 차단
+    // ★ preview-body 스크롤 처리 — passive:false 로 preventDefault 보장
     const bodyEl = el.querySelector('.preview-body');
     if (bodyEl) {
-        bodyEl.onwheel = (e) => {
+        bodyEl._wheelHandler && bodyEl.removeEventListener('wheel', bodyEl._wheelHandler);
+        bodyEl._wheelHandler = (e) => {
             e.stopPropagation();
             e.preventDefault();
             bodyEl.scrollTop += e.deltaY;
@@ -231,13 +232,17 @@ function showPreview(keyword, field, evt) {
             clearTimeout(hidePreviewTimer);
             hidePreviewTimer = null;
         };
+        bodyEl.addEventListener('wheel', bodyEl._wheelHandler, { passive: false });
     }
-    el.onwheel = (e) => {
+    el._wheelHandler && el.removeEventListener('wheel', el._wheelHandler);
+    el._wheelHandler = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         previewPinned = true;
         clearTimeout(hidePreviewTimer);
         hidePreviewTimer = null;
     };
+    el.addEventListener('wheel', el._wheelHandler, { passive: false });
 
     // ★ 첫 진입 시점 좌표로 고정 — 이후 mousemove 추적 없음
     el.classList.add('visible');
