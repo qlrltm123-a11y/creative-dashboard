@@ -261,6 +261,20 @@
         <!-- ★ 성과 분석 탭 공통 선정 기준 배지 (모든 컨텐츠에 동일 적용) -->
         <div id="performance-criteria-badge" class="mb-4"></div>
 
+        <!-- ★ CTR × ROAS 소재 분포도 -->
+        <section class="chart-card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-indigo-500"></i>소재별 CTR × ROAS 분포</h3>
+                    <p class="text-xs text-slate-500 mt-1">버블 크기 = 광고비 규모 · 점 위에 마우스를 올리면 소재 정보가 표시됩니다</p>
+                </div>
+                <span id="scatter-count-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
+            </div>
+            <div style="height: 380px;">
+                <canvas id="scatterChart"></canvas>
+            </div>
+        </section>
+
         <!-- 제품별 소구포인트 인사이트 (이 소구는 좋았다 → 다음에 이렇게) -->
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -485,9 +499,59 @@
                 </div>
             </div>
         </section>
+
+        <!-- ★ 다음 소재는 이렇게 만들어 보세요 (AI 인사이트 탭) -->
+        <section class="mb-6">
+            <div id="next-creative-ai-guide">
+                <!-- 동적 생성 -->
+            </div>
+        </section>
+
         </div>
         <!-- ============ /SECTION: AI INSIGHTS ============ -->
     </main>
+
+    <!-- AI 이미지 프롬프트 Modal -->
+    <div id="creative-prompt-modal" class="modal-overlay hidden">
+        <div class="modal-container" style="max-width:680px;">
+            <button class="modal-close" onclick="document.getElementById('creative-prompt-modal').classList.add('hidden')"><i class="fas fa-times"></i></button>
+            <div class="p-7">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-wand-magic-sparkles text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">AI 이미지 생성 프롬프트</h2>
+                        <p class="text-sm text-slate-500">위너 인사이트 기반 · ChatGPT / DALL-E 3 에 바로 사용</p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">생성된 프롬프트</span>
+                        <button onclick="window.copyCreativePrompt()" class="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1">
+                            <i class="fas fa-copy"></i> 복사
+                        </button>
+                    </div>
+                    <div id="creative-prompt-text" class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-mono bg-white border border-slate-200 rounded-lg p-3 max-h-64 overflow-y-auto"></div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="window.openChatGPT()" class="flex-1 px-4 py-3 bg-[#10a37f] hover:bg-[#0d8a6b] text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-external-link-alt"></i>
+                        ChatGPT에서 열기
+                    </button>
+                    <button onclick="window.copyCreativePrompt()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-copy"></i>
+                        클립보드 복사
+                    </button>
+                </div>
+                <p class="text-xs text-slate-400 mt-3 text-center">
+                    ChatGPT(DALL-E 3) → 이미지 생성 요청 시 위 프롬프트를 붙여넣으세요
+                </p>
+            </div>
+        </div>
+    </div>
 
     <!-- Detail Modal -->
     <div id="detail-modal" class="modal-overlay hidden">

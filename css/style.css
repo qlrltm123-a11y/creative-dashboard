@@ -4182,3 +4182,52 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 3px 8px rgba(139, 92, 246, 0.2);
 }
+
+/* ============================
+   AI 이미지 프롬프트 생성 버튼
+   ============================ */
+.ai-image-gen-wrap {
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%);
+    border: 1.5px dashed #c4b5fd;
+    border-radius: 16px;
+    text-align: center;
+}
+
+.ai-image-gen-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+}
+
+.ai-image-gen-btn:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+.ai-image-gen-badge {
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.25);
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+}
+
+.ai-image-gen-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #7c3aed;
+    opacity: 0.8;
+}

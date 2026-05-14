@@ -303,6 +303,7 @@ function switchSection(sectionName) {
         _renderedSections[sectionName] = true;
         if (sectionName === 'performance') {
             renderPerformanceCriteriaBadge();  // ★ 공통 선정 기준 배지
+            renderScatterChart();
             renderAppealInsight();
             renderProductPerformance();
             renderPlatformCreativeMatrix();
@@ -572,6 +573,7 @@ function syncHiddenAiSelect() {
 // 성과 분석 섹션 컨텐츠만 다시 그리기
 function refreshPerformanceSection() {
     renderPerformanceCriteriaBadge();  // ★ 공통 선정 기준 배지 먼저 갱신
+    renderScatterChart();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
@@ -916,10 +918,10 @@ let scatterMedianInfo = { medianSpend: 0, threshold: 0, qualifiedCount: 0 };
 
 function renderScatterChart() {
     destroyChart('scatter');
-    // ad_name 단위로 합산 + ROAS > 0 필터
+    // ad_name 단위로 합산 + ROAS > 0 필터 (성과 분석 섹션 필터 적용)
     const baseList = (typeof aggregateByAdName === 'function')
-        ? aggregateByAdName(getBrandCreatives())
-        : getBrandCreatives();
+        ? aggregateByAdName(getBrandCreatives('performance'))
+        : getBrandCreatives('performance');
     const roasValid = baseList.filter(c => (c.roas || 0) > 0);
 
     // ★ 중앙값(median) 광고비 이상 소재만 선정
@@ -2140,7 +2142,7 @@ function renderAppealInsight() {
         `;
     }).join('') : '<div class="appeal-suggest-empty">데이터 부족</div>';
 
-    // ★ 개별 배지 제거 — 성과 분석 탭 상단의 공통 선정 기준 배지로 통합
+    // 성과 분석 탭: 위너 소구포인트만 표시
     container.innerHTML = `
         <div class="appeal-insight-grid appeal-insight-grid-single">
             <!-- WINNER 섹션 (LOSER 섹션은 제거됨) -->
@@ -2152,8 +2154,15 @@ function renderAppealInsight() {
                 <div class="appeal-section-body">${winnersHtml}</div>
             </div>
         </div>
+    `;
 
-        <!-- NEXT 추천 박스 — 4개 섹션 강화 -->
+    // AI 인사이트 탭: "다음 소재는 이렇게" 박스 렌더링
+    const aiGuideContainer = document.getElementById('next-creative-ai-guide');
+    if (aiGuideContainer) {
+        // AI 프롬프트 생성용 데이터 저장 (전역)
+        window._lastNextCreativeData = { topWinner, winners, topHooks, topEmotions, topCopies, topMediaType, scopeText };
+
+        aiGuideContainer.innerHTML = `<!-- NEXT 추천 박스 — 4개 섹션 강화 -->
         <div class="appeal-next-box">
             <div class="appeal-next-header">
                 <span class="appeal-next-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
@@ -2276,7 +2285,19 @@ function renderAppealInsight() {
 
             </div>
         </div>
-    `;
+
+        <!-- AI 이미지 프롬프트 생성 버튼 -->
+        <div class="ai-image-gen-wrap">
+            <button class="ai-image-gen-btn" onclick="window.openCreativePromptModal()">
+                <i class="fas fa-wand-magic-sparkles"></i>
+                <span>AI 이미지 프롬프트 생성</span>
+                <span class="ai-image-gen-badge">ChatGPT · DALL-E</span>
+            </button>
+            <p class="ai-image-gen-hint">위 인사이트를 기반으로 ChatGPT/DALL-E에 바로 쓸 수 있는 이미지 생성 프롬프트를 만들어드립니다</p>
+        </div>
+        `;
+        // aiGuideContainer.innerHTML 닫기
+    }
 
     // ★ hover preview 바인딩 — 소구포인트 키워드에 마우스 올리면 대표 소재 카드 표시
     attachAppealInsightHoverPreview(pool);
@@ -3419,6 +3440,81 @@ function openModal(id) {
     document.getElementById('detail-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
+
+// ============================
+// AI 이미지 프롬프트 생성
+// ============================
+window.openCreativePromptModal = function() {
+    const d = window._lastNextCreativeData;
+    const modal = document.getElementById('creative-prompt-modal');
+    const textEl = document.getElementById('creative-prompt-text');
+    if (!modal || !textEl) return;
+
+    const appeal = d?.topWinner?.keyword || '핵심 소구포인트';
+    const hook = d?.topHooks?.[0] || '감성적 후킹';
+    const emotion = d?.topEmotions?.[0] || '공감';
+    const format = d?.topMediaType?.[0] || '이미지';
+    const copy = d?.topCopies?.[0]?.kr || d?.topCopies?.[0]?.jp || '';
+    const scope = d?.scopeText || '해당 제품';
+    const alsoAppeals = (d?.winners || []).slice(1, 3).map(w => w.keyword).join(', ');
+
+    const prompt = `Create a high-quality advertising creative image for a Japanese beauty/cosmetics brand targeting Korean market.
+
+■ Creative Concept
+- Key appeal point: "${appeal}"
+- Hook style: ${hook}
+- Target emotion: ${emotion}
+- Ad format: ${format === '영상' ? 'Video thumbnail / still frame' : format === '캐러셀' ? 'Carousel card (single panel)' : 'Static banner image'}
+${alsoAppeals ? `- Also incorporate: ${alsoAppeals}` : ''}
+
+■ Visual Direction
+- Style: Clean, premium K-beauty aesthetic with soft lighting
+- Layout: Bold headline copy + product hero shot + supporting visual element
+- Mood: ${emotion} — warm, trustworthy, aspirational
+- Color palette: Soft neutrals with accent color matching the brand tone
+
+■ Copy Direction (overlay text)
+${copy ? `- Reference copy: "${copy}"` : `- Emphasize "${appeal}" in the headline`}
+- Keep text minimal, impactful, legible at small sizes
+
+■ Technical Specs
+- Aspect ratio: 1:1 (square) or 4:5 (portrait) for social feed
+- High resolution, clean composition
+- No watermarks or placeholder text
+
+Produce a photorealistic or clean digital illustration style image suitable for Meta/Instagram ads targeting ${scope} audience.`;
+
+    textEl.textContent = prompt;
+    window._currentPrompt = prompt;
+    modal.classList.remove('hidden');
+};
+
+window.copyCreativePrompt = function() {
+    const prompt = window._currentPrompt || '';
+    if (!prompt) return;
+    navigator.clipboard.writeText(prompt).then(() => {
+        const btn = document.querySelector('#creative-prompt-modal .fa-copy')?.closest('button');
+        if (btn) {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> 복사됨!';
+            setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        }
+    }).catch(() => {
+        const textEl = document.getElementById('creative-prompt-text');
+        if (textEl) {
+            const range = document.createRange();
+            range.selectNode(textEl);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+        }
+    });
+};
+
+window.openChatGPT = function() {
+    window.copyCreativePrompt();
+    window.open('https://chat.openai.com/', '_blank');
+};
 
 function closeModal() {
     document.getElementById('detail-modal').classList.add('hidden');
