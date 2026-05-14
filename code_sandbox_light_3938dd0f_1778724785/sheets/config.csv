@@ -1,0 +1,24 @@
+brand,color,manager,budget_monthly
+BOH,#FF6B35,담당자명,10000000
+WM,#4A90E2,담당자명,8000000
+CG,#A78BFA,담당자명,12000000
+
+channel,type,billing,platform_url
+Meta,SNS/피드,CPC/CPM,https://business.facebook.com
+Google,검색/디스플레이,CPC/CPM,https://ads.google.com
+Kakao,SNS/DA,CPM,https://moment.kakao.com
+Naver,검색/DA,CPC/CPM,https://searchad.naver.com
+TikTok,숏폼/SNS,CPM,https://ads.tiktok.com
+YouTube,동영상,CPV/CPM,https://ads.google.com
+
+type,status,concept
+image,active,신메뉴 프로모션
+video,paused,브랜드 인지도
+,ended,프로모션/할인
+,,리타겟팅
+,,신규 획득
+,,서비스 인지도
+,,프로모션/쿠폰
+,,멤버십/구독
+,,바이럴/챌린지
+,,신상품 출시
