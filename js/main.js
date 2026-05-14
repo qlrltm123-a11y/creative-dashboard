@@ -17,7 +17,6 @@ const BRAND_COLORS = {
     BOH: '#f43f5e',
     WM: '#10b981',
     CG: '#f59e0b',
-    RETAIL: '#8b5cf6'
 };
 
 const PLATFORM_COLORS = {
@@ -815,7 +814,7 @@ function destroyChart(key) {
 
 function renderBrandChart() {
     destroyChart('brand');
-    const brands = ['BOH', 'WM', 'CG', 'RETAIL'];
+    const brands = ['BOH', 'WM', 'CG'];
     const data = brands.map(b => {
         const list = allCreatives.filter(c => c.brand === b);
         const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
@@ -931,7 +930,7 @@ function renderScatterChart() {
 
     scatterCreativeMap = {};
     let totalCount = 0;
-    const datasets = ['BOH', 'WM', 'CG', 'RETAIL'].map(brand => {
+    const datasets = ['BOH', 'WM', 'CG'].map(brand => {
         // 브랜드별 광고비 상위 N개만 추림 (시각화 가독성 ↑)
         const brandList = medianFiltered
             .filter(c => c.brand === brand)
