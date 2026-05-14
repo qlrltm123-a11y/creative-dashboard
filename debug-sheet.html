@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Sheet 디버그 도구</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; max-width: 1200px; margin: 20px auto; padding: 20px; background: #f8fafc; }
+        h1 { color: #4338ca; }
+        .box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-family: monospace; font-size: 12px; }
+        button { padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-right: 8px; }
+        button:hover { background: #4f46e5; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 12px; max-height: 400px; }
+        .ok { color: #10b981; font-weight: 700; }
+        .err { color: #ef4444; font-weight: 700; }
+        .warn { color: #f59e0b; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+        th, td { border: 1px solid #e2e8f0; padding: 6px 10px; text-align: left; }
+        th { background: #f1f5f9; }
+        .step { margin: 8px 0; padding: 8px; border-left: 3px solid #6366f1; background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Google Sheets 연동 디버그 도구</h1>
+
+    <div class="box">
+        <h3>1️⃣ CSV URL 입력</h3>
+        <textarea id="url" rows="3" placeholder="시트 게시 CSV URL 붙여넣기">https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1561941261&single=true&output=csv</textarea>
+        <div style="margin-top: 10px;">
+            <button onclick="runDiagnostic()">🔍 진단 시작</button>
+            <button onclick="document.getElementById('result').innerHTML=''">🗑️ 결과 지우기</button>
+        </div>
+    </div>
+
+    <div id="result"></div>
+
+<script>
+async function runDiagnostic() {
+    const url = document.getElementById('url').value.trim();
+    const result = document.getElementById('result');
+    result.innerHTML = '<div class="box">⏳ 진단 중...</div>';
+
+    let html = '';
+
+    // Step 1: URL 형식 검증
+    html += '<div class="box"><h3>📋 진단 결과</h3>';
+    html += '<div class="step"><b>Step 1: URL 형식 검증</b><br>';
+    if (!url.includes('docs.google.com')) {
+        html += '<span class="err">❌ Google Sheets URL이 아닙니다.</span></div>';
+        result.innerHTML = html + '</div>';
+        return;
+    }
+    if (!url.includes('output=csv')) {
+        html += '<span class="err">❌ CSV 출력 형식이 아닙니다. URL 끝에 output=csv가 있어야 합니다.</span></div>';
+        result.innerHTML = html + '</div>';
+        return;
+    }
+    html += '<span class="ok">✅ URL 형식 OK</span></div>';
+
+    // Step 2: Fetch 시도
+    html += '<div class="step"><b>Step 2: CSV 다운로드 시도</b><br>';
+    let text;
+    try {
+        const res = await fetch(url, { cache: 'no-store' });
+        html += `HTTP 상태: <b>${res.status} ${res.statusText}</b><br>`;
+        html += `Content-Type: <code>${res.headers.get('content-type')}</code><br>`;
+        if (!res.ok) {
+            html += '<span class="err">❌ 다운로드 실패</span></div>';
+            result.innerHTML = html + '</div>';
+            return;
+        }
+        text = await res.text();
+        html += `다운로드 크기: <b>${text.length} bytes</b><br>`;
+        html += '<span class="ok">✅ 다운로드 OK</span></div>';
+    } catch (e) {
+        html += `<span class="err">❌ 에러: ${e.message}</span></div>`;
+        result.innerHTML = html + '</div>';
+        return;
+    }
+
+    // Step 3: HTML 응답 체크
+    html += '<div class="step"><b>Step 3: 응답 내용 검증</b><br>';
+    if (text.includes('<!DOCTYPE') || text.includes('<HTML') || text.includes('<html')) {
+        html += '<span class="err">❌ CSV가 아닌 HTML이 반환되었습니다!</span><br>';
+        html += '원인: 시트가 웹에 게시되지 않았거나, URL이 잘못되었습니다.<br>';
+        html += '해결: Google Sheets → 파일 → 공유 → 웹에 게시 → CSV로 게시<br>';
+        html += '<details><summary>응답 일부 보기 (처음 500자)</summary><pre>' + escapeHtml(text.substring(0, 500)) + '</pre></details>';
+        html += '</div>';
+        result.innerHTML = html + '</div>';
+        return;
+    }
+    html += '<span class="ok">✅ CSV 형식 OK</span></div>';
+
+    // Step 4: 처음 1000자 미리보기
+    html += '<div class="step"><b>Step 4: 원본 CSV 미리보기 (처음 1500자)</b>';
+    html += '<pre>' + escapeHtml(text.substring(0, 1500)) + (text.length > 1500 ? '\n\n... (이하 생략)' : '') + '</pre>';
+    html += '</div>';
+
+    // Step 5: 파싱
+    html += '<div class="step"><b>Step 5: CSV 파싱</b><br>';
+    const rows = parseCSV(text.trim());
+    html += `총 행 수: <b>${rows.length}</b> (헤더 1행 + 데이터 ${rows.length - 1}행)<br>`;
+
+    if (rows.length < 2) {
+        html += '<span class="err">❌ 데이터 행이 없습니다. 헤더만 있고 데이터가 없거나, 빈 시트입니다.</span></div>';
+        result.innerHTML = html + '</div>';
+        return;
+    }
+    html += '<span class="ok">✅ 파싱 OK</span></div>';
+
+    // Step 6: 헤더 분석
+    html += '<div class="step"><b>Step 6: 헤더(첫 행) 분석</b><br>';
+    const headers = rows[0];
+    html += `컬럼 개수: <b>${headers.length}</b><br>`;
+    html += '<table><thead><tr><th>#</th><th>원본 헤더</th><th>소문자 변환</th><th>매핑 결과</th><th>상태</th></tr></thead><tbody>';
+    headers.forEach((h, i) => {
+        const raw = h.trim();
+        const lower = raw.toLowerCase();
+        const mapped = COLUMN_ALIASES[lower] || lower;
+        const isMapped = COLUMN_ALIASES[lower] !== undefined;
+        html += `<tr><td>${i+1}</td><td><code>${escapeHtml(raw)}</code></td><td><code>${escapeHtml(lower)}</code></td><td><code>${escapeHtml(mapped)}</code></td><td>${isMapped ? '<span class="ok">✓ 매핑됨</span>' : '<span class="warn">미매핑</span>'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+
+    // 중요 컬럼 체크
+    const mappedHeaders = headers.map(h => COLUMN_ALIASES[h.trim().toLowerCase()] || h.trim().toLowerCase());
+    const hasCreativeName = mappedHeaders.includes('creative_name') || mappedHeaders.includes('ad_name');
+    html += '<br>';
+    html += hasCreativeName
+        ? '<span class="ok">✅ creative_name 또는 ad_name 컬럼 발견</span>'
+        : '<span class="err">❌ creative_name/ad_name으로 매핑된 컬럼 없음! 광고명 컬럼의 헤더가 무엇인지 위 표에서 확인하세요.</span>';
+    html += '</div>';
+
+    // Step 7: 첫 데이터 행 샘플
+    html += '<div class="step"><b>Step 7: 첫 데이터 행 샘플</b>';
+    html += '<table><thead><tr><th>컬럼명 (매핑)</th><th>값</th></tr></thead><tbody>';
+    const firstRow = rows[1];
+    headers.forEach((h, i) => {
+        const lower = h.trim().toLowerCase();
+        const mapped = COLUMN_ALIASES[lower] || lower;
+        const val = (firstRow[i] || '').trim();
+        const isEmpty = !val;
+        html += `<tr><td><code>${escapeHtml(mapped)}</code></td><td>${isEmpty ? '<span class="warn">(빈값)</span>' : escapeHtml(val.substring(0, 200))}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // Step 8: 빈 행 분석
+    html += '<div class="step"><b>Step 8: 행별 데이터 유무 분석</b><br>';
+    let emptyRows = 0, validRows = 0;
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const hasAny = row.some(c => c && c.trim() !== '');
+        if (hasAny) validRows++;
+        else emptyRows++;
+    }
+    html += `유효 행: <b class="ok">${validRows}개</b>, 빈 행: <b>${emptyRows}개</b><br>`;
+    html += '</div>';
+
+    html += '</div>';
+    result.innerHTML = html;
+}
+
+// 대시보드와 동일한 별칭 매핑
+const COLUMN_ALIASES = {
+    'media': 'platform', 'platform': 'platform', '매체': 'platform', '플랫폼': 'platform',
+    'cost': 'spend', 'spend': 'spend', '광고비': 'spend', '비용': 'spend',
+    'sales': 'revenue', 'revenue': 'revenue', '매출': 'revenue', '매출액': 'revenue',
+    'date': 'start_date', 'start_date': 'start_date', '개시일': 'start_date', '날짜': 'start_date', '시작일': 'start_date',
+    'media_url': 'media_url', 'thumbnail_url': 'media_url', 'video_url': 'media_url', 'url': 'media_url',
+    '소재url': 'media_url', '소재링크': 'media_url', '미디어': 'media_url',
+    'creative_name': 'creative_name', 'ad_name': 'ad_name',
+    '광고명': 'ad_name', '소재명': 'creative_name', '광고소재': 'creative_name', '광고소재명': 'creative_name',
+    'name': 'creative_name', 'ad name': 'ad_name',
+    'product': 'product', '제품': 'product', '제품명': 'product',
+    'id': 'id', 'brand': 'brand', '브랜드': 'brand',
+    'media_type': 'media_type', '소재타입': 'media_type',
+    'campaign_type': 'campaign_type', '캠페인타입': 'campaign_type',
+    'campaign_name': 'campaign_name', '캠페인명': 'campaign_name',
+    'adgroup_name': 'adgroup_name', '광고그룹': 'adgroup_name',
+    'impressions': 'impressions', '노출수': 'impressions', '노출': 'impressions',
+    'clicks': 'clicks', '클릭수': 'clicks', '클릭': 'clicks',
+    'ctr': 'ctr', 'cpc': 'cpc', 'cvr': 'cvr',
+    'conversions': 'conversions', '전환수': 'conversions', '전환': 'conversions',
+    'cpa': 'cpa', 'roas': 'roas',
+    'status': 'status', '상태': 'status',
+    'appeal_points': 'appeal_points', '소구포인트': 'appeal_points',
+    'hook_type': 'hook_type', '후킹': 'hook_type',
+    'target_emotion': 'target_emotion', '감정': 'target_emotion',
+    'key_message_jp': 'key_message_jp', 'key_message_kr': 'key_message_kr',
+    '카피_jp': 'key_message_jp', '카피_kr': 'key_message_kr'
+};
+
+function parseCSV(text) {
+    const rows = []; let current = []; let field = ''; let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i], next = text[i + 1];
+        if (inQuotes) {
+            if (ch === '"' && next === '"') { field += '"'; i++; }
+            else if (ch === '"') inQuotes = false;
+            else field += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ',') { current.push(field); field = ''; }
+            else if (ch === '\n' || ch === '\r') {
+                if (field !== '' || current.length > 0) {
+                    current.push(field); rows.push(current); current = []; field = '';
+                }
+                if (ch === '\r' && next === '\n') i++;
+            } else field += ch;
+        }
+    }
+    if (field !== '' || current.length > 0) { current.push(field); rows.push(current); }
+    return rows;
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>

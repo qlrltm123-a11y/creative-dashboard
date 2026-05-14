@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>데이터 일치 검증 도구</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { font-family: 'Pretendard', sans-serif; }
+        .num { font-variant-numeric: tabular-nums; }
+        .diff-bad { background: #fef2f2; color: #b91c1c; font-weight: 700; }
+        .diff-ok { color: #16a34a; font-weight: 600; }
+        .data-table { font-size: 11px; }
+        .data-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; }
+        .data-table td { padding: 4px 8px; border: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body class="bg-slate-50 p-6">
+    <div class="max-w-[1400px] mx-auto">
+        <h1 class="text-2xl font-bold text-slate-900 mb-2">🔍 시트 ↔ 대시보드 데이터 일치 검증</h1>
+        <p class="text-sm text-slate-600 mb-6">시트 원본 데이터와 대시보드가 집계한 결과를 비교하여 차이를 찾아냅니다.</p>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+            <label class="block text-sm font-semibold text-slate-700 mb-2">📋 게시된 CSV URL</label>
+            <textarea id="url" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+                placeholder="https://docs.google.com/spreadsheets/d/e/...">https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1561941261&single=true&output=csv</textarea>
+            <button onclick="runCheck()" class="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">
+                🔍 데이터 일치 검증 시작
+            </button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+<script>
+// 대시보드와 동일한 별칭 매핑
+const COLUMN_ALIASES = {
+    'media': 'platform', 'platform': 'platform', '매체': 'platform', '플랫폼': 'platform',
+    'cost': 'spend', 'spend': 'spend', '광고비': 'spend', '비용': 'spend',
+    'sales': 'revenue', 'revenue': 'revenue', '매출': 'revenue', '매출액': 'revenue',
+    'date': 'start_date', 'start_date': 'start_date', '개시일': 'start_date', '날짜': 'start_date', '시작일': 'start_date',
+    'media_url': 'media_url', 'thumbnail_url': 'media_url', 'video_url': 'media_url', 'url': 'media_url',
+    '소재url': 'media_url', '소재링크': 'media_url', '미디어': 'media_url',
+    'creative_name': 'creative_name', 'ad_name': 'ad_name',
+    '광고명': 'ad_name', '소재명': 'creative_name', '광고소재': 'creative_name', '광고소재명': 'creative_name',
+    'name': 'creative_name', 'ad name': 'ad_name',
+    'product': 'product', '제품': 'product', '제품명': 'product',
+    'id': 'id', 'brand': 'brand', '브랜드': 'brand',
+    'media_type': 'media_type', '소재타입': 'media_type',
+    'campaign_type': 'campaign_type', '캠페인타입': 'campaign_type',
+    'campaign_name': 'campaign_name', '캠페인명': 'campaign_name',
+    'adgroup_name': 'adgroup_name', '광고그룹': 'adgroup_name',
+    'impressions': 'impressions', '노출수': 'impressions', '노출': 'impressions',
+    'clicks': 'clicks', '클릭수': 'clicks', '클릭': 'clicks',
+    'ctr': 'ctr', 'cpc': 'cpc', 'cvr': 'cvr',
+    'conversions': 'conversions', '전환수': 'conversions', '전환': 'conversions',
+    'cpa': 'cpa', 'roas': 'roas',
+    'status': 'status', '상태': 'status',
+    'appeal_points': 'appeal_points', '소구포인트': 'appeal_points',
+    'hook_type': 'hook_type', '후킹': 'hook_type',
+    'target_emotion': 'target_emotion', '감정': 'target_emotion',
+    'key_message_jp': 'key_message_jp', 'key_message_kr': 'key_message_kr',
+    '카피_jp': 'key_message_jp', '카피_kr': 'key_message_kr'
+};
+
+function parseCSV(text) {
+    const rows = []; let current = []; let field = ''; let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i], next = text[i + 1];
+        if (inQuotes) {
+            if (ch === '"' && next === '"') { field += '"'; i++; }
+            else if (ch === '"') inQuotes = false;
+            else field += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ',') { current.push(field); field = ''; }
+            else if (ch === '\n' || ch === '\r') {
+                if (field !== '' || current.length > 0) {
+                    current.push(field); rows.push(current); current = []; field = '';
+                }
+                if (ch === '\r' && next === '\n') i++;
+            } else field += ch;
+        }
+    }
+    if (field !== '' || current.length > 0) { current.push(field); rows.push(current); }
+    return rows;
+}
+
+function formatNum(n) {
+    if (typeof n !== 'number' || isNaN(n)) return '-';
+    if (n >= 100000000) return (n/100000000).toFixed(2) + '억';
+    if (n >= 10000) return (n/10000).toFixed(1) + '만';
+    return n.toLocaleString();
+}
+
+async function runCheck() {
+    const url = document.getElementById('url').value.trim();
+    const result = document.getElementById('result');
+    result.innerHTML = '<div class="bg-white rounded-xl border border-slate-200 p-5">⏳ 검증 중...</div>';
+
+    try {
+        const res = await fetch(url, { cache: 'no-store' });
+        const text = await res.text();
+        const rows = parseCSV(text.trim());
+        if (rows.length < 2) {
+            result.innerHTML = '<div class="bg-rose-50 border border-rose-200 rounded-xl p-5">❌ 데이터가 없습니다.</div>';
+            return;
+        }
+
+        const rawHeaders = rows[0].map(h => h.trim().toLowerCase());
+        const headers = rawHeaders.map(h => COLUMN_ALIASES[h] || h);
+
+        // 📊 1. 시트 원본 집계 (raw CSV 그대로)
+        const rawStats = computeRawStats(rows);
+
+        // 📊 2. 대시보드 파싱 시뮬레이션
+        const dashboardData = csvToDashboardData(rows, headers);
+        const dashStats = computeDashboardStats(dashboardData);
+
+        // 📊 3. 비교 결과 렌더링
+        let html = '';
+
+        // 헤더 매핑 표
+        html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
+        html += '<h2 class="text-lg font-bold text-slate-900 mb-3">📋 컬럼 매핑 결과</h2>';
+        html += '<table class="data-table w-full">';
+        html += '<thead><tr><th>#</th><th>원본 헤더</th><th>매핑 결과</th><th>상태</th></tr></thead><tbody>';
+        rawHeaders.forEach((h, i) => {
+            const isMapped = COLUMN_ALIASES[h] !== undefined;
+            html += `<tr><td>${i+1}</td><td><code>${escapeHtml(rows[0][i])}</code></td><td><code>${escapeHtml(headers[i])}</code></td><td>${isMapped ? '<span class="diff-ok">✓ 매핑</span>' : '<span class="text-slate-400">- 원본 그대로</span>'}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+
+        // KPI 비교
+        html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
+        html += '<h2 class="text-lg font-bold text-slate-900 mb-3">📊 시트 원본 vs 대시보드 KPI 비교</h2>';
+        html += '<table class="data-table w-full">';
+        html += '<thead><tr><th>지표</th><th class="text-right">시트 원본 (raw CSV 합계)</th><th class="text-right">대시보드 (파싱 후 합계)</th><th class="text-right">차이</th></tr></thead><tbody>';
+        const metrics = [
+            { key: 'impressions', label: '총 노출수' },
+            { key: 'clicks', label: '총 클릭수' },
+            { key: 'spend', label: '총 광고비' },
+            { key: 'conversions', label: '총 전환수' },
+            { key: 'revenue', label: '총 매출' }
+        ];
+        metrics.forEach(m => {
+            const raw = rawStats[m.key] || 0;
+            const dash = dashStats[m.key] || 0;
+            const diff = dash - raw;
+            const diffClass = Math.abs(diff) < 0.01 ? 'diff-ok' : 'diff-bad';
+            const diffText = Math.abs(diff) < 0.01 ? '✓ 일치' : `❌ ${diff > 0 ? '+' : ''}${formatNum(diff)}`;
+            html += `<tr><td><b>${m.label}</b></td><td class="text-right num">${formatNum(raw)}</td><td class="text-right num">${formatNum(dash)}</td><td class="text-right ${diffClass}">${diffText}</td></tr>`;
+        });
+        html += '</tbody></table>';
+
+        // 행 수 비교
+        html += '<div class="mt-4 pt-4 border-t border-slate-200">';
+        html += `<p class="text-sm"><b>시트 데이터 행 수:</b> ${rows.length - 1}행</p>`;
+        html += `<p class="text-sm"><b>대시보드 인식 행 수:</b> ${dashboardData.length}행</p>`;
+        if (rows.length - 1 !== dashboardData.length) {
+            html += `<p class="text-sm diff-bad mt-1">⚠️ ${(rows.length - 1) - dashboardData.length}개 행이 필터링되었습니다!</p>`;
+        } else {
+            html += '<p class="text-sm diff-ok mt-1">✓ 모든 행이 정상 인식됨</p>';
+        }
+        html += '</div>';
+        html += '</div>';
+
+        // 브랜드별 비교
+        html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
+        html += '<h2 class="text-lg font-bold text-slate-900 mb-3">🏷️ 브랜드별 데이터 분포</h2>';
+        const brandCounts = {};
+        dashboardData.forEach(d => {
+            const b = d.brand || '(빈값)';
+            brandCounts[b] = (brandCounts[b] || 0) + 1;
+        });
+        html += '<table class="data-table w-full">';
+        html += '<thead><tr><th>브랜드</th><th class="text-right">행 수</th><th class="text-right">광고비 합계</th><th class="text-right">매출 합계</th></tr></thead><tbody>';
+        Object.keys(brandCounts).forEach(b => {
+            const list = dashboardData.filter(d => (d.brand || '(빈값)') === b);
+            const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
+            const revenue = list.reduce((s, c) => s + (c.revenue || 0), 0);
+            html += `<tr><td><b>${escapeHtml(b)}</b></td><td class="text-right">${list.length}개</td><td class="text-right num">${formatNum(spend)}</td><td class="text-right num">${formatNum(revenue)}</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+
+        // 데이터 샘플 (처음 5행)
+        html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
+        html += '<h2 class="text-lg font-bold text-slate-900 mb-3">🔍 데이터 샘플 (처음 5행)</h2>';
+        html += '<div class="overflow-x-auto"><table class="data-table">';
+        const keys = ['brand', 'creative_name', 'ad_name', 'platform', 'impressions', 'clicks', 'spend', 'conversions', 'revenue'];
+        html += '<thead><tr>';
+        keys.forEach(k => html += `<th>${k}</th>`);
+        html += '</tr></thead><tbody>';
+        dashboardData.slice(0, 5).forEach(d => {
+            html += '<tr>';
+            keys.forEach(k => {
+                const v = d[k];
+                const display = typeof v === 'number' ? formatNum(v) : (v || '').toString().substring(0, 40);
+                html += `<td>${escapeHtml(display)}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div></div>';
+
+        // 진단 결과
+        html += renderDiagnosis(rawStats, dashStats, rows, dashboardData, headers);
+
+        result.innerHTML = html;
+    } catch (e) {
+        result.innerHTML = `<div class="bg-rose-50 border border-rose-200 rounded-xl p-5"><b>❌ 에러:</b> ${e.message}</div>`;
+    }
+}
+
+// 시트 raw 데이터에서 직접 집계 (대시보드 파싱 무관)
+function computeRawStats(rows) {
+    const headers = rows[0].map(h => h.trim().toLowerCase());
+    const stats = { impressions: 0, clicks: 0, spend: 0, conversions: 0, revenue: 0 };
+
+    // 헤더의 위치 찾기 (한국어/영어 모두)
+    const findCol = (...names) => {
+        for (const name of names) {
+            const idx = headers.indexOf(name);
+            if (idx !== -1) return idx;
+        }
+        return -1;
+    };
+
+    const cols = {
+        impressions: findCol('impressions', '노출수', '노출'),
+        clicks: findCol('clicks', '클릭수', '클릭'),
+        spend: findCol('spend', 'cost', '광고비', '비용'),
+        conversions: findCol('conversions', '전환수', '전환'),
+        revenue: findCol('revenue', 'sales', '매출', '매출액')
+    };
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        Object.keys(cols).forEach(k => {
+            if (cols[k] === -1) return;
+            const val = parseFloat((row[cols[k]] || '').toString().replace(/,/g, '')) || 0;
+            stats[k] += val;
+        });
+    }
+
+    return stats;
+}
+
+// 대시보드 파싱 시뮬레이션
+function csvToDashboardData(rows, headers) {
+    const numberFields = ['impressions', 'clicks', 'ctr', 'spend', 'conversions', 'cpa', 'roas', 'revenue', 'cpc', 'cvr'];
+    return rows.slice(1).map((row, idx) => {
+        const obj = {};
+        headers.forEach((key, i) => {
+            let val = (row[i] || '').trim();
+            if (numberFields.includes(key)) {
+                val = val === '' ? 0 : parseFloat(val.replace(/,/g, '')) || 0;
+            }
+            obj[key] = val;
+        });
+        if (!obj.creative_name && obj.ad_name) obj.creative_name = obj.ad_name;
+        if (!obj.creative_name) obj.creative_name = `소재 #${idx + 1}`;
+        if (!obj.brand) obj.brand = 'ALL';
+        return obj;
+    }).filter(o => {
+        return Object.values(o).some(v => {
+            if (Array.isArray(v)) return v.length > 0;
+            return v !== '' && v !== 0 && v != null;
+        });
+    });
+}
+
+function computeDashboardStats(data) {
+    return {
+        impressions: data.reduce((s, c) => s + (c.impressions || 0), 0),
+        clicks: data.reduce((s, c) => s + (c.clicks || 0), 0),
+        spend: data.reduce((s, c) => s + (c.spend || 0), 0),
+        conversions: data.reduce((s, c) => s + (c.conversions || 0), 0),
+        revenue: data.reduce((s, c) => s + (c.revenue || 0), 0)
+    };
+}
+
+function renderDiagnosis(rawStats, dashStats, rows, dashData, headers) {
+    let html = '<div class="bg-amber-50 border border-amber-200 rounded-xl p-5"><h2 class="text-lg font-bold text-amber-900 mb-3">🩺 진단 결과</h2><ul class="space-y-2 text-sm text-amber-900">';
+    let issueCount = 0;
+
+    // 1. 행 수 차이
+    if (rows.length - 1 !== dashData.length) {
+        issueCount++;
+        html += `<li>⚠️ <b>행 수 불일치</b>: 시트 ${rows.length - 1}행 → 대시보드 ${dashData.length}행 (${(rows.length - 1) - dashData.length}개 누락)</li>`;
+    }
+
+    // 2. 숫자 컬럼 차이
+    ['impressions', 'clicks', 'spend', 'conversions', 'revenue'].forEach(k => {
+        const diff = Math.abs((dashStats[k] || 0) - (rawStats[k] || 0));
+        if (diff > 0.01) {
+            issueCount++;
+            html += `<li>⚠️ <b>${k} 수치 차이</b>: ${formatNum(diff)} 차이 (쉼표/공백/숫자 형식 이슈 의심)</li>`;
+        }
+    });
+
+    // 3. 필수 컬럼 누락 체크
+    const requiredCols = ['brand', 'impressions', 'clicks', 'spend'];
+    requiredCols.forEach(col => {
+        if (!headers.includes(col)) {
+            issueCount++;
+            html += `<li>⚠️ <b>${col} 컬럼 미인식</b>: 시트에 해당 컬럼이 없거나 매핑되지 않음</li>`;
+        }
+    });
+
+    // 4. brand 분포 체크
+    const brands = new Set(dashData.map(d => d.brand));
+    if (brands.size === 1 && brands.has('ALL')) {
+        issueCount++;
+        html += `<li>⚠️ <b>브랜드 정보 없음</b>: 모든 행의 brand가 비어있어 기본값(ALL)로 처리됨. 브랜드 필터 작동 안 함</li>`;
+    }
+    if (brands.has('') || brands.has('(빈값)')) {
+        issueCount++;
+        html += `<li>⚠️ <b>일부 행의 brand가 비어있음</b>: 브랜드별 차트에 누락될 수 있음</li>`;
+    }
+
+    // 5. 0값 행 체크
+    const zeroRows = dashData.filter(d => !d.impressions && !d.clicks && !d.spend);
+    if (zeroRows.length > 0) {
+        html += `<li>ℹ️ <b>${zeroRows.length}개 행이 모든 지표가 0</b>: 광고 미집행 또는 데이터 미입력</li>`;
+    }
+
+    if (issueCount === 0) {
+        html += '<li class="diff-ok">✅ 데이터가 시트와 정확히 일치합니다!</li>';
+    }
+
+    html += '</ul>';
+
+    // 해결 가이드
+    if (issueCount > 0) {
+        html += '<div class="mt-4 pt-4 border-t border-amber-300"><h3 class="font-bold mb-2">💡 해결 가이드</h3><ul class="space-y-1 text-xs">';
+        html += '<li>• <b>숫자 차이</b>: 시트에서 쉼표(,)나 통화기호(₩, $) 제거 / 셀 서식을 "숫자"로 변경</li>';
+        html += '<li>• <b>컬럼 미인식</b>: 시트 헤더를 표준 이름으로 변경 또는 코드의 COLUMN_ALIASES에 별칭 추가</li>';
+        html += '<li>• <b>브랜드 누락</b>: brand 컬럼에 BOH/WM/CG 중 하나가 입력되어 있어야 함</li>';
+        html += '<li>• <b>행 누락</b>: 빈 행이 있거나, 모든 컬럼이 비어있는 행이 있음</li>';
+        html += '</ul></div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
