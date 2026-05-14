@@ -220,10 +220,19 @@ function showPreview(keyword, field, evt) {
         el.onclick = null;
     }
 
-    // ★ 카드 내부에서 발생한 wheel은 외부 페이지 스크롤로 새지 않도록 stop
-    //    (스크롤 가능한 preview-body 자체는 정상적으로 스크롤됨)
+    // ★ preview-body 직접 스크롤 처리 — 외부 페이지 스크롤 차단
+    const bodyEl = el.querySelector('.preview-body');
+    if (bodyEl) {
+        bodyEl.onwheel = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            bodyEl.scrollTop += e.deltaY;
+            previewPinned = true;
+            clearTimeout(hidePreviewTimer);
+            hidePreviewTimer = null;
+        };
+    }
     el.onwheel = (e) => {
-        // pinned 유지 + 외부 스크롤 차단 (preview-body 내부 스크롤은 정상 동작)
         e.stopPropagation();
         previewPinned = true;
         clearTimeout(hidePreviewTimer);
