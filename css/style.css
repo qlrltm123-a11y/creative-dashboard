@@ -2839,7 +2839,7 @@ body {
     left: -24px;
     right: 0;            /* ★ 우측은 카드 끝과 동일 — 스크롤바 영역 침범 금지 */
     bottom: -24px;
-    pointer-events: auto;
+    pointer-events: none;
     background: transparent;
     /* stacking context를 만들지 않도록 z-index 미지정 — DOM 순서상 카드 콘텐츠 뒤에 위치 */
     border-radius: 24px;
