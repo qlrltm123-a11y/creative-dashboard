@@ -3541,18 +3541,13 @@ window.generateDalleImage = async function() {
 
     try {
         const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    instances: [{ prompt }],
-                    parameters: {
-                        sampleCount: 1,
-                        aspectRatio,
-                        safetyFilterLevel: 'block_some',
-                        personGeneration: 'allow_adult'
-                    }
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
                 })
             }
         );
@@ -3564,10 +3559,12 @@ window.generateDalleImage = async function() {
             throw new Error(msg);
         }
 
-        const b64 = json?.predictions?.[0]?.bytesBase64Encoded;
-        const mime = json?.predictions?.[0]?.mimeType || 'image/png';
-        if (!b64) throw new Error('이미지 데이터를 받지 못했습니다.');
+        const parts = json?.candidates?.[0]?.content?.parts || [];
+        const imgPart = parts.find(p => p.inlineData);
+        if (!imgPart) throw new Error('이미지 데이터를 받지 못했습니다. 프롬프트를 수정해보세요.');
 
+        const b64 = imgPart.inlineData.data;
+        const mime = imgPart.inlineData.mimeType || 'image/png';
         const dataUrl = `data:${mime};base64,${b64}`;
 
         const img = document.getElementById('ai-gen-result-img');
