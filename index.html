@@ -511,44 +511,79 @@
         <!-- ============ /SECTION: AI INSIGHTS ============ -->
     </main>
 
-    <!-- AI 이미지 프롬프트 Modal -->
-    <div id="creative-prompt-modal" class="modal-overlay hidden">
-        <div class="modal-container" style="max-width:680px;">
+    <!-- AI 이미지 생성 Modal -->
+    <div id="creative-prompt-modal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="modal-container ai-gen-modal">
             <button class="modal-close" onclick="document.getElementById('creative-prompt-modal').classList.add('hidden')"><i class="fas fa-times"></i></button>
-            <div class="p-7">
+            <div class="p-6">
+                <!-- 헤더 -->
                 <div class="flex items-center gap-3 mb-5">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-wand-magic-sparkles text-white text-xl"></i>
+                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-image text-white"></i>
                     </div>
                     <div>
-                        <h2 class="text-xl font-bold text-slate-900">AI 이미지 생성 프롬프트</h2>
-                        <p class="text-sm text-slate-500">위너 인사이트 기반 · ChatGPT / DALL-E 3 에 바로 사용</p>
+                        <h2 class="text-lg font-bold text-slate-900">AI 광고 소재 이미지 생성</h2>
+                        <p class="text-xs text-slate-500">위너 인사이트 기반 프롬프트 · DALL-E 3 직접 생성</p>
                     </div>
                 </div>
 
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">생성된 프롬프트</span>
-                        <button onclick="window.copyCreativePrompt()" class="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1">
-                            <i class="fas fa-copy"></i> 복사
+                <!-- API Key -->
+                <div class="ai-gen-section mb-4">
+                    <label class="ai-gen-label">OpenAI API Key</label>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input id="ai-apikey-input" type="password" placeholder="sk-..." class="ai-gen-input pr-10">
+                            <button onclick="window.toggleApiKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                <i id="ai-apikey-eye" class="fas fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                        <button onclick="window.saveApiKey()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition whitespace-nowrap">저장</button>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다</p>
+                </div>
+
+                <!-- 프롬프트 -->
+                <div class="ai-gen-section mb-4">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="ai-gen-label">프롬프트 <span class="text-xs font-normal text-slate-400">(수정 가능)</span></label>
+                        <div class="flex gap-2">
+                            <select id="ai-gen-size" class="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-600">
+                                <option value="1024x1024">1:1 정사각형</option>
+                                <option value="1792x1024">16:9 가로</option>
+                                <option value="1024x1792">9:16 세로</option>
+                            </select>
+                            <select id="ai-gen-quality" class="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-600">
+                                <option value="standard">Standard</option>
+                                <option value="hd">HD</option>
+                            </select>
+                        </div>
+                    </div>
+                    <textarea id="creative-prompt-text" rows="7" class="ai-gen-textarea"></textarea>
+                </div>
+
+                <!-- 생성 버튼 -->
+                <button id="ai-gen-btn" onclick="window.generateDalleImage()" class="ai-gen-submit-btn w-full mb-4">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span id="ai-gen-btn-label">이미지 생성하기</span>
+                </button>
+
+                <!-- 결과 -->
+                <div id="ai-gen-result" class="hidden">
+                    <div class="ai-gen-result-wrap">
+                        <img id="ai-gen-result-img" src="" alt="생성된 이미지" class="ai-gen-result-img">
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <a id="ai-gen-download-btn" href="#" download="creative-ai.png" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition">
+                            <i class="fas fa-download"></i> 이미지 저장
+                        </a>
+                        <button onclick="window.generateDalleImage()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition">
+                            <i class="fas fa-rotate-right"></i> 다시 생성
                         </button>
                     </div>
-                    <div id="creative-prompt-text" class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-mono bg-white border border-slate-200 rounded-lg p-3 max-h-64 overflow-y-auto"></div>
                 </div>
 
-                <div class="flex gap-3">
-                    <button onclick="window.openChatGPT()" class="flex-1 px-4 py-3 bg-[#10a37f] hover:bg-[#0d8a6b] text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition">
-                        <i class="fas fa-external-link-alt"></i>
-                        ChatGPT에서 열기
-                    </button>
-                    <button onclick="window.copyCreativePrompt()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition">
-                        <i class="fas fa-copy"></i>
-                        클립보드 복사
-                    </button>
-                </div>
-                <p class="text-xs text-slate-400 mt-3 text-center">
-                    ChatGPT(DALL-E 3) → 이미지 생성 요청 시 위 프롬프트를 붙여넣으세요
-                </p>
+                <!-- 에러 -->
+                <div id="ai-gen-error" class="hidden mt-3 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700"></div>
             </div>
         </div>
     </div>

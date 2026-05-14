@@ -3442,78 +3442,151 @@ function openModal(id) {
 }
 
 // ============================
-// AI 이미지 프롬프트 생성
+// AI 이미지 생성 (DALL-E 3)
 // ============================
+const OPENAI_KEY_STORAGE = 'openai_api_key';
+
 window.openCreativePromptModal = function() {
     const d = window._lastNextCreativeData;
     const modal = document.getElementById('creative-prompt-modal');
     const textEl = document.getElementById('creative-prompt-text');
     if (!modal || !textEl) return;
 
+    // 저장된 API 키 복원
+    const savedKey = localStorage.getItem(OPENAI_KEY_STORAGE) || '';
+    const keyInput = document.getElementById('ai-apikey-input');
+    if (keyInput && savedKey) keyInput.value = savedKey;
+
+    // 결과/에러 초기화
+    document.getElementById('ai-gen-result')?.classList.add('hidden');
+    document.getElementById('ai-gen-error')?.classList.add('hidden');
+
+    // 인사이트 기반 프롬프트 생성
     const appeal = d?.topWinner?.keyword || '핵심 소구포인트';
     const hook = d?.topHooks?.[0] || '감성적 후킹';
     const emotion = d?.topEmotions?.[0] || '공감';
     const format = d?.topMediaType?.[0] || '이미지';
     const copy = d?.topCopies?.[0]?.kr || d?.topCopies?.[0]?.jp || '';
     const scope = d?.scopeText || '해당 제품';
-    const alsoAppeals = (d?.winners || []).slice(1, 3).map(w => w.keyword).join(', ');
+    const alsoAppeals = (d?.winners || []).slice(1, 3).map(w => w.keyword).filter(Boolean).join(', ');
 
-    const prompt = `Create a high-quality advertising creative image for a Japanese beauty/cosmetics brand targeting Korean market.
+    const prompt = `High-quality advertising creative image for a Japanese beauty/cosmetics brand.
 
-■ Creative Concept
-- Key appeal point: "${appeal}"
-- Hook style: ${hook}
-- Target emotion: ${emotion}
-- Ad format: ${format === '영상' ? 'Video thumbnail / still frame' : format === '캐러셀' ? 'Carousel card (single panel)' : 'Static banner image'}
-${alsoAppeals ? `- Also incorporate: ${alsoAppeals}` : ''}
+Key appeal: "${appeal}"${alsoAppeals ? ` / also: ${alsoAppeals}` : ''}
+Hook style: ${hook}
+Target emotion: ${emotion}
+Format: ${format === '영상' ? 'video thumbnail still frame' : format === '캐러셀' ? 'carousel single card' : 'static banner'}
+${copy ? `Reference copy: "${copy}"` : `Headline emphasizes: "${appeal}"`}
 
-■ Visual Direction
-- Style: Clean, premium K-beauty aesthetic with soft lighting
-- Layout: Bold headline copy + product hero shot + supporting visual element
-- Mood: ${emotion} — warm, trustworthy, aspirational
-- Color palette: Soft neutrals with accent color matching the brand tone
+Visual: Clean premium K-beauty aesthetic, soft lighting, bold headline + product hero shot.
+Mood: ${emotion} — warm, trustworthy, aspirational. Soft neutrals with brand accent color.
+No watermarks, no placeholder text. Suitable for Meta/Instagram feed ads (${scope}).`;
 
-■ Copy Direction (overlay text)
-${copy ? `- Reference copy: "${copy}"` : `- Emphasize "${appeal}" in the headline`}
-- Keep text minimal, impactful, legible at small sizes
-
-■ Technical Specs
-- Aspect ratio: 1:1 (square) or 4:5 (portrait) for social feed
-- High resolution, clean composition
-- No watermarks or placeholder text
-
-Produce a photorealistic or clean digital illustration style image suitable for Meta/Instagram ads targeting ${scope} audience.`;
-
-    textEl.textContent = prompt;
-    window._currentPrompt = prompt;
+    textEl.value = prompt;
     modal.classList.remove('hidden');
 };
 
-window.copyCreativePrompt = function() {
-    const prompt = window._currentPrompt || '';
-    if (!prompt) return;
-    navigator.clipboard.writeText(prompt).then(() => {
-        const btn = document.querySelector('#creative-prompt-modal .fa-copy')?.closest('button');
-        if (btn) {
-            const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check"></i> 복사됨!';
-            setTimeout(() => { btn.innerHTML = orig; }, 1500);
-        }
-    }).catch(() => {
-        const textEl = document.getElementById('creative-prompt-text');
-        if (textEl) {
-            const range = document.createRange();
-            range.selectNode(textEl);
-            window.getSelection().removeAllRanges();
-            window.getSelection().addRange(range);
-            document.execCommand('copy');
-        }
-    });
+window.saveApiKey = function() {
+    const key = document.getElementById('ai-apikey-input')?.value?.trim();
+    if (!key) return;
+    localStorage.setItem(OPENAI_KEY_STORAGE, key);
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '저장됨 ✓';
+    btn.classList.add('text-emerald-600');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-emerald-600'); }, 1500);
 };
 
-window.openChatGPT = function() {
-    window.copyCreativePrompt();
-    window.open('https://chat.openai.com/', '_blank');
+window.toggleApiKeyVisibility = function() {
+    const input = document.getElementById('ai-apikey-input');
+    const eye = document.getElementById('ai-apikey-eye');
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        eye.className = 'fas fa-eye-slash text-sm';
+    } else {
+        input.type = 'password';
+        eye.className = 'fas fa-eye text-sm';
+    }
+};
+
+window.generateDalleImage = async function() {
+    const apiKey = document.getElementById('ai-apikey-input')?.value?.trim()
+                || localStorage.getItem(OPENAI_KEY_STORAGE) || '';
+    const prompt = document.getElementById('creative-prompt-text')?.value?.trim() || '';
+    const size = document.getElementById('ai-gen-size')?.value || '1024x1024';
+    const quality = document.getElementById('ai-gen-quality')?.value || 'standard';
+
+    const errEl = document.getElementById('ai-gen-error');
+    const resultEl = document.getElementById('ai-gen-result');
+    const btn = document.getElementById('ai-gen-btn');
+    const btnLabel = document.getElementById('ai-gen-btn-label');
+
+    errEl.classList.add('hidden');
+    resultEl.classList.add('hidden');
+
+    if (!apiKey) {
+        errEl.textContent = '⚠️ OpenAI API 키를 입력해주세요. (sk-... 형식)';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (!prompt) {
+        errEl.textContent = '⚠️ 프롬프트를 입력해주세요.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    // 로딩 상태
+    btn.disabled = true;
+    btnLabel.textContent = '생성 중... (10~30초 소요)';
+    btn.querySelector('i').className = 'fas fa-spinner fa-spin';
+
+    try {
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'dall-e-3',
+                prompt,
+                n: 1,
+                size,
+                quality,
+                response_format: 'url'
+            })
+        });
+
+        const json = await res.json();
+
+        if (!res.ok) {
+            const msg = json?.error?.message || `API 오류 (${res.status})`;
+            throw new Error(msg);
+        }
+
+        const imageUrl = json?.data?.[0]?.url;
+        if (!imageUrl) throw new Error('이미지 URL을 받지 못했습니다.');
+
+        // 결과 표시
+        const img = document.getElementById('ai-gen-result-img');
+        const dlBtn = document.getElementById('ai-gen-download-btn');
+        img.src = imageUrl;
+        dlBtn.href = imageUrl;
+        dlBtn.download = `creative-${Date.now()}.png`;
+        resultEl.classList.remove('hidden');
+
+        // API 키 자동 저장
+        localStorage.setItem(OPENAI_KEY_STORAGE, apiKey);
+
+    } catch(e) {
+        errEl.textContent = `❌ ${e.message}`;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btnLabel.textContent = '이미지 생성하기';
+        btn.querySelector('i').className = 'fas fa-wand-magic-sparkles';
+    }
 };
 
 function closeModal() {

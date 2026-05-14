@@ -4231,3 +4231,92 @@ body {
     color: #7c3aed;
     opacity: 0.8;
 }
+
+/* ============================
+   AI 이미지 생성 모달
+   ============================ */
+.ai-gen-modal {
+    max-width: 640px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.ai-gen-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.ai-gen-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+}
+
+.ai-gen-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: monospace;
+    background: white;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+.ai-gen-input:focus { border-color: #818cf8; }
+
+.ai-gen-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: 'Pretendard', sans-serif;
+    background: white;
+    outline: none;
+    resize: vertical;
+    line-height: 1.6;
+    color: #334155;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+.ai-gen-textarea:focus { border-color: #818cf8; }
+
+.ai-gen-submit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 13px 24px;
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.12s;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+}
+.ai-gen-submit-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+.ai-gen-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.ai-gen-result-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    text-align: center;
+}
+.ai-gen-result-img {
+    max-width: 100%;
+    display: block;
+    margin: 0 auto;
+}
