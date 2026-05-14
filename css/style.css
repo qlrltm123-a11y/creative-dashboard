@@ -213,6 +213,11 @@ body {
     margin-right: 8px;
 }
 
+.brand-retail.active {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
 /* ============================
    매체(Platform) 전역 필터 — 브랜드 탭 옆에 배치
    ============================ */
@@ -4240,6 +4245,75 @@ body {
     max-height: 90vh;
     overflow-y: auto;
 }
+
+/* 제품 레퍼런스 이미지 그리드 */
+.ref-img-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.ref-img-thumb {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #e2e8f0;
+    background: #f1f5f9;
+    flex-shrink: 0;
+}
+.ref-img-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.ref-img-delete {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    background: rgba(15,23,42,0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.ref-img-delete:hover { background: #ef4444; }
+.ref-img-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(15,23,42,0.6);
+    color: white;
+    font-size: 8px;
+    text-align: center;
+    padding: 2px 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ref-img-add-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #ede9fe;
+    color: #7c3aed;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1.5px dashed #a78bfa;
+}
+.ref-img-add-btn:hover { background: #ddd6fe; }
 
 .ai-gen-section {
     background: #f8fafc;

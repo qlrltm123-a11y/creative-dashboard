@@ -85,6 +85,9 @@
                 <button class="brand-tab brand-cg" data-brand="CG">
                     <span class="brand-dot bg-amber-500"></span>CG
                 </button>
+                <button class="brand-tab brand-retail" data-brand="RETAIL">
+                    <span class="brand-dot bg-violet-500"></span>Retail
+                </button>
 
                 <!-- ★ 매체(Platform) 필터 — 브랜드별 가용 매체로 동적 구성 -->
                 <div id="platform-filter-wrap" class="platform-filter-wrap">
@@ -570,6 +573,20 @@
                         </div>
                     </div>
                     <textarea id="creative-prompt-text" rows="7" class="ai-gen-textarea"></textarea>
+                </div>
+
+                <!-- 제품 레퍼런스 이미지 -->
+                <div class="ai-gen-section mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="ai-gen-label">제품 레퍼런스 이미지 <span class="text-xs font-normal text-slate-400">(선택 · 최대 4개)</span></label>
+                        <span id="ref-count-badge" class="text-xs text-indigo-600 font-semibold hidden"></span>
+                    </div>
+                    <div id="ref-img-grid" class="ref-img-grid"></div>
+                    <label class="ref-img-add-btn cursor-pointer">
+                        <input type="file" accept="image/*" multiple onchange="window.addRefImages(this)" class="hidden">
+                        <i class="fas fa-plus mr-1"></i> 이미지 추가
+                    </label>
+                    <p class="text-xs text-slate-400 mt-1">등록한 제품 이미지를 AI에게 함께 전달해 브랜드 스타일로 생성합니다 · 브라우저에만 저장</p>
                 </div>
 
                 <!-- 생성 버튼 -->

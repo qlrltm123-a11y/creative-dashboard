@@ -16,7 +16,8 @@ let charts = {};
 const BRAND_COLORS = {
     BOH: '#f43f5e',
     WM: '#10b981',
-    CG: '#f59e0b'
+    CG: '#f59e0b',
+    RETAIL: '#8b5cf6'
 };
 
 const PLATFORM_COLORS = {
@@ -814,7 +815,7 @@ function destroyChart(key) {
 
 function renderBrandChart() {
     destroyChart('brand');
-    const brands = ['BOH', 'WM', 'CG'];
+    const brands = ['BOH', 'WM', 'CG', 'RETAIL'];
     const data = brands.map(b => {
         const list = allCreatives.filter(c => c.brand === b);
         const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
@@ -930,7 +931,7 @@ function renderScatterChart() {
 
     scatterCreativeMap = {};
     let totalCount = 0;
-    const datasets = ['BOH', 'WM', 'CG'].map(brand => {
+    const datasets = ['BOH', 'WM', 'CG', 'RETAIL'].map(brand => {
         // 브랜드별 광고비 상위 N개만 추림 (시각화 가독성 ↑)
         const brandList = medianFiltered
             .filter(c => c.brand === brand)
@@ -3445,6 +3446,62 @@ function openModal(id) {
 // AI 이미지 생성 (DALL-E 3)
 // ============================
 const OPENAI_KEY_STORAGE = 'google_ai_api_key';
+const REF_IMAGES_STORAGE = 'product_ref_images';
+const MAX_REF_IMAGES = 4;
+
+function loadRefImages() {
+    try { return JSON.parse(localStorage.getItem(REF_IMAGES_STORAGE) || '[]'); }
+    catch { return []; }
+}
+function saveRefImages(imgs) {
+    localStorage.setItem(REF_IMAGES_STORAGE, JSON.stringify(imgs));
+}
+
+window.renderRefImageThumbs = function() {
+    const grid = document.getElementById('ref-img-grid');
+    const badge = document.getElementById('ref-count-badge');
+    if (!grid) return;
+    const imgs = loadRefImages();
+    if (imgs.length === 0) {
+        grid.innerHTML = '<p class="text-xs text-slate-400 mb-2">등록된 이미지 없음</p>';
+        if (badge) badge.classList.add('hidden');
+        return;
+    }
+    if (badge) { badge.textContent = `${imgs.length}개 등록됨`; badge.classList.remove('hidden'); }
+    grid.innerHTML = imgs.map((img, i) => `
+        <div class="ref-img-thumb" title="${img.name || ''}">
+            <img src="${img.data}" alt="${img.name || ''}">
+            <button class="ref-img-delete" onclick="window.deleteRefImage(${i})" title="삭제"><i class="fas fa-times"></i></button>
+            <span class="ref-img-name">${(img.name || '').length > 10 ? img.name.slice(0,10)+'…' : (img.name || '')}</span>
+        </div>
+    `).join('');
+};
+
+window.addRefImages = function(input) {
+    const files = Array.from(input.files || []);
+    const existing = loadRefImages();
+    const slots = MAX_REF_IMAGES - existing.length;
+    if (slots <= 0) { alert(`최대 ${MAX_REF_IMAGES}개까지 등록 가능합니다.`); input.value = ''; return; }
+    const toAdd = files.slice(0, slots);
+    let loaded = 0;
+    toAdd.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            existing.push({ id: Date.now() + Math.random(), name: file.name.replace(/\.[^.]+$/, ''), data: e.target.result, mimeType: file.type || 'image/jpeg' });
+            loaded++;
+            if (loaded === toAdd.length) { saveRefImages(existing); window.renderRefImageThumbs(); }
+        };
+        reader.readAsDataURL(file);
+    });
+    input.value = '';
+};
+
+window.deleteRefImage = function(idx) {
+    const imgs = loadRefImages();
+    imgs.splice(idx, 1);
+    saveRefImages(imgs);
+    window.renderRefImageThumbs();
+};
 
 window.openCreativePromptModal = function() {
     const d = window._lastNextCreativeData;
@@ -3460,6 +3517,9 @@ window.openCreativePromptModal = function() {
     // 결과/에러 초기화
     document.getElementById('ai-gen-result')?.classList.add('hidden');
     document.getElementById('ai-gen-error')?.classList.add('hidden');
+
+    // 레퍼런스 이미지 썸네일 렌더
+    window.renderRefImageThumbs();
 
     // 인사이트 기반 프롬프트 생성
     const appeal = d?.topWinner?.keyword || '핵심 소구포인트';
@@ -3510,6 +3570,19 @@ window.toggleApiKeyVisibility = function() {
     }
 };
 
+function buildGeminiParts(promptText) {
+    const refs = loadRefImages();
+    const parts = [];
+    refs.forEach(img => {
+        parts.push({ inlineData: { mimeType: img.mimeType || 'image/jpeg', data: img.data.split(',')[1] } });
+    });
+    const refHint = refs.length > 0
+        ? `The above ${refs.length} image(s) are the actual product references. Generate an ad creative using the same product — maintain brand identity, packaging design, and color palette.\n\n`
+        : '';
+    parts.push({ text: refHint + promptText });
+    return parts;
+}
+
 window.generateDalleImage = async function() {
     const apiKey = document.getElementById('ai-apikey-input')?.value?.trim()
                 || localStorage.getItem(OPENAI_KEY_STORAGE) || '';
@@ -3536,7 +3609,8 @@ window.generateDalleImage = async function() {
     }
 
     btn.disabled = true;
-    btnLabel.textContent = '생성 중... (10~30초 소요)';
+    const refImgs = loadRefImages();
+    btnLabel.textContent = refImgs.length > 0 ? `생성 중... (레퍼런스 ${refImgs.length}개 포함)` : '생성 중... (10~30초 소요)';
     btn.querySelector('i').className = 'fas fa-spinner fa-spin';
 
     const modelId = document.getElementById('ai-gen-model')?.value || 'gemini-2.0-flash-exp';
@@ -3548,7 +3622,7 @@ window.generateDalleImage = async function() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
+                    contents: [{ parts: buildGeminiParts(prompt) }],
                     generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
                 })
             }
