@@ -213,9 +213,33 @@ body {
     margin-right: 8px;
 }
 
-.brand-retail.active {
-    background: linear-gradient(135deg, #7c3aed, #a855f7);
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+.retail-divider {
+    width: 1px;
+    height: 22px;
+    background: #e2e8f0;
+    flex-shrink: 0;
+}
+
+.retail-toggle-btn {
+    padding: 5px 12px !important;
+    font-size: 12px !important;
+    height: 30px;
+    border-radius: 8px !important;
+    background: white;
+    border: 1.5px solid #ddd6fe !important;
+    color: #7c3aed !important;
+}
+.retail-toggle-btn:hover {
+    background: #f5f3ff !important;
+    border-color: #8b5cf6 !important;
+    color: #6d28d9 !important;
+    transform: none !important;
+}
+.retail-toggle-btn.active {
+    background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+    border-color: transparent !important;
+    color: white !important;
+    box-shadow: 0 3px 8px rgba(139, 92, 246, 0.35) !important;
 }
 
 /* ============================

@@ -85,9 +85,6 @@
                 <button class="brand-tab brand-cg" data-brand="CG">
                     <span class="brand-dot bg-amber-500"></span>CG
                 </button>
-                <button class="brand-tab brand-retail" data-brand="RETAIL">
-                    <span class="brand-dot bg-violet-500"></span>Retail
-                </button>
 
                 <!-- ★ 매체(Platform) 필터 — 브랜드별 가용 매체로 동적 구성 -->
                 <div id="platform-filter-wrap" class="platform-filter-wrap">
@@ -100,6 +97,11 @@
                     <span id="platform-count" class="platform-filter-count"></span>
                     <button id="platform-filter-reset" class="platform-filter-reset" title="매체 필터 초기화" type="button">
                         <i class="fas fa-rotate-left"></i>
+                    </button>
+                    <!-- Retail 세그먼트 토글 -->
+                    <div class="retail-divider"></div>
+                    <button class="brand-tab brand-retail retail-toggle-btn" data-brand="RETAIL" title="Retail 채널만 보기">
+                        <i class="fas fa-store mr-1.5 text-xs"></i>Retail
                     </button>
                 </div>
 
