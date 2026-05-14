@@ -3539,9 +3539,11 @@ window.generateDalleImage = async function() {
     btnLabel.textContent = '생성 중... (10~30초 소요)';
     btn.querySelector('i').className = 'fas fa-spinner fa-spin';
 
+    const modelId = document.getElementById('ai-gen-model')?.value || 'gemini-2.0-flash-exp';
+
     try {
         const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3583,6 +3585,43 @@ window.generateDalleImage = async function() {
         btn.disabled = false;
         btnLabel.textContent = '이미지 생성하기';
         btn.querySelector('i').className = 'fas fa-wand-magic-sparkles';
+    }
+};
+
+window.listImageModels = async function() {
+    const apiKey = document.getElementById('ai-apikey-input')?.value?.trim()
+                || localStorage.getItem(OPENAI_KEY_STORAGE) || '';
+    const resultEl = document.getElementById('ai-model-list-result');
+    const errEl = document.getElementById('ai-gen-error');
+    if (!apiKey) {
+        errEl.textContent = '⚠️ API 키를 먼저 입력해주세요.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    resultEl.textContent = '조회 중...';
+    resultEl.classList.remove('hidden');
+    try {
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
+        );
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error?.message || `오류 ${res.status}`);
+        const models = (json.models || [])
+            .filter(m => {
+                const n = (m.name || '').toLowerCase();
+                return n.includes('image') || n.includes('imagen') || n.includes('flash');
+            })
+            .map(m => m.name.replace('models/', ''));
+        if (models.length === 0) {
+            resultEl.textContent = '이미지 관련 모델 없음. 전체: ' + (json.models||[]).map(m=>m.name.replace('models/','')).join(', ');
+        } else {
+            // 드롭다운 업데이트
+            const sel = document.getElementById('ai-gen-model');
+            sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            resultEl.textContent = `✅ ${models.length}개 모델 로드됨 — 위 목록에서 선택하세요`;
+        }
+    } catch(e) {
+        resultEl.textContent = `❌ ${e.message}`;
     }
 };
 

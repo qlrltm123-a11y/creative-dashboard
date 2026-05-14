@@ -538,8 +538,21 @@
                             </button>
                         </div>
                         <button onclick="window.saveApiKey()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition whitespace-nowrap">저장</button>
+                        <button onclick="window.listImageModels()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-lg transition whitespace-nowrap">모델 조회</button>
                     </div>
                     <p class="text-xs text-slate-400 mt-1">API 키는 브라우저에만 저장됩니다 · <a href="https://aistudio.google.com/apikey" target="_blank" class="text-indigo-400 hover:underline">aistudio.google.com/apikey</a>에서 확인</p>
+                </div>
+
+                <!-- 모델 선택 -->
+                <div class="ai-gen-section mb-4">
+                    <label class="ai-gen-label">이미지 생성 모델</label>
+                    <select id="ai-gen-model" class="ai-gen-input text-sm">
+                        <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (기본값)</option>
+                        <option value="gemini-2.0-flash-preview-image-generation">gemini-2.0-flash-preview-image-generation</option>
+                        <option value="imagen-3.0-generate-001">imagen-3.0-generate-001</option>
+                        <option value="imagen-3.0-fast-generate-001">imagen-3.0-fast-generate-001</option>
+                    </select>
+                    <p id="ai-model-list-result" class="text-xs text-slate-500 mt-1 hidden"></p>
                 </div>
 
                 <!-- 프롬프트 -->
