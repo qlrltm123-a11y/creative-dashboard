@@ -3444,7 +3444,7 @@ function openModal(id) {
 // ============================
 // AI 이미지 생성 (DALL-E 3)
 // ============================
-const OPENAI_KEY_STORAGE = 'openai_api_key';
+const OPENAI_KEY_STORAGE = 'google_ai_api_key';
 
 window.openCreativePromptModal = function() {
     const d = window._lastNextCreativeData;
@@ -3514,8 +3514,7 @@ window.generateDalleImage = async function() {
     const apiKey = document.getElementById('ai-apikey-input')?.value?.trim()
                 || localStorage.getItem(OPENAI_KEY_STORAGE) || '';
     const prompt = document.getElementById('creative-prompt-text')?.value?.trim() || '';
-    const size = document.getElementById('ai-gen-size')?.value || '1024x1024';
-    const quality = document.getElementById('ai-gen-quality')?.value || 'standard';
+    const aspectRatio = document.getElementById('ai-gen-size')?.value || '1:1';
 
     const errEl = document.getElementById('ai-gen-error');
     const resultEl = document.getElementById('ai-gen-result');
@@ -3526,7 +3525,7 @@ window.generateDalleImage = async function() {
     resultEl.classList.add('hidden');
 
     if (!apiKey) {
-        errEl.textContent = '⚠️ OpenAI API 키를 입력해주세요. (sk-... 형식)';
+        errEl.textContent = '⚠️ Google AI Studio API 키를 입력해주세요. (AIza... 형식)';
         errEl.classList.remove('hidden');
         return;
     }
@@ -3536,27 +3535,27 @@ window.generateDalleImage = async function() {
         return;
     }
 
-    // 로딩 상태
     btn.disabled = true;
     btnLabel.textContent = '생성 중... (10~30초 소요)';
     btn.querySelector('i').className = 'fas fa-spinner fa-spin';
 
     try {
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: 'dall-e-3',
-                prompt,
-                n: 1,
-                size,
-                quality,
-                response_format: 'url'
-            })
-        });
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instances: [{ prompt }],
+                    parameters: {
+                        sampleCount: 1,
+                        aspectRatio,
+                        safetyFilterLevel: 'block_some',
+                        personGeneration: 'allow_adult'
+                    }
+                })
+            }
+        );
 
         const json = await res.json();
 
@@ -3565,18 +3564,19 @@ window.generateDalleImage = async function() {
             throw new Error(msg);
         }
 
-        const imageUrl = json?.data?.[0]?.url;
-        if (!imageUrl) throw new Error('이미지 URL을 받지 못했습니다.');
+        const b64 = json?.predictions?.[0]?.bytesBase64Encoded;
+        const mime = json?.predictions?.[0]?.mimeType || 'image/png';
+        if (!b64) throw new Error('이미지 데이터를 받지 못했습니다.');
 
-        // 결과 표시
+        const dataUrl = `data:${mime};base64,${b64}`;
+
         const img = document.getElementById('ai-gen-result-img');
         const dlBtn = document.getElementById('ai-gen-download-btn');
-        img.src = imageUrl;
-        dlBtn.href = imageUrl;
-        dlBtn.download = `creative-${Date.now()}.png`;
+        img.src = dataUrl;
+        dlBtn.href = dataUrl;
+        dlBtn.download = `creative-imagen3-${Date.now()}.png`;
         resultEl.classList.remove('hidden');
 
-        // API 키 자동 저장
         localStorage.setItem(OPENAI_KEY_STORAGE, apiKey);
 
     } catch(e) {

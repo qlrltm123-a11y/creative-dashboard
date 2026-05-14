@@ -529,17 +529,17 @@
 
                 <!-- API Key -->
                 <div class="ai-gen-section mb-4">
-                    <label class="ai-gen-label">OpenAI API Key</label>
+                    <label class="ai-gen-label">Google AI Studio API Key</label>
                     <div class="flex gap-2">
                         <div class="relative flex-1">
-                            <input id="ai-apikey-input" type="password" placeholder="sk-..." class="ai-gen-input pr-10">
+                            <input id="ai-apikey-input" type="password" placeholder="AIza..." class="ai-gen-input pr-10">
                             <button onclick="window.toggleApiKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                                 <i id="ai-apikey-eye" class="fas fa-eye text-sm"></i>
                             </button>
                         </div>
                         <button onclick="window.saveApiKey()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition whitespace-nowrap">저장</button>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다</p>
+                    <p class="text-xs text-slate-400 mt-1">API 키는 브라우저에만 저장됩니다 · <a href="https://aistudio.google.com/apikey" target="_blank" class="text-indigo-400 hover:underline">aistudio.google.com/apikey</a>에서 확인</p>
                 </div>
 
                 <!-- 프롬프트 -->
@@ -548,13 +548,11 @@
                         <label class="ai-gen-label">프롬프트 <span class="text-xs font-normal text-slate-400">(수정 가능)</span></label>
                         <div class="flex gap-2">
                             <select id="ai-gen-size" class="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-600">
-                                <option value="1024x1024">1:1 정사각형</option>
-                                <option value="1792x1024">16:9 가로</option>
-                                <option value="1024x1792">9:16 세로</option>
-                            </select>
-                            <select id="ai-gen-quality" class="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-600">
-                                <option value="standard">Standard</option>
-                                <option value="hd">HD</option>
+                                <option value="1:1">1:1 정사각형</option>
+                                <option value="4:3">4:3 가로</option>
+                                <option value="3:4">3:4 세로</option>
+                                <option value="16:9">16:9 와이드</option>
+                                <option value="9:16">9:16 세로형</option>
                             </select>
                         </div>
                     </div>
