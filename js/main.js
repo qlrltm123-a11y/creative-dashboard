@@ -662,9 +662,12 @@ const CREATIVE_TYPES = [
 ];
 
 function classifyCreativeType(c) {
-    const name = ((c.ad_name || '') + ' ' + (c.creative_name || '')).toLowerCase();
-    if (name.includes('influencer')) return 'influencer';
-    if (name.includes('ugc'))        return 'ugc';
+    // 소재명 관련 가능한 모든 필드를 합쳐서 검색
+    const name = [
+        c.ad_name, c.creative_name, c.adgroup_name, c.campaign_name, c.id
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (name.includes('influencer') || name.includes('インフルエンサー')) return 'influencer';
+    if (name.includes('ugc')) return 'ugc';
     return 'regular';
 }
 
@@ -692,13 +695,24 @@ function renderCreativeTypeComparison() {
     const badgeEl   = document.getElementById('creative-type-total-badge');
     if (!section) return;
 
-    const base = getBrandCreatives('performance');
+    // 글로벌 필터만 적용 (섹션 필터 제외) — 소재 타입 비교는 전체 풀 기준
+    const base = getBrandCreatives();
 
-    // influencer 또는 ugc가 하나라도 없으면 섹션 숨김
+    section.classList.remove('hidden');
+
+    // influencer / ugc 감지 여부
     const hasInfluencer = base.some(c => classifyCreativeType(c) === 'influencer');
     const hasUGC        = base.some(c => classifyCreativeType(c) === 'ugc');
-    if (!hasInfluencer && !hasUGC) { section.classList.add('hidden'); return; }
-    section.classList.remove('hidden');
+    if (!base.length || (!hasInfluencer && !hasUGC)) {
+        if (cardsEl) cardsEl.innerHTML = `<div class="col-span-3 text-center py-6 text-sm text-slate-400">
+            소재명에 <code class="bg-slate-100 px-1 rounded">influencer</code> 또는 <code class="bg-slate-100 px-1 rounded">ugc</code> 키워드가 포함된 소재가 없습니다.<br>
+            <span class="text-xs">현재 필터: 소재명(ad_name/creative_name) 기준으로 자동 감지합니다.</span>
+        </div>`;
+        if (barsEl) barsEl.innerHTML = '';
+        if (tableEl) tableEl.innerHTML = '';
+        if (badgeEl) badgeEl.textContent = `총 ${base.length}개 소재`;
+        return;
+    }
 
     // 타입별 분류
     const grouped = { influencer: [], ugc: [], regular: [] };
@@ -1040,6 +1054,7 @@ function updateCharts() {
     if (_renderedSections.performance) {
         renderAppealInsight();
         renderPlatformCreativeMatrix();
+        renderCreativeTypeComparison();
     }
 }
 
