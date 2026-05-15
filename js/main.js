@@ -116,7 +116,9 @@ function bindEvents() {
     if (platformSel) {
         platformSel.addEventListener('change', () => {
             currentPlatform = platformSel.value || '';
-            // 매체 바뀌면 섹션별 필터(제품/캠페인)도 리셋 — 매체에 따라 가용 캠페인이 달라지므로
+            // 매체 바뀌면 Retail 옵션 재구성 (매체별 가용 Retail 채널이 달라짐)
+            populateRetailOptions();
+            // 섹션별 제품/캠페인 리셋
             currentCampaign = '';
             const campSel = document.getElementById('campaign-select');
             if (campSel) campSel.value = '';
@@ -124,16 +126,17 @@ function bindEvents() {
             performanceCampaign = '';
             aiProduct = '';
             aiCampaign = '';
-            invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
+            invalidatePerformancePoolCache();
             updateDashboard();
         });
     }
     const platformResetBtn = document.getElementById('platform-filter-reset');
     if (platformResetBtn) {
         platformResetBtn.addEventListener('click', () => {
-            if (!currentPlatform) return; // 이미 전체 상태면 무시
+            if (!currentPlatform) return;
             currentPlatform = '';
             if (platformSel) platformSel.value = '';
+            populateRetailOptions();
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -144,6 +147,13 @@ function bindEvents() {
     if (retailSel) {
         retailSel.addEventListener('change', () => {
             currentRetail = retailSel.value || '';
+            // Retail 바뀌면 매체 옵션 재구성 (Retail별 가용 매체가 달라짐)
+            populatePlatformOptions();
+            // 섹션별 제품/캠페인 리셋
+            performanceProduct = '';
+            performanceCampaign = '';
+            aiProduct = '';
+            aiCampaign = '';
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -154,6 +164,7 @@ function bindEvents() {
             if (!currentRetail) return;
             currentRetail = '';
             if (retailSel) retailSel.value = '';
+            populatePlatformOptions();
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -408,11 +419,8 @@ function getAvailableCampaigns() {
     let base = (currentBrand === 'ALL')
         ? allCreatives
         : allCreatives.filter(c => c.brand === currentBrand);
-    // ★ 매체(Platform) 필터가 걸려 있으면 해당 매체의 캠페인만 추출
-    //   → 성과분석/AI 인사이트 섹션의 캠페인 드롭다운도 자동으로 좁아짐
-    if (currentPlatform) {
-        base = base.filter(c => (c.platform || '').toString().trim() === currentPlatform);
-    }
+    if (currentPlatform) base = base.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+    if (currentRetail)   base = base.filter(c => (c.retail   || '').toString().trim() === currentRetail);
     const set = new Set();
     base.forEach(c => {
         const cn = (c.campaign_name || '').toString().trim();
@@ -451,20 +459,16 @@ function populateCampaignOptions() {
 // ============================
 // 매체(Platform) 필터 — 브랜드별 가용 매체 목록
 // ============================
-// 현재 브랜드 기준 매체 목록 추출 (캠페인 필터는 무시 — 매체→캠페인 순으로 좁히기)
+// 현재 브랜드+Retail 기준 매체 목록 추출
 function getAvailablePlatforms() {
-    const base = (currentBrand === 'ALL')
-        ? allCreatives
-        : allCreatives.filter(c => c.brand === currentBrand);
-    const map = new Map(); // platform → count
+    let base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+    if (currentRetail) base = base.filter(c => (c.retail || '').toString().trim() === currentRetail);
+    const map = new Map();
     base.forEach(c => {
         const p = (c.platform || '').toString().trim();
         if (p) map.set(p, (map.get(p) || 0) + 1);
     });
-    // 소재 수 내림차순 정렬 (자주 쓰이는 매체가 위로)
-    return Array.from(map.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
 }
 
 // 매체 드롭다운 채우기 (브랜드 변경 시 재구성)
@@ -504,18 +508,16 @@ function populatePlatformOptions() {
 // ============================
 // Retail 채널 필터 — 전역 (브랜드·매체 필터 이후 적용)
 // ============================
+// 현재 브랜드+매체 기준 Retail 채널 목록 추출
 function getAvailableRetailChannels() {
-    const base = (currentBrand === 'ALL')
-        ? allCreatives
-        : allCreatives.filter(c => c.brand === currentBrand);
+    let base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+    if (currentPlatform) base = base.filter(c => (c.platform || '').toString().trim() === currentPlatform);
     const map = new Map();
     base.forEach(c => {
         const r = (c.retail || '').toString().trim();
         if (r) map.set(r, (map.get(r) || 0) + 1);
     });
-    return Array.from(map.entries())
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
 }
 
 function populateRetailOptions() {
