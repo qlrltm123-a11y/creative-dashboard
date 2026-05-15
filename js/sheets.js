@@ -267,6 +267,19 @@ function csvToObjects(csvText) {
             obj.platform = normalizePlatform(obj.platform);
         }
 
+        // ★ Retail 채널명 정규화 — 대소문자 표기 통일
+        if (obj.retail) {
+            const RETAIL_DISPLAY = {
+                'qoo10': 'Qoo10',
+                'rkt': 'RKT',
+                'rakuten': 'Rakuten',
+                'amazon': 'Amazon',
+                'yahoo': 'Yahoo',
+            };
+            const key = obj.retail.trim().toLowerCase();
+            obj.retail = RETAIL_DISPLAY[key] || obj.retail.trim();
+        }
+
         // ★ 통화 환산: 시트의 엔화(JPY) 값 → 원화(KRW)로 변환
         // 원본 엔화 값은 별도 필드(_jpy)에 보존
         const fx = getFxRate();
