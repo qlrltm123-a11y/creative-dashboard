@@ -876,7 +876,50 @@ function renderCreativeTypeComparison() {
         const ugcCols = ugcExamples.map((c, i) => makeCard(c, `UGC #${i+1}`, '#8b5cf6')).join('');
         const regCols = regExamples.map((c, i) => makeCard(c, `일반 #${i+1}`, '#94a3b8')).join('');
 
+        // ── UGC 상위 소재 공통 소구·후킹 추출 ──
+        const topUgcPool = [...grouped.ugc]
+            .filter(c => (c.roas || 0) > 0)
+            .sort((a, b) => (b.roas || 0) - (a.roas || 0))
+            .slice(0, 10); // 상위 10개 기준
+
+        const countKeywords = (pool, field) => {
+            const freq = {};
+            pool.forEach(c => {
+                normalizeArrayField(c[field]).forEach(kw => {
+                    if (kw) freq[kw] = (freq[kw] || 0) + 1;
+                });
+            });
+            return Object.entries(freq)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([kw, cnt]) => ({ kw, cnt }));
+        };
+
+        const topAppeals = countKeywords(topUgcPool, 'appeal_points');
+        const topHooks   = countKeywords(topUgcPool, 'hook_type');
+
+        const makeChips = (items, color) => items.length
+            ? items.map(({ kw, cnt }) =>
+                `<span class="ctc-insight-chip" style="background:${color}15;color:${color};border-color:${color}30">
+                    ${kw} <span class="ctc-chip-cnt">${cnt}개</span>
+                </span>`).join('')
+            : '<span class="text-xs text-slate-400">데이터 없음</span>';
+
+        const insightBox = (topAppeals.length || topHooks.length) ? `
+        <div class="ctc-insight-box">
+            <p class="ctc-insight-title"><i class="fas fa-lightbulb mr-1 text-amber-400"></i>UGC 상위 소재 공통점</p>
+            ${topAppeals.length ? `<div class="ctc-insight-row">
+                <span class="ctc-insight-label">소구포인트</span>
+                <div class="ctc-insight-chips">${makeChips(topAppeals, '#8b5cf6')}</div>
+            </div>` : ''}
+            ${topHooks.length ? `<div class="ctc-insight-row">
+                <span class="ctc-insight-label">후킹 유형</span>
+                <div class="ctc-insight-chips">${makeChips(topHooks, '#0ea5e9')}</div>
+            </div>` : ''}
+        </div>` : '';
+
         examplesEl.innerHTML = `
+        ${insightBox}
         <div class="ctc-examples-grid">
             <div class="ctc-examples-col">
                 <p class="ctc-col-header" style="color:#8b5cf6"><i class="fas fa-star mr-1"></i>UGC · 인플루언서 — 상위 소재</p>
