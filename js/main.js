@@ -653,132 +653,157 @@ function syncHiddenAiSelect() {
 }
 
 // ============================
-// 인플루언서 · UGC vs 일반 소재 성과 비교
+// UGC(인플루언서+ugc) vs 일반 소재 성과 비교 — 중앙값 기준
 // ============================
-const CREATIVE_TYPES = [
-    { key: 'influencer', label: '인플루언서', icon: 'fa-star', color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
-    { key: 'ugc',        label: 'UGC',         icon: 'fa-video', color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
-    { key: 'regular',    label: '일반 소재',    icon: 'fa-image', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
-];
+const CT_UGC     = { key: 'ugc',     label: 'UGC · 인플루언서', icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
+const CT_REGULAR = { key: 'regular', label: '일반 소재',          icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
 
 function classifyCreativeType(c) {
-    // 소재명 관련 가능한 모든 필드를 합쳐서 검색
-    const name = [
-        c.ad_name, c.creative_name, c.adgroup_name, c.campaign_name, c.id
-    ].filter(Boolean).join(' ').toLowerCase();
-    if (name.includes('influencer') || name.includes('インフルエンサー')) return 'influencer';
-    if (name.includes('ugc')) return 'ugc';
+    const name = [c.ad_name, c.creative_name, c.adgroup_name, c.campaign_name, c.id]
+        .filter(Boolean).join(' ').toLowerCase();
+    if (name.includes('influencer') || name.includes('ugc') || name.includes('インフルエンサー')) return 'ugc';
     return 'regular';
+}
+
+function medianOf(arr, key) {
+    const vals = arr.map(c => c[key] || 0).filter(v => v > 0).sort((a, b) => a - b);
+    if (!vals.length) return 0;
+    const mid = Math.floor(vals.length / 2);
+    return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
 }
 
 function calcTypeMetrics(list) {
     if (!list.length) return null;
-    const validCTR  = list.filter(c => c.ctr  > 0);
-    const validROAS = list.filter(c => c.roas > 0);
-    const validCVR  = list.filter(c => c.cvr  > 0);
-    const avg = (arr, key) => arr.length ? arr.reduce((s, c) => s + c[key], 0) / arr.length : 0;
     return {
         count:   list.length,
-        spend:   list.reduce((s, c) => s + (c.spend  || 0), 0),
-        revenue: list.reduce((s, c) => s + (c.revenue || 0), 0),
-        ctr:     avg(validCTR,  'ctr'),
-        roas:    avg(validROAS, 'roas'),
-        cvr:     avg(validCVR,  'cvr'),
+        spend:   list.reduce((s, c) => s + (c.spend   || 0), 0),
+        ctr:     medianOf(list, 'ctr'),
+        roas:    medianOf(list, 'roas'),
+        cvr:     medianOf(list, 'cvr'),
     };
 }
 
 function renderCreativeTypeComparison() {
-    const section   = document.getElementById('creative-type-comparison-section');
-    const cardsEl   = document.getElementById('creative-type-summary-cards');
-    const barsEl    = document.getElementById('creative-type-metric-bars');
-    const tableEl   = document.getElementById('creative-type-product-table');
-    const badgeEl   = document.getElementById('creative-type-total-badge');
+    const section = document.getElementById('creative-type-comparison-section');
+    const cardsEl = document.getElementById('creative-type-summary-cards');
+    const barsEl  = document.getElementById('creative-type-metric-bars');
+    const tableEl = document.getElementById('creative-type-product-table');
+    const badgeEl = document.getElementById('creative-type-total-badge');
     if (!section) return;
 
-    // 글로벌 필터만 적용 (섹션 필터 제외) — 소재 타입 비교는 전체 풀 기준
     const base = getBrandCreatives();
-
     section.classList.remove('hidden');
 
-    // influencer / ugc 감지 여부
-    const hasInfluencer = base.some(c => classifyCreativeType(c) === 'influencer');
-    const hasUGC        = base.some(c => classifyCreativeType(c) === 'ugc');
-    if (!base.length || (!hasInfluencer && !hasUGC)) {
-        if (cardsEl) cardsEl.innerHTML = `<div class="col-span-3 text-center py-6 text-sm text-slate-400">
-            소재명에 <code class="bg-slate-100 px-1 rounded">influencer</code> 또는 <code class="bg-slate-100 px-1 rounded">ugc</code> 키워드가 포함된 소재가 없습니다.<br>
-            <span class="text-xs">현재 필터: 소재명(ad_name/creative_name) 기준으로 자동 감지합니다.</span>
+    const hasUGC = base.some(c => classifyCreativeType(c) === 'ugc');
+    if (!base.length || !hasUGC) {
+        if (cardsEl) cardsEl.innerHTML = `<div class="col-span-2 text-center py-6 text-sm text-slate-400">
+            소재명에 <code class="bg-slate-100 px-1 rounded">influencer</code> 또는
+            <code class="bg-slate-100 px-1 rounded">ugc</code> 키워드가 포함된 소재가 없습니다.
         </div>`;
         if (barsEl) barsEl.innerHTML = '';
         if (tableEl) tableEl.innerHTML = '';
-        if (badgeEl) badgeEl.textContent = `총 ${base.length}개 소재`;
         return;
     }
 
-    // 타입별 분류
-    const grouped = { influencer: [], ugc: [], regular: [] };
+    const grouped = { ugc: [], regular: [] };
     base.forEach(c => grouped[classifyCreativeType(c)].push(c));
-    const metrics = {};
-    CREATIVE_TYPES.forEach(t => { metrics[t.key] = calcTypeMetrics(grouped[t.key]); });
+    const mu = calcTypeMetrics(grouped.ugc);
+    const mr = calcTypeMetrics(grouped.regular);
 
-    if (badgeEl) badgeEl.textContent = `총 ${base.length}개 소재`;
+    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 · 일반 ${mr?.count ?? 0}개`;
 
-    // ─── 요약 카드 ───
     const fmt = {
         ctr:  v => (v * 100).toFixed(2) + '%',
         roas: v => v.toFixed(1) + 'x',
         cvr:  v => (v * 100).toFixed(2) + '%',
-        spend: v => (v >= 1e6 ? (v/1e6).toFixed(1)+'M' : Math.round(v/1000)+'K') + '원',
+        pct:  v => (v > 0 ? '+' : '') + v.toFixed(0) + '%',
     };
 
-    cardsEl.innerHTML = CREATIVE_TYPES.map(t => {
-        const m = metrics[t.key];
-        if (!m) return `<div class="rounded-xl border p-4 opacity-40" style="border-color:${t.border};background:${t.bg}">
-            <div class="flex items-center gap-2 mb-2"><i class="fas ${t.icon} text-sm" style="color:${t.color}"></i><span class="font-bold text-sm" style="color:${t.color}">${t.label}</span></div>
-            <p class="text-xs text-slate-400">데이터 없음</p></div>`;
+    // ─── 결론 배너 ───
+    const metricDefs = [
+        { key: 'ctr',  label: 'CTR',  f: fmt.ctr },
+        { key: 'roas', label: 'ROAS', f: fmt.roas },
+        { key: 'cvr',  label: 'CVR',  f: fmt.cvr },
+    ];
+    const wins = metricDefs.filter(md => mr && mr[md.key] > 0 && mu[md.key] > mr[md.key]);
+    const conclusionChips = metricDefs.map(md => {
+        if (!mr || !mr[md.key]) return '';
+        const diff = mr[md.key] > 0 ? ((mu[md.key] - mr[md.key]) / mr[md.key]) * 100 : 0;
+        const better = mu[md.key] > mr[md.key];
+        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${better ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}">
+            ${md.label} ${better ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}%
+        </span>`;
+    }).join('');
+
+    const conclusionText = wins.length >= 2
+        ? `UGC · 인플루언서 소재가 일반 소재 대비 <b>${wins.map(m => m.label).join(' · ')}</b> 모두 우수합니다`
+        : wins.length === 1
+        ? `UGC · 인플루언서 소재가 <b>${wins[0].label}</b> 지표에서 일반 소재를 앞섭니다`
+        : `현재 데이터 기준 일반 소재가 더 높은 지표를 보입니다`;
+
+    // ─── 카드 2개 ───
+    const renderCard = (t, m, isWinner) => {
+        if (!m) return `<div class="rounded-xl border-2 p-5 opacity-40" style="border-color:${t.border};background:${t.bg}">
+            <p class="text-sm font-bold" style="color:${t.color}">${t.label}</p>
+            <p class="text-xs text-slate-400 mt-1">데이터 없음</p></div>`;
         return `
-        <div class="rounded-xl border-2 p-4" style="border-color:${t.border};background:${t.bg}">
-            <div class="flex items-center justify-between mb-3">
+        <div class="rounded-xl border-2 p-5 relative" style="border-color:${isWinner ? t.color : t.border};background:${t.bg}">
+            ${isWinner ? `<span class="absolute -top-2.5 left-4 text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:${t.color}">👑 성과 우수</span>` : ''}
+            <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs" style="background:${t.color}">
-                        <i class="fas ${t.icon}"></i>
+                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white" style="background:${t.color}">
+                        <i class="fas ${t.icon} text-sm"></i>
                     </span>
-                    <span class="font-bold text-sm text-slate-800">${t.label}</span>
+                    <span class="font-bold text-slate-800">${t.label}</span>
                 </div>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style="background:${t.color}">${m.count}개</span>
             </div>
-            <div class="space-y-1.5">
-                <div class="flex justify-between text-xs"><span class="text-slate-500">CTR</span><span class="font-bold" style="color:${t.color}">${fmt.ctr(m.ctr)}</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-500">ROAS</span><span class="font-bold" style="color:${t.color}">${fmt.roas(m.roas)}</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-500">CVR</span><span class="font-bold" style="color:${t.color}">${fmt.cvr(m.cvr)}</span></div>
-                <div class="flex justify-between text-xs"><span class="text-slate-500">광고비</span><span class="font-semibold text-slate-600">${fmt.spend(m.spend)}</span></div>
+            <div class="space-y-2">
+                ${metricDefs.map(md => `
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500">${md.label} <span class="text-slate-400">(중앙값)</span></span>
+                    <span class="text-sm font-bold" style="color:${t.color}">${md.f(m[md.key])}</span>
+                </div>`).join('')}
             </div>
         </div>`;
-    }).join('');
+    };
+
+    const ugcWins = wins.length >= Math.ceil(metricDefs.length / 2);
+    cardsEl.innerHTML = `
+        <div class="col-span-2 mb-1 p-4 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 flex flex-wrap items-center gap-3">
+            <i class="fas fa-lightbulb text-violet-500"></i>
+            <span class="text-sm text-slate-700 flex-1">${conclusionText}</span>
+            <div class="flex flex-wrap gap-2">${conclusionChips}</div>
+        </div>
+        ${renderCard(CT_UGC, mu, ugcWins)}
+        ${renderCard(CT_REGULAR, mr, !ugcWins && mr)}`;
 
     // ─── 지표별 비교 바 ───
-    const metricDefs = [
-        { key: 'ctr',  label: 'CTR',  fmt: fmt.ctr },
-        { key: 'roas', label: 'ROAS', fmt: fmt.roas },
-        { key: 'cvr',  label: 'CVR',  fmt: fmt.cvr },
-    ];
     barsEl.innerHTML = metricDefs.map(md => {
-        const vals = CREATIVE_TYPES.map(t => metrics[t.key]?.[md.key] || 0);
-        const maxVal = Math.max(...vals, 0.0001);
-        const bars = CREATIVE_TYPES.map((t, i) => {
-            const pct = Math.round((vals[i] / maxVal) * 100);
+        const uVal = mu[md.key] || 0;
+        const rVal = mr?.[md.key] || 0;
+        const maxVal = Math.max(uVal, rVal, 0.0001);
+        const diff = rVal > 0 ? ((uVal - rVal) / rVal) * 100 : 0;
+        const diffLabel = rVal > 0 ? `<span class="text-xs font-bold ml-2 ${diff >= 0 ? 'text-violet-600' : 'text-slate-400'}">${fmt.pct(diff)}</span>` : '';
+        const makeBar = (val, color, label) => {
+            const pct = Math.max(Math.round((val / maxVal) * 100), 4);
             return `<div class="flex items-center gap-2 text-xs">
-                <span class="w-16 text-right text-slate-500 flex-shrink-0">${t.label}</span>
-                <div class="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
-                    <div class="h-full rounded-full flex items-center px-2 text-white text-xs font-semibold transition-all" style="width:${Math.max(pct,8)}%;background:${t.color}">
-                        ${pct > 20 ? fmt[md.key](vals[i]) : ''}
-                    </div>
+                <span class="w-20 text-right text-slate-500 flex-shrink-0">${label}</span>
+                <div class="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
+                    <div class="h-full rounded-full flex items-center px-3 text-white text-xs font-bold"
+                         style="width:${pct}%;background:${color}">${pct > 25 ? md.f(val) : ''}</div>
                 </div>
-                ${pct <= 20 ? `<span class="text-slate-600 font-semibold flex-shrink-0">${md.fmt(vals[i])}</span>` : '<span class="w-12"></span>'}
+                ${pct <= 25 ? `<span class="font-bold text-slate-700 w-14 flex-shrink-0">${md.f(val)}</span>` : '<span class="w-14"></span>'}
             </div>`;
-        }).join('');
-        return `<div class="bg-slate-50 rounded-xl p-3">
-            <p class="text-xs font-bold text-slate-700 mb-2">${md.label} 비교</p>
-            <div class="space-y-1.5">${bars}</div>
+        };
+        return `<div class="bg-slate-50 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-xs font-bold text-slate-700">${md.label} 비교</span>${diffLabel}
+            </div>
+            <div class="space-y-2">
+                ${makeBar(uVal, CT_UGC.color,     CT_UGC.label)}
+                ${makeBar(rVal, CT_REGULAR.color, CT_REGULAR.label)}
+            </div>
         </div>`;
     }).join('');
 
@@ -787,33 +812,39 @@ function renderCreativeTypeComparison() {
     if (!products.length) { tableEl.innerHTML = ''; return; }
 
     const rows = products.map(prod => {
-        const typeMetrics = {};
-        CREATIVE_TYPES.forEach(t => {
-            typeMetrics[t.key] = calcTypeMetrics(grouped[t.key].filter(c => (c.product || '').trim() === prod));
-        });
-        const cells = CREATIVE_TYPES.map(t => {
-            const m = typeMetrics[t.key];
-            if (!m) return `<td class="px-3 py-2 text-center text-xs text-slate-300">—</td>`;
-            return `<td class="px-3 py-2 text-center">
-                <div class="text-xs font-bold" style="color:${t.color}">${fmt.ctr(m.ctr)}</div>
-                <div class="text-xs text-slate-500">ROAS ${fmt.roas(m.roas)}</div>
-                <div class="text-xs text-slate-400">${m.count}개</div>
-            </td>`;
-        }).join('');
+        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod));
+        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod));
+        const ugcBetter = mu2 && mr2 && (mu2.ctr > mr2.ctr || mu2.roas > mr2.roas);
         return `<tr class="border-b border-slate-100 hover:bg-slate-50">
-            <td class="px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">${prod}</td>
-            ${cells}
+            <td class="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                ${ugcBetter ? '✅ ' : ''}${prod}
+            </td>
+            <td class="px-3 py-2.5 text-center">
+                ${mu2 ? `<div class="text-xs font-bold text-violet-600">${fmt.ctr(mu2.ctr)}</div>
+                         <div class="text-xs text-slate-500">ROAS ${fmt.roas(mu2.roas)}</div>
+                         <div class="text-xs text-slate-400">${mu2.count}개</div>` : '<span class="text-xs text-slate-300">—</span>'}
+            </td>
+            <td class="px-3 py-2.5 text-center">
+                ${mr2 ? `<div class="text-xs font-bold text-slate-500">${fmt.ctr(mr2.ctr)}</div>
+                         <div class="text-xs text-slate-400">ROAS ${fmt.roas(mr2.roas)}</div>
+                         <div class="text-xs text-slate-400">${mr2.count}개</div>` : '<span class="text-xs text-slate-300">—</span>'}
+            </td>
+            <td class="px-3 py-2.5 text-center text-xs">
+                ${mu2 && mr2 && mr2.ctr > 0 ? `<span class="font-bold ${mu2.ctr >= mr2.ctr ? 'text-violet-600' : 'text-slate-400'}">CTR ${fmt.pct(((mu2.ctr-mr2.ctr)/mr2.ctr)*100)}</span>` : '—'}
+            </td>
         </tr>`;
     }).join('');
 
     tableEl.innerHTML = `
-        <p class="text-xs font-bold text-slate-700 mb-2">제품별 타입 비교 <span class="font-normal text-slate-400">(CTR · ROAS · 소재 수)</span></p>
+        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· 중앙값 기준 · ✅ UGC 우세 제품</span></p>
         <div class="overflow-x-auto rounded-xl border border-slate-200">
-            <table class="w-full text-sm">
+            <table class="w-full">
                 <thead class="bg-slate-50">
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-bold text-slate-600">제품</th>
-                        ${CREATIVE_TYPES.map(t => `<th class="px-3 py-2 text-center text-xs font-bold" style="color:${t.color}">${t.label}</th>`).join('')}
+                        <th class="px-3 py-2 text-center text-xs font-bold text-violet-600">UGC · 인플루언서</th>
+                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-500">일반 소재</th>
+                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-600">UGC 우위</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
