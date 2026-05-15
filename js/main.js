@@ -709,7 +709,9 @@ function renderCreativeTypeComparison() {
     const badgeEl = document.getElementById('creative-type-total-badge');
     if (!section) return;
 
-    const base = getBrandCreatives();
+    const UGC_TARGET_PRODUCTS = ['shurink', 'collagen'];
+    const isTargetProduct = c => UGC_TARGET_PRODUCTS.some(p => (c.product || '').toLowerCase().includes(p));
+    const base = getBrandCreatives().filter(isTargetProduct);
     section.classList.remove('hidden');
 
     const hasUGC = base.some(c => classifyCreativeType(c) === 'ugc');
