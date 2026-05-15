@@ -655,13 +655,14 @@ function syncHiddenAiSelect() {
 // ============================
 // UGC(인플루언서+ugc) vs 일반 소재 성과 비교 — 중앙값 기준
 // ============================
-const CT_UGC     = { key: 'ugc',     label: 'UGC · 인플루언서', icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
-const CT_REGULAR = { key: 'regular', label: '일반 소재',          icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
+const CT_UGC     = { key: 'ugc',     label: 'UGC 소재',      icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
+const CT_REGULAR = { key: 'regular', label: '일반 소재 (저효율 평균)', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
 
 function classifyCreativeType(c) {
-    const name = [c.ad_name, c.creative_name, c.adgroup_name, c.campaign_name, c.id]
+    // ad_name 우선 체크, 없으면 다른 필드까지 확인
+    const name = [c.ad_name, c.creative_name, c.adgroup_name]
         .filter(Boolean).join(' ').toLowerCase();
-    if (name.includes('influencer') || name.includes('ugc') || name.includes('インフルエンサー')) return 'ugc';
+    if (name.includes('ugc') || name.includes('influencer') || name.includes('model') || name.includes('インフルエンサー')) return 'ugc';
     return 'regular';
 }
 
@@ -672,14 +673,22 @@ function medianOf(arr, key) {
     return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
 }
 
-function calcTypeMetrics(list) {
+function avgOf(arr, key) {
+    const vals = arr.map(c => c[key] || 0).filter(v => v > 0);
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+}
+
+// UGC → 중앙값, 일반 → 평균(저효율 평균)
+function calcTypeMetrics(list, useMedian = true) {
     if (!list.length) return null;
+    const calc = useMedian ? medianOf : avgOf;
     return {
-        count:   list.length,
-        spend:   list.reduce((s, c) => s + (c.spend   || 0), 0),
-        ctr:     medianOf(list, 'ctr'),
-        roas:    medianOf(list, 'roas'),
-        cvr:     medianOf(list, 'cvr'),
+        count:  list.length,
+        spend:  list.reduce((s, c) => s + (c.spend || 0), 0),
+        ctr:    calc(list, 'ctr'),
+        roas:   calc(list, 'roas'),
+        cvr:    calc(list, 'cvr'),
+        method: useMedian ? '중앙값' : '평균',
     };
 }
 
@@ -707,10 +716,10 @@ function renderCreativeTypeComparison() {
 
     const grouped = { ugc: [], regular: [] };
     base.forEach(c => grouped[classifyCreativeType(c)].push(c));
-    const mu = calcTypeMetrics(grouped.ugc);
-    const mr = calcTypeMetrics(grouped.regular);
+    const mu = calcTypeMetrics(grouped.ugc,     true);   // UGC → 중앙값
+    const mr = calcTypeMetrics(grouped.regular, false);  // 일반 → 평균(저효율 평균)
 
-    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 · 일반 ${mr?.count ?? 0}개`;
+    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 (중앙값) · 일반 ${mr?.count ?? 0}개 (저효율 평균)`;
 
     const fmt = {
         ctr:  v => (v * 100).toFixed(2) + '%',
@@ -761,7 +770,7 @@ function renderCreativeTypeComparison() {
             <div class="space-y-2">
                 ${metricDefs.map(md => `
                 <div class="flex items-center justify-between">
-                    <span class="text-xs text-slate-500">${md.label} <span class="text-slate-400">(중앙값)</span></span>
+                    <span class="text-xs text-slate-500">${md.label} <span class="text-slate-400">(${m.method})</span></span>
                     <span class="text-sm font-bold" style="color:${t.color}">${md.f(m[md.key])}</span>
                 </div>`).join('')}
             </div>
@@ -812,8 +821,8 @@ function renderCreativeTypeComparison() {
     if (!products.length) { tableEl.innerHTML = ''; return; }
 
     const rows = products.map(prod => {
-        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod));
-        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod));
+        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod),     true);
+        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod), false);
         const ugcBetter = mu2 && mr2 && (mu2.ctr > mr2.ctr || mu2.roas > mr2.roas);
         return `<tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
@@ -836,7 +845,7 @@ function renderCreativeTypeComparison() {
     }).join('');
 
     tableEl.innerHTML = `
-        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· 중앙값 기준 · ✅ UGC 우세 제품</span></p>
+        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· UGC 중앙값 vs 일반 저효율 평균 · ✅ UGC 우세 제품</span></p>
         <div class="overflow-x-auto rounded-xl border border-slate-200">
             <table class="w-full">
                 <thead class="bg-slate-50">
