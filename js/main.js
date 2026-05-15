@@ -656,7 +656,7 @@ function syncHiddenAiSelect() {
 // UGC(인플루언서+ugc) vs 일반 소재 성과 비교 — 중앙값 기준
 // ============================
 const CT_UGC     = { key: 'ugc',     label: 'UGC 소재',      icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
-const CT_REGULAR = { key: 'regular', label: '일반 소재 (저효율 평균)', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
+const CT_REGULAR = { key: 'regular', label: '일반 소재 (하위 중앙값)', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
 
 function classifyCreativeType(c) {
     // ad_name 우선 체크, 없으면 다른 필드까지 확인
@@ -678,17 +678,26 @@ function avgOf(arr, key) {
     return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
 }
 
-// UGC → 중앙값, 일반 → 평균(저효율 평균)
-function calcTypeMetrics(list, useMedian = true) {
+// UGC → 전체 중앙값 / 일반 → 하위 50% 중앙값
+function calcTypeMetrics(list, mode = 'median') {
     if (!list.length) return null;
-    const calc = useMedian ? medianOf : avgOf;
+    let target = list;
+    let method = '중앙값';
+    if (mode === 'bottom-median') {
+        // ROAS 기준 오름차순 정렬 후 하위 50% 추출
+        const sorted = [...list].filter(c => (c.roas || 0) > 0).sort((a, b) => a.roas - b.roas);
+        const half = Math.ceil(sorted.length / 2);
+        target = sorted.slice(0, half);
+        method = '하위 중앙값';
+    }
     return {
-        count:  list.length,
-        spend:  list.reduce((s, c) => s + (c.spend || 0), 0),
-        ctr:    calc(list, 'ctr'),
-        roas:   calc(list, 'roas'),
-        cvr:    calc(list, 'cvr'),
-        method: useMedian ? '중앙값' : '평균',
+        count:      list.length,
+        countUsed:  target.length,
+        spend:      list.reduce((s, c) => s + (c.spend || 0), 0),
+        ctr:        medianOf(target, 'ctr'),
+        roas:       medianOf(target, 'roas'),
+        cvr:        medianOf(target, 'cvr'),
+        method,
     };
 }
 
@@ -716,10 +725,10 @@ function renderCreativeTypeComparison() {
 
     const grouped = { ugc: [], regular: [] };
     base.forEach(c => grouped[classifyCreativeType(c)].push(c));
-    const mu = calcTypeMetrics(grouped.ugc,     true);   // UGC → 중앙값
-    const mr = calcTypeMetrics(grouped.regular, false);  // 일반 → 평균(저효율 평균)
+    const mu = calcTypeMetrics(grouped.ugc,     'median');        // UGC → 전체 중앙값
+    const mr = calcTypeMetrics(grouped.regular, 'bottom-median'); // 일반 → 하위 50% 중앙값
 
-    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 (중앙값) · 일반 ${mr?.count ?? 0}개 (저효율 평균)`;
+    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 (중앙값) · 일반 ${mr?.count ?? 0}개 중 하위 ${mr?.countUsed ?? 0}개 중앙값`;
 
     const fmt = {
         ctr:  v => (v * 100).toFixed(2) + '%',
@@ -821,8 +830,8 @@ function renderCreativeTypeComparison() {
     if (!products.length) { tableEl.innerHTML = ''; return; }
 
     const rows = products.map(prod => {
-        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod),     true);
-        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod), false);
+        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod),     'median');
+        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod), 'bottom-median');
         const ugcBetter = mu2 && mr2 && (mu2.ctr > mr2.ctr || mu2.roas > mr2.roas);
         return `<tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
@@ -845,7 +854,7 @@ function renderCreativeTypeComparison() {
     }).join('');
 
     tableEl.innerHTML = `
-        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· UGC 중앙값 vs 일반 저효율 평균 · ✅ UGC 우세 제품</span></p>
+        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· UGC 중앙값 vs 일반 하위 50% 중앙값 · ✅ UGC 우세 제품</span></p>
         <div class="overflow-x-auto rounded-xl border border-slate-200">
             <table class="w-full">
                 <thead class="bg-slate-50">
