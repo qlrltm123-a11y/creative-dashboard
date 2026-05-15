@@ -656,7 +656,7 @@ function syncHiddenAiSelect() {
 // UGC(인플루언서+ugc) vs 일반 소재 성과 비교 — 중앙값 기준
 // ============================
 const CT_UGC     = { key: 'ugc',     label: 'UGC 소재',      icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
-const CT_REGULAR = { key: 'regular', label: '일반 소재 (하위 중앙값)', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
+const CT_REGULAR = { key: 'regular', label: '일반 소재', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
 
 function classifyCreativeType(c) {
     // ad_name 우선 체크, 없으면 다른 필드까지 확인
@@ -688,7 +688,7 @@ function calcTypeMetrics(list, mode = 'median') {
         const sorted = [...list].filter(c => (c.roas || 0) > 0).sort((a, b) => a.roas - b.roas);
         const half = Math.ceil(sorted.length / 2);
         target = sorted.slice(0, half);
-        method = '하위 중앙값';
+        method = '중앙값';
     }
     return {
         count:      list.length,
@@ -732,7 +732,7 @@ function renderCreativeTypeComparison() {
     const mu = calcTypeMetrics(grouped.ugc,     'median');        // UGC → 전체 중앙값
     const mr = calcTypeMetrics(grouped.regular, 'bottom-median'); // 일반 → 하위 50% 중앙값
 
-    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 (중앙값) · 일반 ${mr?.count ?? 0}개 중 하위 ${mr?.countUsed ?? 0}개 중앙값`;
+    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 · 일반 ${mr?.count ?? 0}개`;
 
     const fmt = {
         ctr:  v => (v * 100).toFixed(2) + '%',
@@ -918,7 +918,7 @@ function renderCreativeTypeComparison() {
     }).join('');
 
     tableEl.innerHTML = `
-        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· UGC 중앙값 vs 일반 하위 50% 중앙값 · ✅ UGC 우세 제품</span></p>
+        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· ✅ UGC 우세 제품</span></p>
         <div class="overflow-x-auto rounded-xl border border-slate-200">
             <table class="w-full">
                 <thead class="bg-slate-50">
