@@ -703,10 +703,11 @@ function calcTypeMetrics(list, mode = 'median') {
 
 function renderCreativeTypeComparison() {
     const section = document.getElementById('creative-type-comparison-section');
-    const cardsEl = document.getElementById('creative-type-summary-cards');
-    const barsEl  = document.getElementById('creative-type-metric-bars');
-    const tableEl = document.getElementById('creative-type-product-table');
-    const badgeEl = document.getElementById('creative-type-total-badge');
+    const cardsEl   = document.getElementById('creative-type-summary-cards');
+    const barsEl    = document.getElementById('creative-type-metric-bars');
+    const examplesEl= document.getElementById('creative-type-examples');
+    const tableEl   = document.getElementById('creative-type-product-table');
+    const badgeEl   = document.getElementById('creative-type-total-badge');
     if (!section) return;
 
     const UGC_TARGET_PRODUCTS = ['shurink', 'collagen'];
@@ -721,6 +722,7 @@ function renderCreativeTypeComparison() {
             <code class="bg-slate-100 px-1 rounded">ugc</code> 키워드가 포함된 소재가 없습니다.
         </div>`;
         if (barsEl) barsEl.innerHTML = '';
+        if (examplesEl) examplesEl.innerHTML = '';
         if (tableEl) tableEl.innerHTML = '';
         return;
     }
@@ -826,6 +828,66 @@ function renderCreativeTypeComparison() {
             </div>
         </div>`;
     }).join('');
+
+    // ─── 대표 소재 예시 ───
+    if (examplesEl) {
+        const EXAMPLE_N = 3;
+        // UGC: ROAS 상위 N개 / 일반: ROAS 하위 N개
+        const ugcExamples = [...grouped.ugc]
+            .filter(c => (c.roas || 0) > 0)
+            .sort((a, b) => (b.roas || 0) - (a.roas || 0))
+            .slice(0, EXAMPLE_N);
+        const regExamples = [...grouped.regular]
+            .filter(c => (c.roas || 0) > 0)
+            .sort((a, b) => (a.roas || 0) - (b.roas || 0))
+            .slice(0, EXAMPLE_N);
+
+        const makeThumb = (c) => {
+            const raw = (c.thumbnail_url || c.media_url || '').trim();
+            const isVideo = (c.media_type || '').toLowerCase() === 'video';
+            const fallback = `<div class="ctc-thumb-fallback"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
+            if (!raw) return fallback;
+            if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(raw) && typeof window.buildDriveImgHtml === 'function') {
+                return window.buildDriveImgHtml(raw, { className: 'ctc-thumb-img', alt: '', finalFallbackHtml: fallback });
+            }
+            return `<img class="ctc-thumb-img" src="${raw}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='${fallback.replace(/'/g, "&#39;")}'">`;
+        };
+
+        const makeCard = (c, rankLabel, rankColor) => {
+            const name = (c.ad_name || c.creative_name || '소재명 없음').slice(0, 28);
+            const product = (c.product || '').trim();
+            return `
+            <div class="ctc-example-card" onclick="window.openCreativeDetail && window.openCreativeDetail('${(c.id||'').replace(/'/g,"&#39;")}')">
+                <div class="ctc-thumb-wrap">
+                    ${makeThumb(c)}
+                    <span class="ctc-rank-badge" style="background:${rankColor}">${rankLabel}</span>
+                </div>
+                <div class="ctc-card-info">
+                    ${product ? `<span class="ctc-product-tag">${product}</span>` : ''}
+                    <p class="ctc-card-name" title="${c.ad_name || ''}">${name}</p>
+                    <div class="ctc-card-metrics">
+                        <span>CTR <b>${(((c.ctr||0)*100).toFixed(2))}%</b></span>
+                        <span>ROAS <b>${(c.roas||0).toFixed(1)}x</b></span>
+                    </div>
+                </div>
+            </div>`;
+        };
+
+        const ugcCols = ugcExamples.map((c, i) => makeCard(c, `UGC #${i+1}`, '#8b5cf6')).join('');
+        const regCols = regExamples.map((c, i) => makeCard(c, `일반 #${i+1}`, '#94a3b8')).join('');
+
+        examplesEl.innerHTML = `
+        <div class="ctc-examples-grid">
+            <div class="ctc-examples-col">
+                <p class="ctc-col-header" style="color:#8b5cf6"><i class="fas fa-star mr-1"></i>UGC · 인플루언서 — 상위 소재</p>
+                <div class="ctc-cards-row">${ugcCols || '<p class="text-xs text-slate-400 p-2">소재 없음</p>'}</div>
+            </div>
+            <div class="ctc-examples-col">
+                <p class="ctc-col-header" style="color:#94a3b8"><i class="fas fa-image mr-1"></i>일반 소재 — 저효율 하위 소재</p>
+                <div class="ctc-cards-row">${regCols || '<p class="text-xs text-slate-400 p-2">소재 없음</p>'}</div>
+            </div>
+        </div>`;
+    }
 
     // ─── 제품별 비교 테이블 ───
     const products = Array.from(new Set(base.map(c => (c.product || '').trim()).filter(Boolean))).sort();
