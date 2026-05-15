@@ -338,11 +338,12 @@ function switchSection(sectionName) {
     if (!_renderedSections[sectionName]) {
         _renderedSections[sectionName] = true;
         if (sectionName === 'performance') {
-            renderPerformanceCriteriaBadge();  // ★ 공통 선정 기준 배지
+            renderPerformanceCriteriaBadge();
             renderScatterChart();
             renderAppealInsight();
             renderProductPerformance();
             renderPlatformCreativeMatrix();
+            renderCreativeTypeComparison();
         } else if (sectionName === 'ai') {
             if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
         }
@@ -651,13 +652,169 @@ function syncHiddenAiSelect() {
     if (oldAi) oldAi.value = aiProduct ? aiProduct : '__all__';
 }
 
+// ============================
+// 인플루언서 · UGC vs 일반 소재 성과 비교
+// ============================
+const CREATIVE_TYPES = [
+    { key: 'influencer', label: '인플루언서', icon: 'fa-star', color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' },
+    { key: 'ugc',        label: 'UGC',         icon: 'fa-video', color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
+    { key: 'regular',    label: '일반 소재',    icon: 'fa-image', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
+];
+
+function classifyCreativeType(c) {
+    const name = ((c.ad_name || '') + ' ' + (c.creative_name || '')).toLowerCase();
+    if (name.includes('influencer')) return 'influencer';
+    if (name.includes('ugc'))        return 'ugc';
+    return 'regular';
+}
+
+function calcTypeMetrics(list) {
+    if (!list.length) return null;
+    const validCTR  = list.filter(c => c.ctr  > 0);
+    const validROAS = list.filter(c => c.roas > 0);
+    const validCVR  = list.filter(c => c.cvr  > 0);
+    const avg = (arr, key) => arr.length ? arr.reduce((s, c) => s + c[key], 0) / arr.length : 0;
+    return {
+        count:   list.length,
+        spend:   list.reduce((s, c) => s + (c.spend  || 0), 0),
+        revenue: list.reduce((s, c) => s + (c.revenue || 0), 0),
+        ctr:     avg(validCTR,  'ctr'),
+        roas:    avg(validROAS, 'roas'),
+        cvr:     avg(validCVR,  'cvr'),
+    };
+}
+
+function renderCreativeTypeComparison() {
+    const section   = document.getElementById('creative-type-comparison-section');
+    const cardsEl   = document.getElementById('creative-type-summary-cards');
+    const barsEl    = document.getElementById('creative-type-metric-bars');
+    const tableEl   = document.getElementById('creative-type-product-table');
+    const badgeEl   = document.getElementById('creative-type-total-badge');
+    if (!section) return;
+
+    const base = getBrandCreatives('performance');
+
+    // influencer 또는 ugc가 하나라도 없으면 섹션 숨김
+    const hasInfluencer = base.some(c => classifyCreativeType(c) === 'influencer');
+    const hasUGC        = base.some(c => classifyCreativeType(c) === 'ugc');
+    if (!hasInfluencer && !hasUGC) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+
+    // 타입별 분류
+    const grouped = { influencer: [], ugc: [], regular: [] };
+    base.forEach(c => grouped[classifyCreativeType(c)].push(c));
+    const metrics = {};
+    CREATIVE_TYPES.forEach(t => { metrics[t.key] = calcTypeMetrics(grouped[t.key]); });
+
+    if (badgeEl) badgeEl.textContent = `총 ${base.length}개 소재`;
+
+    // ─── 요약 카드 ───
+    const fmt = {
+        ctr:  v => (v * 100).toFixed(2) + '%',
+        roas: v => v.toFixed(1) + 'x',
+        cvr:  v => (v * 100).toFixed(2) + '%',
+        spend: v => (v >= 1e6 ? (v/1e6).toFixed(1)+'M' : Math.round(v/1000)+'K') + '원',
+    };
+
+    cardsEl.innerHTML = CREATIVE_TYPES.map(t => {
+        const m = metrics[t.key];
+        if (!m) return `<div class="rounded-xl border p-4 opacity-40" style="border-color:${t.border};background:${t.bg}">
+            <div class="flex items-center gap-2 mb-2"><i class="fas ${t.icon} text-sm" style="color:${t.color}"></i><span class="font-bold text-sm" style="color:${t.color}">${t.label}</span></div>
+            <p class="text-xs text-slate-400">데이터 없음</p></div>`;
+        return `
+        <div class="rounded-xl border-2 p-4" style="border-color:${t.border};background:${t.bg}">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs" style="background:${t.color}">
+                        <i class="fas ${t.icon}"></i>
+                    </span>
+                    <span class="font-bold text-sm text-slate-800">${t.label}</span>
+                </div>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style="background:${t.color}">${m.count}개</span>
+            </div>
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs"><span class="text-slate-500">CTR</span><span class="font-bold" style="color:${t.color}">${fmt.ctr(m.ctr)}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-500">ROAS</span><span class="font-bold" style="color:${t.color}">${fmt.roas(m.roas)}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-500">CVR</span><span class="font-bold" style="color:${t.color}">${fmt.cvr(m.cvr)}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-500">광고비</span><span class="font-semibold text-slate-600">${fmt.spend(m.spend)}</span></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // ─── 지표별 비교 바 ───
+    const metricDefs = [
+        { key: 'ctr',  label: 'CTR',  fmt: fmt.ctr },
+        { key: 'roas', label: 'ROAS', fmt: fmt.roas },
+        { key: 'cvr',  label: 'CVR',  fmt: fmt.cvr },
+    ];
+    barsEl.innerHTML = metricDefs.map(md => {
+        const vals = CREATIVE_TYPES.map(t => metrics[t.key]?.[md.key] || 0);
+        const maxVal = Math.max(...vals, 0.0001);
+        const bars = CREATIVE_TYPES.map((t, i) => {
+            const pct = Math.round((vals[i] / maxVal) * 100);
+            return `<div class="flex items-center gap-2 text-xs">
+                <span class="w-16 text-right text-slate-500 flex-shrink-0">${t.label}</span>
+                <div class="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+                    <div class="h-full rounded-full flex items-center px-2 text-white text-xs font-semibold transition-all" style="width:${Math.max(pct,8)}%;background:${t.color}">
+                        ${pct > 20 ? fmt[md.key](vals[i]) : ''}
+                    </div>
+                </div>
+                ${pct <= 20 ? `<span class="text-slate-600 font-semibold flex-shrink-0">${md.fmt(vals[i])}</span>` : '<span class="w-12"></span>'}
+            </div>`;
+        }).join('');
+        return `<div class="bg-slate-50 rounded-xl p-3">
+            <p class="text-xs font-bold text-slate-700 mb-2">${md.label} 비교</p>
+            <div class="space-y-1.5">${bars}</div>
+        </div>`;
+    }).join('');
+
+    // ─── 제품별 비교 테이블 ───
+    const products = Array.from(new Set(base.map(c => (c.product || '').trim()).filter(Boolean))).sort();
+    if (!products.length) { tableEl.innerHTML = ''; return; }
+
+    const rows = products.map(prod => {
+        const typeMetrics = {};
+        CREATIVE_TYPES.forEach(t => {
+            typeMetrics[t.key] = calcTypeMetrics(grouped[t.key].filter(c => (c.product || '').trim() === prod));
+        });
+        const cells = CREATIVE_TYPES.map(t => {
+            const m = typeMetrics[t.key];
+            if (!m) return `<td class="px-3 py-2 text-center text-xs text-slate-300">—</td>`;
+            return `<td class="px-3 py-2 text-center">
+                <div class="text-xs font-bold" style="color:${t.color}">${fmt.ctr(m.ctr)}</div>
+                <div class="text-xs text-slate-500">ROAS ${fmt.roas(m.roas)}</div>
+                <div class="text-xs text-slate-400">${m.count}개</div>
+            </td>`;
+        }).join('');
+        return `<tr class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="px-3 py-2 text-xs font-semibold text-slate-700 whitespace-nowrap">${prod}</td>
+            ${cells}
+        </tr>`;
+    }).join('');
+
+    tableEl.innerHTML = `
+        <p class="text-xs font-bold text-slate-700 mb-2">제품별 타입 비교 <span class="font-normal text-slate-400">(CTR · ROAS · 소재 수)</span></p>
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-600">제품</th>
+                        ${CREATIVE_TYPES.map(t => `<th class="px-3 py-2 text-center text-xs font-bold" style="color:${t.color}">${t.label}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+}
+
 // 성과 분석 섹션 컨텐츠만 다시 그리기
 function refreshPerformanceSection() {
-    renderPerformanceCriteriaBadge();  // ★ 공통 선정 기준 배지 먼저 갱신
+    renderPerformanceCriteriaBadge();
     renderScatterChart();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
+    renderCreativeTypeComparison();
 }
 
 // ★ 성과 분석 탭 공통 선정 기준 배지 렌더
