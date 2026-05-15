@@ -166,7 +166,13 @@ const COLUMN_ALIASES = {
     'key_message_jp': 'key_message_jp',
     'key_message_kr': 'key_message_kr',
     '카피_jp': 'key_message_jp',
-    '카피_kr': 'key_message_kr'
+    '카피_kr': 'key_message_kr',
+    // Retail 채널
+    'retail': 'retail',
+    'retail_channel': 'retail',
+    '리테일': 'retail',
+    '리테일채널': 'retail',
+    'channel': 'retail'
 };
 
 // URL 또는 파일명에서 미디어 타입 자동 감지
