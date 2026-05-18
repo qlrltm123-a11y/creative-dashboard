@@ -1916,192 +1916,107 @@ function renderAppealInsight() {
     // ★ 성과 분석 섹션 통합 필터(performance scope) — 제품/캠페인 자동 반영
     const product = performanceProduct || '';
 
-    const noConv = isNoConvPlatform(currentPlatform);
-    // ★★★ 공통 선정 기준 풀 사용 (모든 성과 분석 컨텐츠 통일)
-    let pool, appealThreshold, appealMedian;
-    if (noConv) {
-        // noConv 플랫폼(X/Meta/TikTok): window.allCreatives 직접 사용, CTR 기반
+    // --- ROAS 풀 (Single one: 전환 추적 플랫폼) ---
+    let roasPool = [];
+    {
         let raw = Array.isArray(window.allCreatives) ? window.allCreatives
                 : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
-        if (currentPlatform) raw = raw.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+        raw = raw.filter(c => !isNoConvPlatform((c.platform || '').toString().trim()));
         if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
-        pool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
-        appealThreshold = 0;
-        appealMedian = 0;
-    } else {
-        const perfPoolForAppeal = getPerformancePool();
-        pool = perfPoolForAppeal.qualified.filter(c => (c.roas || 0) > 0);
-        appealThreshold = perfPoolForAppeal.threshold;
-        appealMedian = perfPoolForAppeal.medianSpend;
+        roasPool = raw.filter(c => (c.roas || 0) > 0);
+    }
+    // --- CTR 풀 (직매체: X/Meta/TikTok) ---
+    let ctrPool = [];
+    {
+        let raw = Array.isArray(window.allCreatives) ? window.allCreatives
+                : Array.isArray(allCreatives) ? allCreatives : [];
+        if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
+        raw = raw.filter(c => isNoConvPlatform((c.platform || '').toString().trim()));
+        if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
+        if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
+        ctrPool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
     }
 
-    if (!pool.length) {
-        container.innerHTML = `
-            <div class="text-center text-slate-400 text-sm py-12">
-                <i class="fas fa-folder-open text-2xl mb-2"></i><br>
-                해당 조건의 데이터가 없습니다
-            </div>
-        `;
+    if (!roasPool.length && !ctrPool.length) {
+        container.innerHTML = `<div class="text-center text-slate-400 text-sm py-12"><i class="fas fa-folder-open text-2xl mb-2"></i><br>해당 조건의 데이터가 없습니다</div>`;
         return;
     }
 
-    // 3) 소구포인트별 집계 (제품 범위 안에서, 중앙값 이상 소재만)
-    const appealMap = new Map();
-    pool.forEach(c => {
-        const appeals = (typeof normalizeArrayField === 'function')
-            ? normalizeArrayField(c.appeal_points)
-            : [];
-        appeals.forEach(a => {
-            if (!a || a.startsWith('❌')) return;
-            if (!appealMap.has(a)) {
-                appealMap.set(a, {
-                    keyword: a,
-                    count: 0,
-                    creatives: []
-                });
-            }
-            const item = appealMap.get(a);
-            item.count++;
-            item.creatives.push(c);
-        });
-    });
-
-    // ★ 키워드별 ROAS = "픽업한 대표 소재들의 평균 ROAS" 로 계산
-    //   - 단일 소재 키워드일 때 풀에서 같은 소재를 (광고비 큰 순) 추가로 보강
-    //     → 최소 3개 ~ 최대 5개 소재 기반으로 평균
-    //   - 소재가 부족한 경우 가능한 만큼만 사용 (강제 보강 X)
-    // ★ 각 키워드의 ROAS = "그 키워드에 실제 매칭된 소재들"의 평균 ROAS
-    //   - 풀에서 인위적으로 같은 소재를 끌어다 보강하지 않음 (다 똑같아지는 문제 방지)
-    //   - 자연스럽게 N개의 소재가 매칭되었으면 N개의 평균을 그대로 사용
-    //   - 광고비 큰 순으로 최대 5개까지 (소재가 너무 많으면 노이즈 방지)
     const MAX_CREATIVES = 5;
+    function buildAppealAll(pool) {
+        const aMap = new Map();
+        pool.forEach(c => {
+            const appeals = typeof normalizeArrayField === 'function' ? normalizeArrayField(c.appeal_points) : [];
+            appeals.forEach(a => {
+                if (!a || a.startsWith('❌')) return;
+                if (!aMap.has(a)) aMap.set(a, { keyword: a, count: 0, creatives: [] });
+                const item = aMap.get(a);
+                item.count++;
+                item.creatives.push(c);
+            });
+        });
+        return Array.from(aMap.values()).map(item => {
+            const picked = [...item.creatives].sort((a, b) => (b.spend || 0) - (a.spend || 0)).slice(0, MAX_CREATIVES);
+            const avgOf = f => picked.length ? picked.map(c => Number(c[f]) || 0).reduce((s, v) => s + v, 0) / picked.length : 0;
+            const sumOf = f => picked.reduce((s, c) => s + (Number(c[f]) || 0), 0);
+            return { ...item, roas: avgOf('roas'), ctr: avgOf('ctr'), cvr: avgOf('cvr'),
+                spend: sumOf('spend'), revenue: sumOf('revenue'), impressions: sumOf('impressions'),
+                clicks: sumOf('clicks'), conversions: sumOf('conversions'),
+                pickedCreatives: picked, pickedCount: picked.length, ownCount: item.count };
+        });
+    }
 
-    const all = Array.from(appealMap.values()).map(item => {
-        // 해당 키워드에 매칭된 소재 (광고비 큰 순, 최대 5개)
-        const picked = [...item.creatives]
-            .sort((a, b) => (b.spend || 0) - (a.spend || 0))
-            .slice(0, MAX_CREATIVES);
+    const allRoas = buildAppealAll(roasPool);
+    const allCtr  = buildAppealAll(ctrPool);
 
-        const avgOf = (field) => {
-            if (!picked.length) return 0;
-            const vals = picked.map(c => Number(c[field]) || 0);
-            return vals.reduce((s, v) => s + v, 0) / vals.length;
-        };
-        const sumOf = (field) => picked.reduce((s, c) => s + (Number(c[field]) || 0), 0);
-
-        return {
-            ...item,
-            // ★ ROAS = 매칭된 대표 소재들의 평균 ROAS (단순 평균)
-            roas: avgOf('roas'),
-            ctr:  avgOf('ctr'),
-            cvr:  avgOf('cvr'),
-            spend: sumOf('spend'),
-            revenue: sumOf('revenue'),
-            impressions: sumOf('impressions'),
-            clicks: sumOf('clicks'),
-            conversions: sumOf('conversions'),
-            pickedCreatives: picked,
-            pickedCount: picked.length,
-            ownCount: item.count,
-        };
-    });
-
-    if (!all.length) {
-        container.innerHTML = `
-            <div class="text-center text-slate-400 text-sm py-12">
-                <i class="fas fa-magic-wand-sparkles text-2xl mb-2"></i><br>
-                소구포인트(appeal_points) 데이터가 없습니다.<br>
-                <span class="text-xs">Apps Script로 AI 분석을 실행해주세요.</span>
-            </div>
-        `;
+    if (!allRoas.length && !allCtr.length) {
+        container.innerHTML = `<div class="text-center text-slate-400 text-sm py-12"><i class="fas fa-magic-wand-sparkles text-2xl mb-2"></i><br>소구포인트(appeal_points) 데이터가 없습니다.<br><span class="text-xs">Apps Script로 AI 분석을 실행해주세요.</span></div>`;
         return;
     }
 
     // 기준 지표 평균
-    const totalSpend = all.reduce((s, x) => s + x.spend, 0);
-    const totalRev = all.reduce((s, x) => s + x.revenue, 0);
+    const totalSpend = allRoas.reduce((s, x) => s + x.spend, 0);
+    const totalRev   = allRoas.reduce((s, x) => s + x.revenue, 0);
     const avgRoas = totalSpend > 0 ? totalRev / totalSpend : 0;
-    const avgCtr = all.length > 0 ? all.reduce((s, x) => s + (x.ctr || 0), 0) / all.length : 0;
+    const avgCtr  = allCtr.length > 0 ? allCtr.reduce((s, x) => s + (x.ctr || 0), 0) / allCtr.length : 0;
 
-    // ★ 다양성 보장 선정 로직 (강화 버전)
-    //   "같은 소재를 여러 번 쓸 필요 없고 필요에 따라 취합" 원칙
-    //   - 키워드 카드의 "대표 소재"(=가장 광고비 큰 소재)가 이미 다른 키워드에서
-    //     대표로 쓰였다면 스킵 → 5개 카드가 다 똑같아 보이는 문제를 원천 차단
-    //   - 후보가 부족할 때만 중복을 허용 (마지막 폴백)
     function pickDiverse(sortedList, take = 5) {
-        const usedRepIds = new Set();   // 이미 대표 소재로 쓰인 ID
-        const picked = [];
-        const skipped = [];             // 중복으로 스킵된 후보 (폴백용)
-
+        const usedRepIds = new Set();
+        const picked = [], skipped = [];
         sortedList.forEach(item => {
             if (picked.length >= take) return;
             const picks = item.pickedCreatives || item.creatives || [];
-            const rep = picks[0]; // 광고비 가장 큰 소재 (이미 정렬되어 있음)
+            const rep = picks[0];
             const repId = rep ? (rep.id || rep.ad_name || rep.creative_name) : null;
-
-            if (repId && usedRepIds.has(repId)) {
-                // 대표 소재가 이미 사용됨 → 일단 스킵
-                skipped.push(item);
-                return;
-            }
+            if (repId && usedRepIds.has(repId)) { skipped.push(item); return; }
             picked.push(item);
             if (repId) usedRepIds.add(repId);
         });
-
-        // 5개를 못 채웠다면 스킵한 항목으로 폴백 보충
         if (picked.length < take && skipped.length) {
-            for (const s of skipped) {
-                if (picked.length >= take) break;
-                picked.push(s);
-            }
+            for (const s of skipped) { if (picked.length >= take) break; picked.push(s); }
         }
         return picked;
     }
 
-    // ★ 키워드 핵심 토큰 추출 — winner/loser 주제 중복 방지
-    //   예: "화장 밀착력 개선" vs "메이크업 밀착력 향상" → 둘 다 "밀착력" 포함 → 중복
-    //   2글자 이상 단어만 토큰으로 인정 (조사/접미사 제거)
-    const STOP_WORDS = new Set([
-        '개선', '향상', '효과', '증진', '강화', '있는', '없는', '및',
-        '같은', '하는', '되는', '느낌', '관리', '케어', '느낌의',
-        '동시', '동시에', '높은', '낮은', '제공', '연출'
-    ]);
+    const STOP_WORDS = new Set(['개선','향상','효과','증진','강화','있는','없는','및','같은','하는','되는','느낌','관리','케어','느낌의','동시','동시에','높은','낮은','제공','연출']);
     function extractTokens(keyword) {
         if (!keyword) return [];
-        return String(keyword)
-            .split(/[\s,·・、，/\\-]+/)
-            .map(s => s.trim())
-            .filter(s => s.length >= 2 && !STOP_WORDS.has(s));
+        return String(keyword).split(/[\s,·・、，/\\-]+/).map(s => s.trim()).filter(s => s.length >= 2 && !STOP_WORDS.has(s));
     }
-    function hasTokenOverlap(tokensA, tokensB) {
-        if (!tokensA.length || !tokensB.length) return false;
-        const setA = new Set(tokensA);
-        return tokensB.some(t => setA.has(t));
+    allRoas.forEach(item => { item._tokens = extractTokens(item.keyword); });
+    allCtr.forEach(item =>  { item._tokens = extractTokens(item.keyword); });
+
+    function buildWinners(all, sortKey) {
+        const minThree = all.filter(x => (x.pickedCount || 0) >= 3);
+        const minTwo   = all.filter(x => (x.pickedCount || 0) >= 2);
+        const candidates = minThree.length >= 3 ? minThree : minTwo.length >= 3 ? minTwo : all;
+        return pickDiverse([...candidates].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0)), 5);
     }
-
-    // 각 항목에 토큰 정보 부착
-    all.forEach(item => {
-        item._tokens = extractTokens(item.keyword);
-    });
-
-    // 상위 (좋았던 소구) — ★ LOSER 섹션은 제거됨 (사용자 요청)
-    //   ★ 최소 3개 이상 소재 기반 키워드만 winner 후보 (1~2개 소재 평균은 신뢰도 낮음)
-    //   후보 부족 시 단계적 폴백: ≥3 → ≥2 → 전체
-    const minThree = all.filter(x => (x.pickedCount || 0) >= 3);
-    const minTwo = all.filter(x => (x.pickedCount || 0) >= 2);
-    const winnerCandidates = (minThree.length >= 3)
-        ? minThree
-        : (minTwo.length >= 3 ? minTwo : all);
-    const sortedByRoasDesc = [...winnerCandidates].sort((a, b) => noConv ? b.ctr - a.ctr : b.roas - a.roas);
-
-    // winner 선정 (다양성 보장)
-    const winners = pickDiverse(sortedByRoasDesc, 5);
-
-    // (참고) winner 토큰 — 추후 다른 인사이트에서 활용 가능
-    const winnerTokens = new Set();
-    winners.forEach(w => (w._tokens || []).forEach(t => winnerTokens.add(t)));
+    const roasWinners = buildWinners(allRoas, 'roas');
+    const ctrWinners  = buildWinners(allCtr,  'ctr');
+    const winners = roasWinners; // aiGuide는 ROAS 기준 사용
 
     // 4) "다음에 이렇게 만들자" 추천 조합 — winner 소구 + 같은 소재의 후킹/감정 추출
     const recommendedHooks = new Map();
@@ -2157,36 +2072,36 @@ function renderAppealInsight() {
         return '';
     }
 
-    const winnersHtml = winners.length ? winners.map((w, i) => {
-        const medal = ['🥇','🥈','🥉','4','5'][i];
-        const baseVal = noConv ? avgCtr : avgRoas;
-        const wVal = noConv ? (w.ctr || 0) : (w.roas || 0);
-        const lift = baseVal > 0 ? ((wVal / baseVal - 1) * 100) : 0;
-        const liftTxt = lift > 0 ? `+${lift.toFixed(0)}%` : `${lift.toFixed(0)}%`;
-        const topCreative = topCreativeLabel(w);
-        const pickedCount = w.pickedCount || (w.pickedCreatives || []).length || 0;
-        const mainStatVal = noConv ? `${(w.ctr * 100).toFixed(2)}%` : `${Math.round(w.roas * 100)}%`;
-        const mainStatLbl = noConv ? '평균 CTR' : '평균 ROAS';
-        return `
-            <div class="appeal-rank-row appeal-rank-winner">
-                <div class="appeal-rank-medal">${medal}</div>
-                <div class="appeal-rank-info">
-                    <div class="appeal-rank-keyword">${w.keyword}</div>
-                    <div class="appeal-rank-meta">
-                        ${pickedCount}개 소재 평균 · ${noConv ? `노출 ${formatNumber(w.impressions)}` : `광고비 ₩${formatNumber(w.spend)}`}
-                        ${reliabilityBadge(w)}
+    function buildWinnersHtml(list, isNoConvSide, avgBase) {
+        if (!list.length) return '<div class="appeal-empty">분석 가능한 소구포인트 데이터가 부족합니다</div>';
+        return list.map((w, i) => {
+            const medal = ['🥇','🥈','🥉','4','5'][i];
+            const wVal  = isNoConvSide ? (w.ctr || 0) : (w.roas || 0);
+            const lift  = avgBase > 0 ? ((wVal / avgBase - 1) * 100) : 0;
+            const liftTxt = lift > 0 ? `+${lift.toFixed(0)}%` : `${lift.toFixed(0)}%`;
+            const topCreative = topCreativeLabel(w);
+            const pickedCount = w.pickedCount || (w.pickedCreatives || []).length || 0;
+            const mainStatVal = isNoConvSide ? `${(w.ctr * 100).toFixed(2)}%` : `${Math.round(w.roas * 100)}%`;
+            const mainStatLbl = isNoConvSide ? '평균 CTR' : '평균 ROAS';
+            const subInfo = isNoConvSide ? `노출 ${formatNumber(w.impressions)}` : `광고비 ₩${formatNumber(w.spend)}`;
+            return `
+                <div class="appeal-rank-row appeal-rank-winner">
+                    <div class="appeal-rank-medal">${medal}</div>
+                    <div class="appeal-rank-info">
+                        <div class="appeal-rank-keyword">${w.keyword}</div>
+                        <div class="appeal-rank-meta">${pickedCount}개 소재 평균 · ${subInfo} ${reliabilityBadge(w)}</div>
+                        ${topCreative ? `<div class="appeal-rank-topcreative"><i class="fas fa-star"></i> 대표 소재: <b>${topCreative}</b></div>` : ''}
                     </div>
-                    ${topCreative ? `<div class="appeal-rank-topcreative"><i class="fas fa-star"></i> 대표 소재: <b>${topCreative}</b></div>` : ''}
-                </div>
-                <div class="appeal-rank-stats">
-                    <div class="appeal-rank-roas"><b>${mainStatVal}</b><span>${mainStatLbl}</span></div>
-                    <div class="appeal-rank-lift positive">평균比 ${liftTxt}</div>
-                </div>
-            </div>
-        `;
-    }).join('') : '<div class="appeal-empty">분석 가능한 소구포인트 데이터가 부족합니다</div>';
+                    <div class="appeal-rank-stats">
+                        <div class="appeal-rank-roas"><b>${mainStatVal}</b><span>${mainStatLbl}</span></div>
+                        <div class="appeal-rank-lift positive">평균比 ${liftTxt}</div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+    const roasWinnersHtml = buildWinnersHtml(roasWinners, false, avgRoas);
+    const ctrWinnersHtml  = buildWinnersHtml(ctrWinners,  true,  avgCtr);
 
-    // ★ LOSER 렌더링 제거 (사용자 요청: "평균보다 약했던 소구포인트를 없애줘")
     const topWinner = winners[0];
     const recommendChips = (arr, cls) => arr.length
         ? arr.map(x => `<span class="appeal-suggest-chip ${cls}">${x}</span>`).join('')
@@ -2261,12 +2176,11 @@ function renderAppealInsight() {
 
     // 캐치카피 카드 HTML 빌더
     const copyCardsHtml = topCopies.length ? topCopies.map((c, i) => {
-        const _copyBase = noConv ? avgCtr : avgRoas;
-        const _copyVal = noConv ? (c.ctr || 0) : (c.roas || 0);
-        const liftPct = _copyBase > 0 ? Math.round((_copyVal / _copyBase - 1) * 100) : 0;
+        const _copyVal = c.roas || 0;
+        const liftPct = avgRoas > 0 ? Math.round((_copyVal / avgRoas - 1) * 100) : 0;
         const liftBadge = liftPct > 0
             ? `<span class="appeal-copy-lift positive">평균比 +${liftPct}%</span>`
-            : `<span class="appeal-copy-lift">${noConv ? `CTR ${(_copyVal * 100).toFixed(2)}%` : `ROAS ${Math.round(_copyVal * 100)}%`}</span>`;
+            : `<span class="appeal-copy-lift">ROAS ${Math.round(_copyVal * 100)}%</span>`;
         return `
             <div class="appeal-copy-card">
                 <div class="appeal-copy-rank">#${i + 1}</div>
@@ -2296,16 +2210,22 @@ function renderAppealInsight() {
         `;
     }).join('') : '<div class="appeal-suggest-empty">데이터 부족</div>';
 
-    // 성과 분석 탭: 위너 소구포인트만 표시
+    // 성과 분석 탭: Single one(ROAS) | 직매체(CTR) 두 열 나란히
     container.innerHTML = `
-        <div class="appeal-insight-grid appeal-insight-grid-single">
-            <!-- WINNER 섹션 (LOSER 섹션은 제거됨) -->
+        <div class="appeal-insight-dual-grid">
             <div class="appeal-section appeal-section-winner">
                 <div class="appeal-section-header">
                     <i class="fas fa-trophy"></i>
-                    <span>${scopeText}에서 가장 효과적이었던 소구포인트</span>
+                    <span>${scopeText} · Single one&nbsp;<span class="appeal-header-metric roas">ROAS 기준</span></span>
                 </div>
-                <div class="appeal-section-body">${winnersHtml}</div>
+                <div class="appeal-section-body">${roasWinnersHtml}</div>
+            </div>
+            <div class="appeal-section appeal-section-winner appeal-section-ctr">
+                <div class="appeal-section-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>${scopeText} · 직매체&nbsp;<span class="appeal-header-metric ctr">CTR 기준</span></span>
+                </div>
+                <div class="appeal-section-body">${ctrWinnersHtml}</div>
             </div>
         </div>
     `;
@@ -2338,12 +2258,12 @@ function renderAppealInsight() {
                                 <span class="appeal-suggest-chip primary big">${topWinner.keyword}</span>
                                 <div class="appeal-appeal-stats">
                                     <div class="appeal-appeal-stat">
-                                        <span class="appeal-appeal-stat-val">+${noConv ? Math.round((topWinner.ctr / (avgCtr || 1) - 1) * 100) : Math.round((topWinner.roas / (avgRoas || 1) - 1) * 100)}%</span>
-                                        <span class="appeal-appeal-stat-lbl">${noConv ? '평균比 CTR' : '평균比 ROAS'}</span>
+                                        <span class="appeal-appeal-stat-val">+${Math.round((topWinner.roas / (avgRoas || 1) - 1) * 100)}%</span>
+                                        <span class="appeal-appeal-stat-lbl">평균比 ROAS</span>
                                     </div>
                                     <div class="appeal-appeal-stat">
-                                        <span class="appeal-appeal-stat-val">${noConv ? `${((topWinner.ctr || 0) * 100).toFixed(2)}%` : `${Math.round(topWinner.roas * 100)}%`}</span>
-                                        <span class="appeal-appeal-stat-lbl">${noConv ? '달성 CTR' : '달성 ROAS'}</span>
+                                        <span class="appeal-appeal-stat-val">${Math.round(topWinner.roas * 100)}%</span>
+                                        <span class="appeal-appeal-stat-lbl">달성 ROAS</span>
                                     </div>
                                     <div class="appeal-appeal-stat">
                                         <span class="appeal-appeal-stat-val">${topWinner.pickedCount || (topWinner.pickedCreatives||[]).length || 0}</span>
@@ -2454,7 +2374,7 @@ function renderAppealInsight() {
     }
 
     // ★ hover preview 바인딩 — 소구포인트 키워드에 마우스 올리면 대표 소재 카드 표시
-    attachAppealInsightHoverPreview(pool);
+    attachAppealInsightHoverPreview([...roasPool, ...ctrPool]);
 }
 
 // ============================

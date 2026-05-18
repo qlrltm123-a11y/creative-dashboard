@@ -1858,8 +1858,38 @@ body {
     grid-template-columns: 1fr;
 }
 
+/* Single one(ROAS) | 직매체(CTR) 두 열 */
+.appeal-insight-dual-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.appeal-section-ctr {
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 60%);
+    border-color: #93c5fd;
+}
+.appeal-section-ctr .appeal-section-header i { color: #3b82f6; }
+
+.appeal-header-metric {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-left: 4px;
+}
+.appeal-header-metric.roas {
+    background: #d1fae5;
+    color: #065f46;
+}
+.appeal-header-metric.ctr {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
 @media (max-width: 900px) {
-    .appeal-insight-grid {
+    .appeal-insight-grid, .appeal-insight-dual-grid {
         grid-template-columns: 1fr;
     }
 }
