@@ -308,8 +308,8 @@
                     <span class="text-sm font-semibold text-slate-700">BEST TOP 5 정렬 기준</span>
                 </div>
                 <select id="product-sort-metric" class="filter-select">
+                    <option value="ctr" selected>CTR</option>
                     <option value="roas">ROAS</option>
-                    <option value="ctr">CTR</option>
                     <option value="cvr">CVR</option>
                     <option value="revenue">매출</option>
                     <option value="conversions">전환수</option>
@@ -340,25 +340,6 @@
             </div>
         </section>
 
-        <!-- ★ 인플루언서 vs UGC 소재 성과 비교 -->
-        <section id="creative-type-comparison-section" class="chart-card mb-6 hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-                <div>
-                    <h3 class="chart-title"><i class="fas fa-users mr-2 text-violet-500"></i>인플루언서 · UGC vs 일반 소재 성과 비교</h3>
-                    <p class="text-xs text-slate-500 mt-1">소재명에 <code class="bg-slate-100 px-1 rounded">influencer</code> · <code class="bg-slate-100 px-1 rounded">ugc</code> 포함 여부로 자동 분류</p>
-                </div>
-                <div id="creative-type-total-badge" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></div>
-            </div>
-            <!-- 타입별 요약 카드 -->
-            <div id="creative-type-summary-cards" class="grid grid-cols-2 gap-3 mb-5"></div>
-            <!-- 지표별 가로 비교 바 -->
-            <div id="creative-type-metric-bars" class="space-y-3 mb-5"></div>
-            <!-- 대표 소재 예시 -->
-            <div id="creative-type-examples" class="mb-5"></div>
-            <!-- 제품별 비교 테이블 -->
-            <div id="creative-type-product-table"></div>
-        </section>
-
         <!-- ★ 매체 × 소재 조합 분석 -->
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -372,8 +353,8 @@
                     <i class="fas fa-sort-amount-down text-slate-400 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">지표</span>
                     <select id="platform-matrix-metric" class="filter-select text-sm">
+                        <option value="ctr" selected>CTR</option>
                         <option value="roas">ROAS</option>
-                        <option value="ctr">CTR</option>
                         <option value="cvr">CVR</option>
                         <option value="revenue">매출</option>
                     </select>

@@ -64,6 +64,7 @@ async function loadData() {
 // 시트 연동 후 전역 갱신을 위해 노출
 window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
+    invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
     populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
     populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
     populateCampaignOptions(); // ★ 전역 캠페인 옵션 (매체 필터 적용 후 갱신)
@@ -76,7 +77,13 @@ window.updateDashboard = function() {
     populateProductOptions();
     populateAppealInsightProductOptions();
     populatePlatformMatrixProductOptions();
-    renderProductPerformance();
+    if (_renderedSections.performance) {
+        renderPerformanceCriteriaBadge();
+        renderScatterChart();
+        renderProductPerformance();
+    } else {
+        renderProductPerformance();
+    }
     if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
     document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
 };
@@ -126,6 +133,11 @@ function bindEvents() {
             performanceCampaign = '';
             aiProduct = '';
             aiCampaign = '';
+            // 전환 미측정 플랫폼(X/Meta/TikTok) 선택 시 정렬 기준 CTR로 자동 전환
+            if (isNoConvPlatform(currentPlatform)) {
+                const metricSel = document.getElementById('product-sort-metric');
+                if (metricSel) metricSel.value = 'ctr';
+            }
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -343,7 +355,6 @@ function switchSection(sectionName) {
             renderAppealInsight();
             renderProductPerformance();
             renderPlatformCreativeMatrix();
-            renderCreativeTypeComparison();
         } else if (sectionName === 'ai') {
             if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
         }
@@ -652,330 +663,7 @@ function syncHiddenAiSelect() {
     if (oldAi) oldAi.value = aiProduct ? aiProduct : '__all__';
 }
 
-// ============================
-// UGC(인플루언서+ugc) vs 일반 소재 성과 비교 — 중앙값 기준
-// ============================
-const CT_UGC     = { key: 'ugc',     label: 'UGC 소재',      icon: 'fa-star',  color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe' };
-const CT_REGULAR = { key: 'regular', label: '일반 소재', icon: 'fa-image', color: '#94a3b8', bg: '#f8fafc', border: '#e2e8f0' };
 
-function classifyCreativeType(c) {
-    // ad_name 우선 체크, 없으면 다른 필드까지 확인
-    const name = [c.ad_name, c.creative_name, c.adgroup_name]
-        .filter(Boolean).join(' ').toLowerCase();
-    if (name.includes('ugc') || name.includes('influencer') || name.includes('model') || name.includes('インフルエンサー')) return 'ugc';
-    return 'regular';
-}
-
-function medianOf(arr, key) {
-    const vals = arr.map(c => c[key] || 0).filter(v => v > 0).sort((a, b) => a - b);
-    if (!vals.length) return 0;
-    const mid = Math.floor(vals.length / 2);
-    return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
-}
-
-function avgOf(arr, key) {
-    const vals = arr.map(c => c[key] || 0).filter(v => v > 0);
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-}
-
-// UGC → 전체 중앙값 / 일반 → 하위 50% 중앙값
-function calcTypeMetrics(list, mode = 'median') {
-    if (!list.length) return null;
-    let target = list;
-    let method = '중앙값';
-    if (mode === 'bottom-median') {
-        // ROAS 기준 오름차순 정렬 후 하위 50% 추출
-        const sorted = [...list].filter(c => (c.roas || 0) > 0).sort((a, b) => a.roas - b.roas);
-        const half = Math.ceil(sorted.length / 2);
-        target = sorted.slice(0, half);
-        method = '중앙값';
-    }
-    return {
-        count:      list.length,
-        countUsed:  target.length,
-        spend:      list.reduce((s, c) => s + (c.spend || 0), 0),
-        ctr:        medianOf(target, 'ctr'),
-        roas:       medianOf(target, 'roas'),
-        cvr:        medianOf(target, 'cvr'),
-        method,
-    };
-}
-
-function renderCreativeTypeComparison() {
-    const section = document.getElementById('creative-type-comparison-section');
-    const cardsEl   = document.getElementById('creative-type-summary-cards');
-    const barsEl    = document.getElementById('creative-type-metric-bars');
-    const examplesEl= document.getElementById('creative-type-examples');
-    const tableEl   = document.getElementById('creative-type-product-table');
-    const badgeEl   = document.getElementById('creative-type-total-badge');
-    if (!section) return;
-
-    const UGC_TARGET_PRODUCTS = ['shurink', 'collagen'];
-    const isTargetProduct = c => UGC_TARGET_PRODUCTS.some(p => (c.product || '').toLowerCase().includes(p));
-    const base = getBrandCreatives().filter(isTargetProduct);
-    section.classList.remove('hidden');
-
-    const hasUGC = base.some(c => classifyCreativeType(c) === 'ugc');
-    if (!base.length || !hasUGC) {
-        if (cardsEl) cardsEl.innerHTML = `<div class="col-span-2 text-center py-6 text-sm text-slate-400">
-            소재명에 <code class="bg-slate-100 px-1 rounded">influencer</code> 또는
-            <code class="bg-slate-100 px-1 rounded">ugc</code> 키워드가 포함된 소재가 없습니다.
-        </div>`;
-        if (barsEl) barsEl.innerHTML = '';
-        if (examplesEl) examplesEl.innerHTML = '';
-        if (tableEl) tableEl.innerHTML = '';
-        return;
-    }
-
-    const grouped = { ugc: [], regular: [] };
-    base.forEach(c => grouped[classifyCreativeType(c)].push(c));
-    const mu = calcTypeMetrics(grouped.ugc,     'median');        // UGC → 전체 중앙값
-    const mr = calcTypeMetrics(grouped.regular, 'bottom-median'); // 일반 → 하위 50% 중앙값
-
-    if (badgeEl) badgeEl.textContent = `UGC ${mu.count}개 · 일반 ${mr?.count ?? 0}개`;
-
-    const fmt = {
-        ctr:  v => (v * 100).toFixed(2) + '%',
-        roas: v => v.toFixed(1) + 'x',
-        cvr:  v => (v * 100).toFixed(2) + '%',
-        pct:  v => (v > 0 ? '+' : '') + v.toFixed(0) + '%',
-    };
-
-    // ─── 결론 배너 ───
-    const metricDefs = [
-        { key: 'ctr',  label: 'CTR',  f: fmt.ctr },
-        { key: 'roas', label: 'ROAS', f: fmt.roas },
-        { key: 'cvr',  label: 'CVR',  f: fmt.cvr },
-    ];
-    const wins = metricDefs.filter(md => mr && mr[md.key] > 0 && mu[md.key] > mr[md.key]);
-    const conclusionChips = metricDefs.map(md => {
-        if (!mr || !mr[md.key]) return '';
-        const diff = mr[md.key] > 0 ? ((mu[md.key] - mr[md.key]) / mr[md.key]) * 100 : 0;
-        const better = mu[md.key] > mr[md.key];
-        return `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${better ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}">
-            ${md.label} ${better ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}%
-        </span>`;
-    }).join('');
-
-    const conclusionText = wins.length >= 2
-        ? `UGC · 인플루언서 소재가 일반 소재 대비 <b>${wins.map(m => m.label).join(' · ')}</b> 모두 우수합니다`
-        : wins.length === 1
-        ? `UGC · 인플루언서 소재가 <b>${wins[0].label}</b> 지표에서 일반 소재를 앞섭니다`
-        : `현재 데이터 기준 일반 소재가 더 높은 지표를 보입니다`;
-
-    // ─── 카드 2개 ───
-    const renderCard = (t, m, isWinner) => {
-        if (!m) return `<div class="rounded-xl border-2 p-5 opacity-40" style="border-color:${t.border};background:${t.bg}">
-            <p class="text-sm font-bold" style="color:${t.color}">${t.label}</p>
-            <p class="text-xs text-slate-400 mt-1">데이터 없음</p></div>`;
-        return `
-        <div class="rounded-xl border-2 p-5 relative" style="border-color:${isWinner ? t.color : t.border};background:${t.bg}">
-            ${isWinner ? `<span class="absolute -top-2.5 left-4 text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:${t.color}">👑 성과 우수</span>` : ''}
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white" style="background:${t.color}">
-                        <i class="fas ${t.icon} text-sm"></i>
-                    </span>
-                    <span class="font-bold text-slate-800">${t.label}</span>
-                </div>
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style="background:${t.color}">${m.count}개</span>
-            </div>
-            <div class="space-y-2">
-                ${metricDefs.map(md => `
-                <div class="flex items-center justify-between">
-                    <span class="text-xs text-slate-500">${md.label} <span class="text-slate-400">(${m.method})</span></span>
-                    <span class="text-sm font-bold" style="color:${t.color}">${md.f(m[md.key])}</span>
-                </div>`).join('')}
-            </div>
-        </div>`;
-    };
-
-    const ugcWins = wins.length >= Math.ceil(metricDefs.length / 2);
-    cardsEl.innerHTML = `
-        <div class="col-span-2 mb-1 p-4 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 flex flex-wrap items-center gap-3">
-            <i class="fas fa-lightbulb text-violet-500"></i>
-            <span class="text-sm text-slate-700 flex-1">${conclusionText}</span>
-            <div class="flex flex-wrap gap-2">${conclusionChips}</div>
-        </div>
-        ${renderCard(CT_UGC, mu, ugcWins)}
-        ${renderCard(CT_REGULAR, mr, !ugcWins && mr)}`;
-
-    // ─── 지표별 비교 바 ───
-    barsEl.innerHTML = metricDefs.map(md => {
-        const uVal = mu[md.key] || 0;
-        const rVal = mr?.[md.key] || 0;
-        const maxVal = Math.max(uVal, rVal, 0.0001);
-        const diff = rVal > 0 ? ((uVal - rVal) / rVal) * 100 : 0;
-        const diffLabel = rVal > 0 ? `<span class="text-xs font-bold ml-2 ${diff >= 0 ? 'text-violet-600' : 'text-slate-400'}">${fmt.pct(diff)}</span>` : '';
-        const makeBar = (val, color, label) => {
-            const pct = Math.max(Math.round((val / maxVal) * 100), 4);
-            return `<div class="flex items-center gap-2 text-xs">
-                <span class="w-20 text-right text-slate-500 flex-shrink-0">${label}</span>
-                <div class="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
-                    <div class="h-full rounded-full flex items-center px-3 text-white text-xs font-bold"
-                         style="width:${pct}%;background:${color}">${pct > 25 ? md.f(val) : ''}</div>
-                </div>
-                ${pct <= 25 ? `<span class="font-bold text-slate-700 w-14 flex-shrink-0">${md.f(val)}</span>` : '<span class="w-14"></span>'}
-            </div>`;
-        };
-        return `<div class="bg-slate-50 rounded-xl p-4">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="text-xs font-bold text-slate-700">${md.label} 비교</span>${diffLabel}
-            </div>
-            <div class="space-y-2">
-                ${makeBar(uVal, CT_UGC.color,     CT_UGC.label)}
-                ${makeBar(rVal, CT_REGULAR.color, CT_REGULAR.label)}
-            </div>
-        </div>`;
-    }).join('');
-
-    // ─── 대표 소재 예시 ───
-    if (examplesEl) {
-        const EXAMPLE_N = 3;
-        // UGC: ROAS 상위 N개 / 일반: ROAS 하위 N개
-        const ugcExamples = [...grouped.ugc]
-            .filter(c => (c.roas || 0) > 0)
-            .sort((a, b) => (b.roas || 0) - (a.roas || 0))
-            .slice(0, EXAMPLE_N);
-        const regExamples = [...grouped.regular]
-            .filter(c => (c.roas || 0) > 0)
-            .sort((a, b) => (a.roas || 0) - (b.roas || 0))
-            .slice(0, EXAMPLE_N);
-
-        const makeThumb = (c) => {
-            const raw = (c.thumbnail_url || c.media_url || '').trim();
-            const isVideo = (c.media_type || '').toLowerCase() === 'video';
-            const fallback = `<div class="ctc-thumb-fallback"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
-            if (!raw) return fallback;
-            if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(raw) && typeof window.buildDriveImgHtml === 'function') {
-                return window.buildDriveImgHtml(raw, { className: 'ctc-thumb-img', alt: '', finalFallbackHtml: fallback });
-            }
-            return `<img class="ctc-thumb-img" src="${raw}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='${fallback.replace(/'/g, "&#39;")}'">`;
-        };
-
-        const makeCard = (c, rankLabel, rankColor) => {
-            const name = (c.ad_name || c.creative_name || '소재명 없음').slice(0, 28);
-            const product = (c.product || '').trim();
-            return `
-            <div class="ctc-example-card" onclick="window.openCreativeDetail && window.openCreativeDetail('${(c.id||'').replace(/'/g,"&#39;")}')">
-                <div class="ctc-thumb-wrap">
-                    ${makeThumb(c)}
-                    <span class="ctc-rank-badge" style="background:${rankColor}">${rankLabel}</span>
-                </div>
-                <div class="ctc-card-info">
-                    ${product ? `<span class="ctc-product-tag">${product}</span>` : ''}
-                    <p class="ctc-card-name" title="${c.ad_name || ''}">${name}</p>
-                    <div class="ctc-card-metrics">
-                        <span>CTR <b>${(((c.ctr||0)*100).toFixed(2))}%</b></span>
-                        <span>ROAS <b>${(c.roas||0).toFixed(1)}x</b></span>
-                    </div>
-                </div>
-            </div>`;
-        };
-
-        const ugcCols = ugcExamples.map((c, i) => makeCard(c, `UGC #${i+1}`, '#8b5cf6')).join('');
-        const regCols = regExamples.map((c, i) => makeCard(c, `일반 #${i+1}`, '#94a3b8')).join('');
-
-        // ── UGC 상위 소재 공통 소구·후킹 추출 ──
-        const topUgcPool = [...grouped.ugc]
-            .filter(c => (c.roas || 0) > 0)
-            .sort((a, b) => (b.roas || 0) - (a.roas || 0))
-            .slice(0, 10); // 상위 10개 기준
-
-        const countKeywords = (pool, field) => {
-            const freq = {};
-            pool.forEach(c => {
-                normalizeArrayField(c[field]).forEach(kw => {
-                    if (kw) freq[kw] = (freq[kw] || 0) + 1;
-                });
-            });
-            return Object.entries(freq)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([kw, cnt]) => ({ kw, cnt }));
-        };
-
-        const topAppeals = countKeywords(topUgcPool, 'appeal_points');
-        const topHooks   = countKeywords(topUgcPool, 'hook_type');
-
-        const makeChips = (items, color) => items.length
-            ? items.map(({ kw, cnt }) =>
-                `<span class="ctc-insight-chip" style="background:${color}15;color:${color};border-color:${color}30">
-                    ${kw} <span class="ctc-chip-cnt">${cnt}개</span>
-                </span>`).join('')
-            : '<span class="text-xs text-slate-400">데이터 없음</span>';
-
-        const insightBox = (topAppeals.length || topHooks.length) ? `
-        <div class="ctc-insight-box">
-            <p class="ctc-insight-title"><i class="fas fa-lightbulb mr-1 text-amber-400"></i>UGC 상위 소재 공통점</p>
-            ${topAppeals.length ? `<div class="ctc-insight-row">
-                <span class="ctc-insight-label">소구포인트</span>
-                <div class="ctc-insight-chips">${makeChips(topAppeals, '#8b5cf6')}</div>
-            </div>` : ''}
-            ${topHooks.length ? `<div class="ctc-insight-row">
-                <span class="ctc-insight-label">후킹 유형</span>
-                <div class="ctc-insight-chips">${makeChips(topHooks, '#0ea5e9')}</div>
-            </div>` : ''}
-        </div>` : '';
-
-        examplesEl.innerHTML = `
-        ${insightBox}
-        <div class="ctc-examples-grid">
-            <div class="ctc-examples-col">
-                <p class="ctc-col-header" style="color:#8b5cf6"><i class="fas fa-star mr-1"></i>UGC · 인플루언서 — 상위 소재</p>
-                <div class="ctc-cards-row">${ugcCols || '<p class="text-xs text-slate-400 p-2">소재 없음</p>'}</div>
-            </div>
-            <div class="ctc-examples-col">
-                <p class="ctc-col-header" style="color:#94a3b8"><i class="fas fa-image mr-1"></i>일반 소재 — 저효율 하위 소재</p>
-                <div class="ctc-cards-row">${regCols || '<p class="text-xs text-slate-400 p-2">소재 없음</p>'}</div>
-            </div>
-        </div>`;
-    }
-
-    // ─── 제품별 비교 테이블 ───
-    const products = Array.from(new Set(base.map(c => (c.product || '').trim()).filter(Boolean))).sort();
-    if (!products.length) { tableEl.innerHTML = ''; return; }
-
-    const rows = products.map(prod => {
-        const mu2 = calcTypeMetrics(grouped.ugc.filter(c => (c.product || '').trim() === prod),     'median');
-        const mr2 = calcTypeMetrics(grouped.regular.filter(c => (c.product || '').trim() === prod), 'bottom-median');
-        const ugcBetter = mu2 && mr2 && (mu2.ctr > mr2.ctr || mu2.roas > mr2.roas);
-        return `<tr class="border-b border-slate-100 hover:bg-slate-50">
-            <td class="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                ${ugcBetter ? '✅ ' : ''}${prod}
-            </td>
-            <td class="px-3 py-2.5 text-center">
-                ${mu2 ? `<div class="text-xs font-bold text-violet-600">${fmt.ctr(mu2.ctr)}</div>
-                         <div class="text-xs text-slate-500">ROAS ${fmt.roas(mu2.roas)}</div>
-                         <div class="text-xs text-slate-400">${mu2.count}개</div>` : '<span class="text-xs text-slate-300">—</span>'}
-            </td>
-            <td class="px-3 py-2.5 text-center">
-                ${mr2 ? `<div class="text-xs font-bold text-slate-500">${fmt.ctr(mr2.ctr)}</div>
-                         <div class="text-xs text-slate-400">ROAS ${fmt.roas(mr2.roas)}</div>
-                         <div class="text-xs text-slate-400">${mr2.count}개</div>` : '<span class="text-xs text-slate-300">—</span>'}
-            </td>
-            <td class="px-3 py-2.5 text-center text-xs">
-                ${mu2 && mr2 && mr2.ctr > 0 ? `<span class="font-bold ${mu2.ctr >= mr2.ctr ? 'text-violet-600' : 'text-slate-400'}">CTR ${fmt.pct(((mu2.ctr-mr2.ctr)/mr2.ctr)*100)}</span>` : '—'}
-            </td>
-        </tr>`;
-    }).join('');
-
-    tableEl.innerHTML = `
-        <p class="text-xs font-bold text-slate-700 mb-2 mt-1">제품별 비교 <span class="font-normal text-slate-400">· ✅ UGC 우세 제품</span></p>
-        <div class="overflow-x-auto rounded-xl border border-slate-200">
-            <table class="w-full">
-                <thead class="bg-slate-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left text-xs font-bold text-slate-600">제품</th>
-                        <th class="px-3 py-2 text-center text-xs font-bold text-violet-600">UGC · 인플루언서</th>
-                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-500">일반 소재</th>
-                        <th class="px-3 py-2 text-center text-xs font-bold text-slate-600">UGC 우위</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>`;
-}
 
 // 성과 분석 섹션 컨텐츠만 다시 그리기
 function refreshPerformanceSection() {
@@ -984,7 +672,6 @@ function refreshPerformanceSection() {
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
-    renderCreativeTypeComparison();
 }
 
 // ★ 성과 분석 탭 공통 선정 기준 배지 렌더
@@ -1020,6 +707,8 @@ function updateDashboard() {
     populatePlatformMatrixProductOptions();
     // ★ 속도 개선: 활성 섹션만 렌더 (비활성 섹션은 진입 시 lazy render)
     if (_renderedSections.performance) {
+        renderPerformanceCriteriaBadge();
+        renderScatterChart();
         renderProductPerformance();
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
@@ -1064,10 +753,10 @@ function filterByMedianSpend(list, opts) {
 
     let qualified = list.filter(c => (Number(c.spend) || 0) >= threshold);
 
-    // 후보 수가 너무 적으면 광고비 상위로 보충
-    if (qualified.length < minRequired && list.length >= minRequired) {
+    // 후보 수가 너무 적으면 광고비 상위로 보충 (list.length 조건 제거 — 소규모 플랫폼/X/Meta 포함)
+    if (qualified.length < minRequired) {
         const sortedBySpend = [...list].sort((a, b) => (Number(b.spend) || 0) - (Number(a.spend) || 0));
-        qualified = sortedBySpend.slice(0, Math.max(minRequired, qualified.length));
+        qualified = sortedBySpend.slice(0, Math.max(Math.min(minRequired, list.length), qualified.length));
     }
     return { qualified, medianSpend: med, threshold };
 }
@@ -1089,42 +778,64 @@ window.aggregateByAdName = aggregateByAdName;
 // [선정 기준 — 단일 표준]
 //   1) 현재 브랜드 + 성과 분석 섹션 필터(제품/캠페인) 반영
 //   2) ad_name 단위로 일별 breakdown 합산 (aggregateByAdName)
-//   3) ROAS > 0 (집행 결과가 있는 소재만)
+//   3) 광고비 > 0 (전환 미측정 X/Meta/TikTok 포함 — ROAS 필터 제거)
 //   4) 광고비 중앙값(median spend) 이상 + ₩10,000 하한선 (filterByMedianSpend)
 //   5) minRequired=5 (후보 부족 시 광고비 상위로 보충)
+//   ★ ROAS 기반 분석(scatter/appeal insight)은 각 렌더 함수에서 roas>0 필터 적용
 // ============================
 const PERFORMANCE_MIN_REQUIRED = 5; // 모든 컨텐츠 공통 minRequired
 
-// 캐시 (currentBrand/performanceProduct/performanceCampaign 동일하면 재사용)
+// 전환 미측정 플랫폼 — CV/CVR/ROAS 측정 불가, CTR 기준으로 자동 전환
+const NO_CONV_PLATFORMS = ['x', 'meta', 'tiktok'];
+function isNoConvPlatform(platform) {
+    if (!platform) return false;
+    const lc = platform.toLowerCase();
+    return NO_CONV_PLATFORMS.some(p => lc === p || lc.includes(p));
+}
+
+// 캐시 (currentBrand/currentPlatform/currentRetail/performanceProduct/performanceCampaign 동일하면 재사용)
 let _performancePoolCache = null;
 function invalidatePerformancePoolCache() { _performancePoolCache = null; }
 window.invalidatePerformancePoolCache = invalidatePerformancePoolCache;
 
 function getPerformancePool() {
-    // 캐시 키
-    const cacheKey = `${currentBrand}|${performanceProduct}|${performanceCampaign}`;
+    // 캐시 키 (platform/retail 포함 — 매체 필터 변경 시 재계산 필요)
+    const cacheKey = `${currentBrand}|${currentPlatform}|${currentRetail}|${performanceProduct}|${performanceCampaign}`;
     if (_performancePoolCache && _performancePoolCache.key === cacheKey) {
         return _performancePoolCache.value;
     }
 
     // 1) 브랜드 + 섹션 필터 적용
     let base = getBrandCreatives('performance');
+    console.log(`[Pool] getBrandCreatives → ${base.length}개 (brand=${currentBrand}, platform=${currentPlatform})`);
+    if (base.length && base.length <= 20) {
+        // 소규모 플랫폼 진단: 각 소재의 핵심 지표 출력
+        console.log('[Pool] 소재 목록:', base.map(c => ({
+            ad_name: c.ad_name, platform: c.platform, spend: c.spend, impressions: c.impressions, clicks: c.clicks, ctr: c.ctr
+        })));
+    }
 
     // 2) ad_name 단위 집계
     if (typeof aggregateByAdName === 'function') {
         base = aggregateByAdName(base);
     }
+    console.log(`[Pool] aggregateByAdName → ${base.length}개`);
 
-    // 3) ROAS > 0
-    base = base.filter(c => (c.roas || 0) > 0);
+    // 3) 노출/클릭/광고비 중 하나라도 있으면 포함 (X/Meta/TikTok 인지도 캠페인 등 spend=0 케이스 포함)
+    const beforeFilter = base.length;
+    const filtered = base.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0 || (c.spend || 0) > 0);
+    // 모두 걸러지면 원본 유지 (컬럼명 불인식 등으로 숫자가 전부 0인 경우 대비)
+    base = filtered.length > 0 ? filtered : base;
+    console.log(`[Pool] data filter → ${base.length}개 (spend/impr/clicks > 0) [제외: ${beforeFilter - base.length}개]`);
 
     // 4) 중앙값 광고비 + ₩10,000 하한선
     const { qualified, medianSpend, threshold } = filterByMedianSpend(base, { minRequired: PERFORMANCE_MIN_REQUIRED });
+    console.log(`[Pool] filterByMedianSpend → qualified=${qualified.length}개, median=₩${Math.round(medianSpend)}, threshold=₩${Math.round(threshold)}`);
 
     const result = {
         key: cacheKey,
         value: {
-            base,              // ad_name 집계 + ROAS>0 통과한 전체 (광고비 미달 포함)
+            base,              // ad_name 집계 + spend>0 통과한 전체 (광고비 미달 포함)
             qualified,         // ★ 최종 선정 풀 (모든 컨텐츠가 이걸 사용)
             medianSpend,       // 광고비 중앙값
             threshold,         // 적용된 임계값 (max(median, ₩10,000))
@@ -1159,7 +870,7 @@ function buildPerformanceCriteriaBadge() {
             </div>
             <div class="perf-criteria-sub">
                 <i class="fas fa-info-circle"></i>
-                <span>아래 모든 컨텐츠는 동일한 기준으로 선정됩니다 · ad_name 합산 · ROAS&gt;0 · 광고비 중앙값/₩10,000 이상</span>
+                <span>아래 모든 컨텐츠는 동일한 기준으로 선정됩니다 · ad_name 합산 · 광고비 중앙값/₩10,000 이상 · X·Meta·TikTok 포함</span>
             </div>
         </div>
     `;
@@ -1204,13 +915,10 @@ function updateCharts() {
     renderBrandChart();
     renderPlatformChart();
     if (typeof renderWinningElements === 'function') renderWinningElements();
-    // ★ scatterChart는 제거됨 (소재별 CTR vs ROAS — 사용자 요청)
-
     // ★ 속도 개선: 성과 분석 섹션은 진입했을 때만 렌더
     if (_renderedSections.performance) {
         renderAppealInsight();
         renderPlatformCreativeMatrix();
-        renderCreativeTypeComparison();
     }
 }
 
@@ -1885,13 +1593,17 @@ function renderPlatformCreativeMatrix() {
     const productSel = document.getElementById('platform-matrix-product-select');
     if (!matrixEl || !topCombosEl) return;
 
-    const metric = metricSel?.value || 'roas';
+    const metric = metricSel?.value || 'ctr';
     // ★ 섹션 통합 필터 사용 — performance scope (제품/캠페인 자동 반영)
     const selectedProduct = performanceProduct || '';
 
-    // ★★★ 공통 선정 기준 풀 사용 (모든 성과 분석 컨텐츠 통일)
-    const perfPool = getPerformancePool();
-    const { qualified: pool } = perfPool;
+    // AI 인사이트와 동일하게 raw 데이터 직접 사용 (spend 임계값 필터 없음)
+    let pool;
+    {
+        let raw = getBrandCreatives('performance');
+        if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
+        pool = raw;
+    }
 
     // ★ 선정 기준 배지는 상단의 공통 배지로 통합 (개별 표시 제거)
     if (thresholdEl) thresholdEl.innerHTML = '';
@@ -2195,7 +1907,8 @@ function renderAppealInsight() {
 
     // ★★★ 공통 선정 기준 풀 사용 (모든 성과 분석 컨텐츠 통일)
     const perfPoolForAppeal = getPerformancePool();
-    const pool = perfPoolForAppeal.qualified;
+    // 소구포인트 인사이트는 ROAS 기반 분석 — 전환 미측정 플랫폼(X/Meta/TikTok) 제외
+    const pool = perfPoolForAppeal.qualified.filter(c => (c.roas || 0) > 0);
     const appealThreshold = perfPoolForAppeal.threshold;
     const appealMedian = perfPoolForAppeal.medianSpend;
 
@@ -3215,7 +2928,8 @@ const METRIC_CONFIG = {
     ctr:         { label: 'CTR',  format: v => ((v||0) * 100).toFixed(2) + '%', higherIsBetter: true },
     cvr:         { label: 'CVR',  format: v => ((v||0) * 100).toFixed(2) + '%', higherIsBetter: true },
     revenue:     { label: '매출',  format: v => '₩' + formatNumber(v||0), higherIsBetter: true },
-    conversions: { label: '전환수', format: v => formatNumber(v||0) + '건', higherIsBetter: true }
+    conversions: { label: '전환수', format: v => formatNumber(v||0) + '건', higherIsBetter: true },
+    impressions: { label: '노출수', format: v => formatNumber(v||0), higherIsBetter: true },
 };
 
 // ============================
@@ -3328,7 +3042,14 @@ function aggregateByAdName(rows) {
         // 비율형 지표 재계산 (분모 0 방지)
         const ctr  = sumImpr   > 0 ? (sumClicks / sumImpr)        : 0;
         const cvr  = sumClicks > 0 ? (sumConv   / sumClicks)      : 0;
-        const roas = sumSpend  > 0 ? (sumRev    / sumSpend)       : 0;
+        // spend 컬럼이 없는 시트(opa 등 다른 컬럼명 사용)는 sumSpend=0
+        // → 시트에 직접 입력된 roas 값들의 평균을 사용 (0은 제외)
+        const rawRoasArr = items.map(x => Number(x.roas) || 0).filter(v => v > 0);
+        const roas = sumSpend > 0
+            ? (sumRev / sumSpend)
+            : rawRoasArr.length > 0
+                ? rawRoasArr.reduce((a, b) => a + b, 0) / rawRoasArr.length
+                : 0;
         const cpc  = sumClicks > 0 ? (sumSpend  / sumClicks)      : 0;
         const cpa  = sumConv   > 0 ? (sumSpend  / sumConv)        : 0;
 
@@ -3414,59 +3135,74 @@ function renderProductPerformance() {
     const bestLabel = document.getElementById('best-metric-label');
     if (!bestEl) return;
 
-    // ★ 섹션 통합 필터 사용 (performance scope)
-    const product = performanceProduct || '';
-    const metric = metricSel?.value || 'roas';
-    const cfg = METRIC_CONFIG[metric];
-
-    // ★★★ 공통 선정 기준 풀 사용 (모든 성과 분석 컨텐츠 통일)
-    const pool = getPerformancePool();
-    const { qualified: qualifiedBase, medianSpend } = pool;
-
-    // 선택 지표 > 0 필터 (지표별 추가 필터)
-    const qualified = qualifiedBase.filter(c => (c[metric] || 0) > 0);
-
-    if (bestLabel) bestLabel.textContent = `${cfg.label} 최상위`;
-    // ★ 개별 배지 제거 — 성과 분석 탭 상단의 공통 선정 기준 배지로 통합
-    //   summaryEl은 간단한 컨텐츠 요약만 표시 (선정 기준은 공통 배지에서 안내)
-    if (summaryEl) {
-        summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${qualified.length}개 후보 중 상위</span>`;
+    // ★ window.allCreatives 직접 사용 (getBrandCreatives 우회)
+    let data = Array.isArray(window.allCreatives) ? window.allCreatives
+             : Array.isArray(allCreatives) ? allCreatives : [];
+    // 브랜드 필터
+    if (currentBrand && currentBrand !== 'ALL') {
+        data = data.filter(c => c.brand === currentBrand);
     }
+    // 매체 필터
+    if (currentPlatform) {
+        data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+    }
+    // 제품 필터 (성과 분석 섹션 필터)
+    if (performanceProduct) {
+        data = data.filter(c => (c.product || '').trim() === performanceProduct);
+    }
+    // ad_name 단위 합산
+    if (typeof aggregateByAdName === 'function') data = aggregateByAdName(data);
 
-    if (!qualified.length) {
-        bestEl.innerHTML = '<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>데이터 없음</div>';
+    console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform}`);
+
+    if (!data.length) {
+        if (bestLabel) bestLabel.textContent = '소재 없음';
+        if (summaryEl) summaryEl.innerHTML = '';
+        bestEl.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>데이터 없음</div>`;
         return;
     }
 
-    // 5) 정렬 → BEST 5
-    const sortedDesc = [...qualified].sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
-    const best = sortedDesc.slice(0, 5);
+    // 정렬 지표: 전환 미측정 플랫폼은 CTR 강제
+    let metric = metricSel?.value || 'ctr';
+    if (isNoConvPlatform(currentPlatform) && ['roas','cvr','conversions','revenue'].includes(metric)) {
+        metric = 'ctr';
+        if (metricSel) metricSel.value = 'ctr';
+    }
 
-    // ★ 평균 지표 계산 (전체 qualified 풀 기준 — 가중평균)
-    const totalSpend = qualified.reduce((s, x) => s + (x.spend || 0), 0);
-    const totalRev = qualified.reduce((s, x) => s + (x.revenue || 0), 0);
-    const totalImpr = qualified.reduce((s, x) => s + (x.impressions || 0), 0);
-    const totalClicks = qualified.reduce((s, x) => s + (x.clicks || 0), 0);
-    const totalConv = qualified.reduce((s, x) => s + (x.conversions || 0), 0);
+    // 지표값 > 0인 소재 우선, 없으면 impressions > 0, 그래도 없으면 전체
+    let pool = data.filter(c => (c[metric] || 0) > 0);
+    if (!pool.length) pool = data.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0);
+    if (!pool.length) pool = data;
+
+    const cfg = METRIC_CONFIG[metric] || METRIC_CONFIG['impressions'];
+    if (bestLabel) bestLabel.textContent = `${cfg.label} 최상위`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보</span>`;
+
+    // 정렬 → BEST 5
+    const best = [...pool].sort((a, b) => (b[metric] || 0) - (a[metric] || 0)).slice(0, 5);
+
+    // benchmark (가중평균)
+    const totalSpend  = pool.reduce((s, x) => s + (x.spend || 0), 0);
+    const totalRev    = pool.reduce((s, x) => s + (x.revenue || 0), 0);
+    const totalImpr   = pool.reduce((s, x) => s + (x.impressions || 0), 0);
+    const totalClicks = pool.reduce((s, x) => s + (x.clicks || 0), 0);
+    const totalConv   = pool.reduce((s, x) => s + (x.conversions || 0), 0);
     const benchmark = {
-        roas: totalSpend > 0 ? totalRev / totalSpend : 0,
-        ctr:  totalImpr > 0 ? totalClicks / totalImpr : 0,
-        cvr:  totalClicks > 0 ? totalConv / totalClicks : 0,
-        revenue: qualified.length > 0 ? totalRev / qualified.length : 0,
-        conversions: qualified.length > 0 ? totalConv / qualified.length : 0,
+        roas:        totalSpend  > 0 ? totalRev    / totalSpend  : 0,
+        ctr:         totalImpr   > 0 ? totalClicks / totalImpr   : 0,
+        cvr:         totalClicks > 0 ? totalConv   / totalClicks : 0,
+        revenue:     pool.length > 0 ? totalRev    / pool.length : 0,
+        conversions: pool.length > 0 ? totalConv   / pool.length : 0,
     };
 
     bestEl.innerHTML = best.map((c, i) => createRankRow(c, i + 1, metric, 'best', benchmark)).join('');
 
-    // 클릭 이벤트
     bestEl.querySelectorAll('.rank-row').forEach(row => {
         row.addEventListener('click', (e) => {
             if (e.target.closest('.rank-comment-toggle')) return;
             openModal(row.dataset.id);
         });
     });
-
-    // 코멘트 토글 버튼 이벤트
     bestEl.querySelectorAll('.rank-comment-toggle').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();

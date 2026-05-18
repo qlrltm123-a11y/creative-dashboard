@@ -93,6 +93,7 @@ const COLUMN_ALIASES = {
     '광고비': 'spend',
     '비용': 'spend',
     '집행비': 'spend',
+    'amount': 'spend',
     // 매출
     'sales': 'revenue',
     'revenue': 'revenue',
