@@ -1035,48 +1035,59 @@ let scatterMedianInfo = { medianSpend: 0, threshold: 0, qualifiedCount: 0 };
 
 function renderScatterChart() {
     destroyChart('scatter');
-    // ad_name 단위로 합산 + ROAS > 0 필터 (성과 분석 섹션 필터 적용)
+    const noConv = isNoConvPlatform(currentPlatform);
+
     const baseList = (typeof aggregateByAdName === 'function')
         ? aggregateByAdName(getBrandCreatives('performance'))
         : getBrandCreatives('performance');
-    const roasValid = baseList.filter(c => (c.roas || 0) > 0);
 
-    // ★ 중앙값(median) 광고비 이상 소재만 선정
-    const { qualified: medianFiltered, medianSpend, threshold } = filterByMedianSpend(roasValid, { minRequired: 10 });
-    scatterMedianInfo = { medianSpend, threshold, qualifiedCount: medianFiltered.length };
+    let chartPool;
+    if (noConv) {
+        // X/Meta/TikTok: CTR > 0 또는 impressions > 0인 소재 전체 사용
+        chartPool = baseList.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
+    } else {
+        const roasValid = baseList.filter(c => (c.roas || 0) > 0);
+        const { qualified, medianSpend, threshold } = filterByMedianSpend(roasValid, { minRequired: 10 });
+        scatterMedianInfo = { medianSpend, threshold, qualifiedCount: qualified.length };
+        chartPool = qualified;
+    }
+
+    // 차트 제목 동적 변경
+    const titleEl = document.querySelector('#scatterChart')?.closest('section')?.querySelector('.chart-title');
+    if (titleEl) {
+        titleEl.innerHTML = noConv
+            ? `<i class="fas fa-chart-scatter mr-2 text-indigo-500"></i>소재별 CTR × 노출수 분포`
+            : `<i class="fas fa-chart-scatter mr-2 text-indigo-500"></i>소재별 CTR × ROAS 분포`;
+    }
 
     scatterCreativeMap = {};
     let totalCount = 0;
+    const maxImpr = noConv ? Math.max(...chartPool.map(c => c.impressions || 0), 1) : 1;
+
     const datasets = ['BOH', 'WM', 'CG'].map(brand => {
-        // 브랜드별 광고비 상위 N개만 추림 (시각화 가독성 ↑)
-        const brandList = medianFiltered
+        const brandList = chartPool
             .filter(c => c.brand === brand)
-            .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+            .sort((a, b) => noConv ? (b.impressions || 0) - (a.impressions || 0) : (b.spend || 0) - (a.spend || 0))
             .slice(0, SCATTER_TOP_N);
         totalCount += brandList.length;
-
         scatterCreativeMap[brand] = brandList;
 
         return {
             label: brand,
             data: brandList.map((c, idx) => ({
                 x: (c.ctr || 0) * 100,
-                y: (c.roas || 0) * 100,
-                r: Math.max(5, Math.min(28, Math.sqrt(c.spend / 100000))),
+                y: noConv ? (c.impressions || 0) : (c.roas || 0) * 100,
+                r: noConv
+                    ? Math.max(5, Math.min(28, Math.sqrt((c.impressions || 0) / maxImpr) * 28))
+                    : Math.max(5, Math.min(28, Math.sqrt((c.spend || 0) / 100000))),
                 name: c.creative_name || c.ad_name || '-',
-                _idx: idx,
-                _brand: brand,
-                _id: c.id,
-                spend: c.spend,
-                revenue: c.revenue,
-                spend_jpy: c.spend_jpy,
-                revenue_jpy: c.revenue_jpy
+                _idx: idx, _brand: brand, _id: c.id,
+                spend: c.spend, revenue: c.revenue,
+                spend_jpy: c.spend_jpy, revenue_jpy: c.revenue_jpy
             })),
             backgroundColor: BRAND_COLORS[brand] + 'aa',
             borderColor: BRAND_COLORS[brand],
-            borderWidth: 1.5,
-            hoverBorderWidth: 3,
-            hoverBorderColor: '#0f172a'
+            borderWidth: 1.5, hoverBorderWidth: 3, hoverBorderColor: '#0f172a'
         };
     });
 
@@ -1130,7 +1141,7 @@ function renderScatterChart() {
             },
             scales: {
                 x: { title: { display: true, text: 'CTR (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } },
-                y: { title: { display: true, text: 'ROAS (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
+                y: { title: { display: true, text: noConv ? '노출수' : 'ROAS (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
             }
         }
     });
@@ -1905,12 +1916,26 @@ function renderAppealInsight() {
     // ★ 성과 분석 섹션 통합 필터(performance scope) — 제품/캠페인 자동 반영
     const product = performanceProduct || '';
 
+    const noConv = isNoConvPlatform(currentPlatform);
     // ★★★ 공통 선정 기준 풀 사용 (모든 성과 분석 컨텐츠 통일)
-    const perfPoolForAppeal = getPerformancePool();
-    // 소구포인트 인사이트는 ROAS 기반 분석 — 전환 미측정 플랫폼(X/Meta/TikTok) 제외
-    const pool = perfPoolForAppeal.qualified.filter(c => (c.roas || 0) > 0);
-    const appealThreshold = perfPoolForAppeal.threshold;
-    const appealMedian = perfPoolForAppeal.medianSpend;
+    let pool, appealThreshold, appealMedian;
+    if (noConv) {
+        // noConv 플랫폼(X/Meta/TikTok): window.allCreatives 직접 사용, CTR 기반
+        let raw = Array.isArray(window.allCreatives) ? window.allCreatives
+                : Array.isArray(allCreatives) ? allCreatives : [];
+        if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
+        if (currentPlatform) raw = raw.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+        if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
+        if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
+        pool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
+        appealThreshold = 0;
+        appealMedian = 0;
+    } else {
+        const perfPoolForAppeal = getPerformancePool();
+        pool = perfPoolForAppeal.qualified.filter(c => (c.roas || 0) > 0);
+        appealThreshold = perfPoolForAppeal.threshold;
+        appealMedian = perfPoolForAppeal.medianSpend;
+    }
 
     if (!pool.length) {
         container.innerHTML = `
@@ -1994,10 +2019,11 @@ function renderAppealInsight() {
         return;
     }
 
-    // ROAS 평균 (제품 전체)
+    // 기준 지표 평균
     const totalSpend = all.reduce((s, x) => s + x.spend, 0);
     const totalRev = all.reduce((s, x) => s + x.revenue, 0);
     const avgRoas = totalSpend > 0 ? totalRev / totalSpend : 0;
+    const avgCtr = all.length > 0 ? all.reduce((s, x) => s + (x.ctr || 0), 0) / all.length : 0;
 
     // ★ 다양성 보장 선정 로직 (강화 버전)
     //   "같은 소재를 여러 번 쓸 필요 없고 필요에 따라 취합" 원칙
@@ -2068,7 +2094,7 @@ function renderAppealInsight() {
     const winnerCandidates = (minThree.length >= 3)
         ? minThree
         : (minTwo.length >= 3 ? minTwo : all);
-    const sortedByRoasDesc = [...winnerCandidates].sort((a, b) => b.roas - a.roas);
+    const sortedByRoasDesc = [...winnerCandidates].sort((a, b) => noConv ? b.ctr - a.ctr : b.roas - a.roas);
 
     // winner 선정 (다양성 보장)
     const winners = pickDiverse(sortedByRoasDesc, 5);
@@ -2133,23 +2159,27 @@ function renderAppealInsight() {
 
     const winnersHtml = winners.length ? winners.map((w, i) => {
         const medal = ['🥇','🥈','🥉','4','5'][i];
-        const lift = avgRoas > 0 ? ((w.roas / avgRoas - 1) * 100) : 0;
+        const baseVal = noConv ? avgCtr : avgRoas;
+        const wVal = noConv ? (w.ctr || 0) : (w.roas || 0);
+        const lift = baseVal > 0 ? ((wVal / baseVal - 1) * 100) : 0;
         const liftTxt = lift > 0 ? `+${lift.toFixed(0)}%` : `${lift.toFixed(0)}%`;
         const topCreative = topCreativeLabel(w);
         const pickedCount = w.pickedCount || (w.pickedCreatives || []).length || 0;
+        const mainStatVal = noConv ? `${(w.ctr * 100).toFixed(2)}%` : `${Math.round(w.roas * 100)}%`;
+        const mainStatLbl = noConv ? '평균 CTR' : '평균 ROAS';
         return `
             <div class="appeal-rank-row appeal-rank-winner">
                 <div class="appeal-rank-medal">${medal}</div>
                 <div class="appeal-rank-info">
                     <div class="appeal-rank-keyword">${w.keyword}</div>
                     <div class="appeal-rank-meta">
-                        ${pickedCount}개 소재 평균 · 광고비 ₩${formatNumber(w.spend)}
+                        ${pickedCount}개 소재 평균 · ${noConv ? `노출 ${formatNumber(w.impressions)}` : `광고비 ₩${formatNumber(w.spend)}`}
                         ${reliabilityBadge(w)}
                     </div>
                     ${topCreative ? `<div class="appeal-rank-topcreative"><i class="fas fa-star"></i> 대표 소재: <b>${topCreative}</b></div>` : ''}
                 </div>
                 <div class="appeal-rank-stats">
-                    <div class="appeal-rank-roas"><b>${Math.round(w.roas * 100)}%</b><span>평균 ROAS</span></div>
+                    <div class="appeal-rank-roas"><b>${mainStatVal}</b><span>${mainStatLbl}</span></div>
                     <div class="appeal-rank-lift positive">평균比 ${liftTxt}</div>
                 </div>
             </div>
@@ -2231,10 +2261,12 @@ function renderAppealInsight() {
 
     // 캐치카피 카드 HTML 빌더
     const copyCardsHtml = topCopies.length ? topCopies.map((c, i) => {
-        const liftPct = avgRoas > 0 ? Math.round((c.roas / avgRoas - 1) * 100) : 0;
+        const _copyBase = noConv ? avgCtr : avgRoas;
+        const _copyVal = noConv ? (c.ctr || 0) : (c.roas || 0);
+        const liftPct = _copyBase > 0 ? Math.round((_copyVal / _copyBase - 1) * 100) : 0;
         const liftBadge = liftPct > 0
             ? `<span class="appeal-copy-lift positive">평균比 +${liftPct}%</span>`
-            : `<span class="appeal-copy-lift">ROAS ${Math.round(c.roas * 100)}%</span>`;
+            : `<span class="appeal-copy-lift">${noConv ? `CTR ${(_copyVal * 100).toFixed(2)}%` : `ROAS ${Math.round(_copyVal * 100)}%`}</span>`;
         return `
             <div class="appeal-copy-card">
                 <div class="appeal-copy-rank">#${i + 1}</div>
@@ -2306,12 +2338,12 @@ function renderAppealInsight() {
                                 <span class="appeal-suggest-chip primary big">${topWinner.keyword}</span>
                                 <div class="appeal-appeal-stats">
                                     <div class="appeal-appeal-stat">
-                                        <span class="appeal-appeal-stat-val">+${Math.round((topWinner.roas / (avgRoas || 1) - 1) * 100)}%</span>
-                                        <span class="appeal-appeal-stat-lbl">평균比 ROAS</span>
+                                        <span class="appeal-appeal-stat-val">+${noConv ? Math.round((topWinner.ctr / (avgCtr || 1) - 1) * 100) : Math.round((topWinner.roas / (avgRoas || 1) - 1) * 100)}%</span>
+                                        <span class="appeal-appeal-stat-lbl">${noConv ? '평균比 CTR' : '평균比 ROAS'}</span>
                                     </div>
                                     <div class="appeal-appeal-stat">
-                                        <span class="appeal-appeal-stat-val">${Math.round(topWinner.roas * 100)}%</span>
-                                        <span class="appeal-appeal-stat-lbl">달성 ROAS</span>
+                                        <span class="appeal-appeal-stat-val">${noConv ? `${((topWinner.ctr || 0) * 100).toFixed(2)}%` : `${Math.round(topWinner.roas * 100)}%`}</span>
+                                        <span class="appeal-appeal-stat-lbl">${noConv ? '달성 CTR' : '달성 ROAS'}</span>
                                     </div>
                                     <div class="appeal-appeal-stat">
                                         <span class="appeal-appeal-stat-val">${topWinner.pickedCount || (topWinner.pickedCreatives||[]).length || 0}</span>
