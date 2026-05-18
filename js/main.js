@@ -790,6 +790,8 @@ const NO_CONV_PLATFORMS = ['x', 'meta', 'tiktok'];
 function isNoConvPlatform(platform) {
     if (!platform) return false;
     const lc = platform.toLowerCase();
+    // "single one ..." 계열은 전환 추적 있음 → noConv 아님
+    if (lc.includes('single')) return false;
     return NO_CONV_PLATFORMS.some(p => lc === p || lc.includes(p));
 }
 
