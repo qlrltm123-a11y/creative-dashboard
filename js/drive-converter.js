@@ -124,9 +124,40 @@ function createMediaElement(creative, forModal = false) {
         if (forModal) {
             // 모달: 실제 영상 재생
             if (isDriveUrl(videoUrl)) {
-                // Google Drive 영상은 iframe으로 임베드
                 const embedUrl = convertDriveVideoUrl(videoUrl);
-                return `<iframe src="${embedUrl}" allow="autoplay" allowfullscreen frameborder="0" style="width:100%;height:100%;border:0;"></iframe>`;
+                const driveId = extractDriveFileId(videoUrl);
+                const openUrl = driveId ? `https://drive.google.com/file/d/${driveId}/view` : videoUrl;
+                const uid = 'drv_' + (driveId || Date.now());
+                // iframe 로드 후 로딩 오버레이 제거, 8초 내 미로드 시 폴백 표시
+                const onloadScript = `
+                    (function(){
+                        var w = document.getElementById('${uid}');
+                        if (!w) return;
+                        w.querySelector('.dv-loading') && w.querySelector('.dv-loading').remove();
+                        // 8초 타임아웃: iframe content가 비어있으면 폴백 표시
+                        var t = setTimeout(function(){
+                            var fr = w.querySelector('iframe');
+                            if (!fr) return;
+                            try { if (!fr.contentDocument || !fr.contentDocument.body || fr.contentDocument.body.innerHTML === '') { w.querySelector('.dv-fallback') && (w.querySelector('.dv-fallback').style.display='flex'); } } catch(e) { w.querySelector('.dv-fallback') && (w.querySelector('.dv-fallback').style.display='flex'); }
+                        }, 8000);
+                    })()
+                `.replace(/\s+/g, ' ');
+                return `
+                    <div id="${uid}" class="drive-video-wrap">
+                        <iframe src="${embedUrl}" allow="autoplay" allowfullscreen frameborder="0" class="dv-iframe" onload="${onloadScript.trim()}"></iframe>
+                        <div class="dv-loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>영상 로딩 중...</span>
+                        </div>
+                        <div class="dv-fallback" style="display:none">
+                            <i class="fas fa-video-slash"></i>
+                            <span>영상을 불러올 수 없습니다</span>
+                            <span class="dv-fallback-name">${creative.creative_name || ''}</span>
+                        </div>
+                        <a href="${openUrl}" target="_blank" rel="noopener" class="dv-open-btn">
+                            <i class="fas fa-external-link-alt"></i> Drive에서 열기
+                        </a>
+                    </div>`;
             } else {
                 // 일반 MP4 URL
                 return `<video controls playsinline webkit-playsinline autoplay muted><source src="${videoUrl}" type="video/mp4"></video>`;

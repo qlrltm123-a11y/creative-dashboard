@@ -745,6 +745,77 @@ body {
     border: 0;
 }
 
+/* Drive 영상 래퍼 */
+.drive-video-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.drive-video-wrap .dv-iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+}
+.dv-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(15,23,42,0.85);
+    color: #94a3b8;
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 2;
+}
+.dv-loading .fa-spinner { font-size: 28px; color: #6366f1; }
+.dv-fallback {
+    position: absolute;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(15,23,42,0.92);
+    color: #94a3b8;
+    font-size: 13px;
+    z-index: 2;
+    text-align: center;
+    padding: 20px;
+}
+.dv-fallback .fa-video-slash { font-size: 36px; color: #475569; margin-bottom: 4px; }
+.dv-fallback-name {
+    font-size: 11px;
+    color: #64748b;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 4px;
+}
+.dv-open-btn {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 5;
+    background: rgba(99,102,241,0.9);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(4px);
+    transition: background 0.2s;
+}
+.dv-open-btn:hover { background: rgba(79,70,229,1); }
+
 /* 정보 영역: 미디어와 독립 스크롤 */
 .modal-info {
     padding: 28px;

@@ -3483,8 +3483,8 @@ function openModal(id) {
             <div class="modal-info">
                 <div class="flex items-center gap-2 mb-2">
                     <span class="brand-badge ${c.brand}" style="position: static;">${c.brand}</span>
-                    <span class="meta-chip platform">${c.platform}</span>
-                    <span class="meta-chip">${c.campaign_type}</span>
+                    ${c.platform ? `<span class="meta-chip platform">${c.platform}</span>` : ''}
+                    ${c.campaign_type ? `<span class="meta-chip">${c.campaign_type}</span>` : ''}
                 </div>
                 <h2>${c.creative_name}</h2>
                 <p class="subtitle"><i class="far fa-calendar mr-1"></i>${startDate} 시작 · ${c.status}</p>
