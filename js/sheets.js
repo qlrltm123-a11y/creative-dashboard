@@ -173,7 +173,13 @@ const COLUMN_ALIASES = {
     'retail_channel': 'retail',
     '리테일': 'retail',
     '리테일채널': 'retail',
-    'channel': 'retail'
+    'channel': 'retail',
+    // Event (AA열)
+    'event': 'event',
+    'event_name': 'event',
+    '이벤트': 'event',
+    '이벤트명': 'event',
+    'campaign_event': 'event'
 };
 
 // URL 또는 파일명에서 미디어 타입 자동 감지
@@ -279,6 +285,11 @@ function csvToObjects(csvText) {
             };
             const key = obj.retail.trim().toLowerCase();
             obj.retail = RETAIL_DISPLAY[key] || obj.retail.trim();
+        }
+
+        // event 필드 정규화
+        if (obj.event) {
+            obj.event = String(obj.event).trim();
         }
 
         // ★ 통화 환산: 시트의 엔화(JPY) 값 → 원화(KRW)로 변환

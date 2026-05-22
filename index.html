@@ -114,6 +114,20 @@
                     </button>
                 </div>
 
+                <!-- ★ Event 필터 (시트 AA열) -->
+                <div id="event-filter-wrap" class="platform-filter-wrap hidden">
+                    <label for="event-select" class="platform-filter-label">
+                        <i class="fas fa-calendar-star"></i> 이벤트
+                    </label>
+                    <select id="event-select" class="platform-filter-select">
+                        <option value="">전체</option>
+                    </select>
+                    <span id="event-count" class="platform-filter-count"></span>
+                    <button id="event-filter-reset" class="platform-filter-reset" title="이벤트 필터 초기화" type="button">
+                        <i class="fas fa-rotate-left"></i>
+                    </button>
+                </div>
+
                 <!-- ★ 전역 캠페인 필터는 제거됨 (섹션별 통합 필터로 대체) -->
                 <select id="campaign-select" class="hidden">
                     <option value="">전체 캠페인</option>

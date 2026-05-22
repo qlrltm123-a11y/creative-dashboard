@@ -6,6 +6,7 @@ let currentBrand = 'ALL';
 let currentCampaign = ''; // ★ 전역 캠페인 필터 ('' = 전체) — UI 제거됐지만 호환용 유지
 let currentPlatform = ''; // ★ 전역 매체(Platform) 필터 ('' = 전체) — 브랜드별로 동적 구성
 let currentRetail = '';   // ★ 전역 Retail 채널 필터 ('' = 전체, 'Qoo10'/'RKT' 등)
+let currentEvent  = '';   // ★ 전역 Event 필터 ('' = 전체, 시트 AA열)
 // ★ 섹션 단위 필터 (성과 분석 / AI 인사이트)
 let performanceProduct = '';   // 성과 분석 섹션 - 제품 필터
 let performanceCampaign = '';  // 성과 분석 섹션 - 캠페인 필터
@@ -67,6 +68,7 @@ window.updateDashboard = function() {
     invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
     populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
     populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
+    populateEventOptions();    // ★ Event 옵션 (event 컬럼이 있을 때만 표시)
     populateCampaignOptions(); // ★ 전역 캠페인 옵션 (매체 필터 적용 후 갱신)
     populatePerformanceFilterOptions(); // ★ 성과 분석 섹션 필터
     populateAiFilterOptions();           // ★ AI 인사이트 섹션 필터
@@ -108,6 +110,9 @@ function bindEvents() {
             currentRetail = '';
             const retSel = document.getElementById('retail-select');
             if (retSel) retSel.value = '';
+            currentEvent = '';
+            const evSel = document.getElementById('event-select');
+            if (evSel) evSel.value = '';
             // ★ 섹션 단위 필터도 리셋 (브랜드 바뀌면 제품/캠페인 풀이 달라짐)
             performanceProduct = '';
             performanceCampaign = '';
@@ -123,8 +128,9 @@ function bindEvents() {
     if (platformSel) {
         platformSel.addEventListener('change', () => {
             currentPlatform = platformSel.value || '';
-            // 매체 바뀌면 Retail 옵션 재구성 (매체별 가용 Retail 채널이 달라짐)
+            // 매체 바뀌면 Retail/Event 옵션 재구성
             populateRetailOptions();
+            populateEventOptions();
             // 섹션별 제품/캠페인 리셋
             currentCampaign = '';
             const campSel = document.getElementById('campaign-select');
@@ -159,8 +165,9 @@ function bindEvents() {
     if (retailSel) {
         retailSel.addEventListener('change', () => {
             currentRetail = retailSel.value || '';
-            // Retail 바뀌면 매체 옵션 재구성 (Retail별 가용 매체가 달라짐)
+            // Retail 바뀌면 매체/Event 옵션 재구성
             populatePlatformOptions();
+            populateEventOptions();
             // 섹션별 제품/캠페인 리셋
             performanceProduct = '';
             performanceCampaign = '';
@@ -177,6 +184,30 @@ function bindEvents() {
             currentRetail = '';
             if (retailSel) retailSel.value = '';
             populatePlatformOptions();
+            invalidatePerformancePoolCache();
+            updateDashboard();
+        });
+    }
+
+    // ★ Event 전역 필터 이벤트 바인딩
+    const eventSel = document.getElementById('event-select');
+    if (eventSel) {
+        eventSel.addEventListener('change', () => {
+            currentEvent = eventSel.value || '';
+            performanceProduct = '';
+            performanceCampaign = '';
+            aiProduct = '';
+            aiCampaign = '';
+            invalidatePerformancePoolCache();
+            updateDashboard();
+        });
+    }
+    const eventResetBtn = document.getElementById('event-filter-reset');
+    if (eventResetBtn) {
+        eventResetBtn.addEventListener('click', () => {
+            if (!currentEvent) return;
+            currentEvent = '';
+            if (eventSel) eventSel.value = '';
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -395,6 +426,10 @@ function getBrandCreatives(scope) {
     if (currentRetail) {
         list = list.filter(c => (c.retail || '').toString().trim() === currentRetail);
     }
+    // ★ 전역 Event 필터 적용 (선택 시)
+    if (currentEvent) {
+        list = list.filter(c => (c.event || '').toString().trim() === currentEvent);
+    }
     // ★ 전역 캠페인 필터 적용 (선택 시)
     if (currentCampaign) {
         list = list.filter(c => matchCampaign(c, currentCampaign));
@@ -563,6 +598,51 @@ function populateRetailOptions() {
         currentRetail = '';
     }
     if (countEl) countEl.textContent = channels.length ? `${channels.length}개 채널` : '';
+}
+
+// ============================
+// Event 필터 — 전역 (브랜드·매체·Retail 이후 적용)
+// ============================
+function getAvailableEvents() {
+    let base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+    if (currentPlatform) base = base.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+    if (currentRetail)   base = base.filter(c => (c.retail   || '').toString().trim() === currentRetail);
+    const map = new Map();
+    base.forEach(c => {
+        const ev = (c.event || '').toString().trim();
+        if (ev) map.set(ev, (map.get(ev) || 0) + 1);
+    });
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+}
+
+function populateEventOptions() {
+    const sel   = document.getElementById('event-select');
+    const countEl = document.getElementById('event-count');
+    const wrap  = document.getElementById('event-filter-wrap');
+    if (!sel || !wrap) return;
+
+    const events = getAvailableEvents();
+    if (events.length < 1) {
+        wrap.classList.add('hidden');
+        currentEvent = '';
+        return;
+    }
+    wrap.classList.remove('hidden');
+
+    const totalCount = events.reduce((s, e) => s + e.count, 0);
+    const current = sel.value;
+    sel.innerHTML = `<option value="">전체 이벤트 (${totalCount}건)</option>` +
+        events.map(e => `<option value="${e.name.replace(/"/g,'&quot;')}">${e.name} (${e.count}건)</option>`).join('');
+
+    const names = events.map(e => e.name);
+    if (current && names.includes(current)) {
+        sel.value = current;
+        currentEvent = current;
+    } else {
+        sel.value = '';
+        currentEvent = '';
+    }
+    if (countEl) countEl.textContent = events.length ? `${events.length}개 이벤트` : '';
 }
 
 // ============================
@@ -802,7 +882,7 @@ window.invalidatePerformancePoolCache = invalidatePerformancePoolCache;
 
 function getPerformancePool() {
     // 캐시 키 (platform/retail 포함 — 매체 필터 변경 시 재계산 필요)
-    const cacheKey = `${currentBrand}|${currentPlatform}|${currentRetail}|${performanceProduct}|${performanceCampaign}`;
+    const cacheKey = `${currentBrand}|${currentPlatform}|${currentRetail}|${currentEvent}|${performanceProduct}|${performanceCampaign}`;
     if (_performancePoolCache && _performancePoolCache.key === cacheKey) {
         return _performancePoolCache.value;
     }
@@ -1925,6 +2005,7 @@ function renderAppealInsight() {
                 : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
         raw = raw.filter(c => !isNoConvPlatform((c.platform || '').toString().trim()));
+        if (currentEvent)       raw = raw.filter(c => (c.event || '').toString().trim() === currentEvent);
         if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
         roasPool = raw.filter(c => (c.roas || 0) > 0);
@@ -1936,6 +2017,7 @@ function renderAppealInsight() {
                 : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
         raw = raw.filter(c => isNoConvPlatform((c.platform || '').toString().trim()));
+        if (currentEvent)       raw = raw.filter(c => (c.event || '').toString().trim() === currentEvent);
         if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
         ctrPool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
@@ -3100,6 +3182,10 @@ function renderProductPerformance() {
     if (currentPlatform) {
         data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
     }
+    // 이벤트 필터
+    if (currentEvent) {
+        data = data.filter(c => (c.event || '').toString().trim() === currentEvent);
+    }
     // 제품 필터 (성과 분석 섹션 필터)
     if (performanceProduct) {
         data = data.filter(c => (c.product || '').trim() === performanceProduct);
@@ -3107,7 +3193,7 @@ function renderProductPerformance() {
     // ad_name 단위 합산
     if (typeof aggregateByAdName === 'function') data = aggregateByAdName(data);
 
-    console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform}`);
+    console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
 
     if (!data.length) {
         if (bestLabel) bestLabel.textContent = '소재 없음';
