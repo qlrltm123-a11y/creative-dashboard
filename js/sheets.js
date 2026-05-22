@@ -292,21 +292,23 @@ function csvToObjects(csvText) {
             obj.event = String(obj.event).trim();
         }
 
-        // ★ 통화 환산: 시트의 엔화(JPY) 값 → 원화(KRW)로 변환
-        // 원본 엔화 값은 별도 필드(_jpy)에 보존
-        const fx = getFxRate();
-        obj.spend_jpy = obj.spend || 0;
-        obj.revenue_jpy = obj.revenue || 0;
-        obj.spend = Math.round((obj.spend || 0) * fx);
-        obj.revenue = Math.round((obj.revenue || 0) * fx);
-        // 시트에 직접 입력된 cpc/cpa도 엔화로 보고 환산
-        if (obj.cpc) {
-            obj.cpc_jpy = obj.cpc;
-            obj.cpc = Math.round(obj.cpc * fx);
-        }
-        if (obj.cpa) {
-            obj.cpa_jpy = obj.cpa;
-            obj.cpa = Math.round(obj.cpa * fx);
+        // ★ 통화 처리: Single One 플랫폼 → 엔화(JPY)→원화(KRW) 환산
+        //              직매체(X/Meta/TikTok 등) → 이미 원화, 환산 불필요
+        const _platLc = (obj.platform || '').toLowerCase();
+        const isJpyPlatform = _platLc.includes('single');
+
+        if (isJpyPlatform) {
+            const fx = getFxRate();
+            obj.spend_jpy   = obj.spend   || 0;
+            obj.revenue_jpy = obj.revenue || 0;
+            obj.spend   = Math.round((obj.spend   || 0) * fx);
+            obj.revenue = Math.round((obj.revenue || 0) * fx);
+            if (obj.cpc) { obj.cpc_jpy = obj.cpc; obj.cpc = Math.round(obj.cpc * fx); }
+            if (obj.cpa) { obj.cpa_jpy = obj.cpa; obj.cpa = Math.round(obj.cpa * fx); }
+        } else {
+            // 직매체: 원화 그대로 — JPY 필드는 null (모달에서 엔화 서브라인 미표시)
+            obj.spend_jpy   = null;
+            obj.revenue_jpy = null;
         }
 
         // ★ 파생 지표 자동 계산 (시트에 없으면 채워줌)
