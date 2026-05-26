@@ -1981,6 +1981,56 @@ body {
     background: #dbeafe;
     color: #1e40af;
 }
+.appeal-header-metric.atc {
+    background: #dcfce7;
+    color: #14532d;
+}
+
+/* 소구포인트 우측 컬럼 지표 토글 */
+.appeal-section-header-flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.appeal-section-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.appeal-metric-tabs {
+    display: flex;
+    gap: 4px;
+}
+.appeal-metric-tab {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1.5px solid #cbd5e1;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.appeal-metric-tab:hover {
+    border-color: #3b82f6;
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+.appeal-metric-tab.active {
+    border-color: #3b82f6;
+    background: #3b82f6;
+    color: #fff;
+}
+.appeal-metric-tab.active[data-metric="atc_rate"] {
+    border-color: #16a34a;
+    background: #16a34a;
+}
 
 @media (max-width: 900px) {
     .appeal-insight-grid, .appeal-insight-dual-grid {

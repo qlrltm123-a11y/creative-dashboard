@@ -13,6 +13,7 @@ let performanceCampaign = '';  // 성과 분석 섹션 - 캠페인 필터
 let aiProduct = '';            // AI 인사이트 섹션 - 제품 필터
 let aiCampaign = '';           // AI 인사이트 섹션 - 캠페인 필터
 let winningProduct = '';       // ★ 위닝 요소 인사이트 - 제품 필터 (개요 탭)
+let appealRightMetric = 'ctr'; // 소구포인트 우측 컬럼 지표: 'ctr' | 'atc_rate'
 let charts = {};
 
 const BRAND_COLORS = {
@@ -2017,17 +2018,21 @@ function renderAppealInsight() {
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
         roasPool = raw.filter(c => (c.roas || 0) > 0);
     }
-    // --- CTR 풀 (직매체: X/Meta/TikTok) ---
+    // --- 우측 지표 풀 (전체 플랫폼 — 지표 필터로 전환 가능: CTR / ATC율) ---
     let ctrPool = [];
     {
         let raw = Array.isArray(window.allCreatives) ? window.allCreatives
                 : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
-        raw = raw.filter(c => isNoConvPlatform((c.platform || '').toString().trim()));
         if (currentEvent)       raw = raw.filter(c => (c.event || '').toString().trim() === currentEvent);
         if (performanceProduct) raw = raw.filter(c => (c.product || '').trim() === performanceProduct);
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
-        ctrPool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
+        // 선택 지표에 따라 풀 필터링
+        if (appealRightMetric === 'atc_rate') {
+            ctrPool = raw.filter(c => (c.add_to_cart || 0) > 0);
+        } else {
+            ctrPool = raw.filter(c => (c.ctr || 0) > 0 || (c.impressions || 0) > 0);
+        }
     }
 
     if (!roasPool.length && !ctrPool.length) {
@@ -2052,9 +2057,15 @@ function renderAppealInsight() {
             const picked = [...item.creatives].sort((a, b) => (b.spend || 0) - (a.spend || 0)).slice(0, MAX_CREATIVES);
             const avgOf = f => picked.length ? picked.map(c => Number(c[f]) || 0).reduce((s, v) => s + v, 0) / picked.length : 0;
             const sumOf = f => picked.reduce((s, c) => s + (Number(c[f]) || 0), 0);
+            const sumAtc    = sumOf('add_to_cart');
+            const sumClicks = sumOf('clicks');
+            const sumSpend  = sumOf('spend');
             return { ...item, roas: avgOf('roas'), ctr: avgOf('ctr'), cvr: avgOf('cvr'),
-                spend: sumOf('spend'), revenue: sumOf('revenue'), impressions: sumOf('impressions'),
-                clicks: sumOf('clicks'), conversions: sumOf('conversions'),
+                spend: sumSpend, revenue: sumOf('revenue'), impressions: sumOf('impressions'),
+                clicks: sumClicks, conversions: sumOf('conversions'),
+                add_to_cart:  sumAtc,
+                atc_rate:     sumClicks > 0 ? sumAtc / sumClicks : 0,
+                cost_per_atc: sumAtc > 0 ? Math.round(sumSpend / sumAtc) : 0,
                 pickedCreatives: picked, pickedCount: picked.length, ownCount: item.count };
         });
     }
@@ -2067,11 +2078,15 @@ function renderAppealInsight() {
         return;
     }
 
+    // 우측 컬럼 지표 — 전역 appealRightMetric 따름
+    const ctrCartMode = (appealRightMetric === 'atc_rate');
+
     // 기준 지표 평균
     const totalSpend = allRoas.reduce((s, x) => s + x.spend, 0);
     const totalRev   = allRoas.reduce((s, x) => s + x.revenue, 0);
-    const avgRoas = totalSpend > 0 ? totalRev / totalSpend : 0;
-    const avgCtr  = allCtr.length > 0 ? allCtr.reduce((s, x) => s + (x.ctr || 0), 0) / allCtr.length : 0;
+    const avgRoas    = totalSpend > 0 ? totalRev / totalSpend : 0;
+    const avgCtr     = allCtr.length > 0 ? allCtr.reduce((s, x) => s + (x.ctr || 0), 0) / allCtr.length : 0;
+    const avgAtcRate = allCtr.length > 0 ? allCtr.reduce((s, x) => s + (x.atc_rate || 0), 0) / allCtr.length : 0;
 
     function pickDiverse(sortedList, take = 5) {
         const usedRepIds = new Set();
@@ -2106,7 +2121,8 @@ function renderAppealInsight() {
         return pickDiverse([...candidates].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0)), 5);
     }
     const roasWinners = buildWinners(allRoas, 'roas');
-    const ctrWinners  = buildWinners(allCtr,  'ctr');
+    const ctrSortKey  = ctrCartMode ? 'atc_rate' : 'ctr';
+    const ctrWinners  = buildWinners(allCtr, ctrSortKey);
     const winners = roasWinners; // aiGuide는 ROAS 기준 사용
 
     // 4) "다음에 이렇게 만들자" 추천 조합 — winner 소구 + 같은 소재의 후킹/감정 추출
@@ -2163,18 +2179,33 @@ function renderAppealInsight() {
         return '';
     }
 
-    function buildWinnersHtml(list, isNoConvSide, avgBase) {
+    // metric: 'roas' | 'ctr' | 'atc_rate'
+    function buildWinnersHtml(list, metric, avgBase) {
         if (!list.length) return '<div class="appeal-empty">분석 가능한 소구포인트 데이터가 부족합니다</div>';
         return list.map((w, i) => {
             const medal = ['🥇','🥈','🥉','4','5'][i];
-            const wVal  = isNoConvSide ? (w.ctr || 0) : (w.roas || 0);
-            const lift  = avgBase > 0 ? ((wVal / avgBase - 1) * 100) : 0;
+            let wVal, mainStatVal, mainStatLbl, subInfo;
+            if (metric === 'atc_rate') {
+                wVal       = w.atc_rate || 0;
+                mainStatVal = `${(wVal * 100).toFixed(2)}%`;
+                mainStatLbl = '평균 ATC율';
+                subInfo     = `ATC ${formatNumber(w.add_to_cart)}건 · 노출 ${formatNumber(w.impressions)}`;
+            } else if (metric === 'ctr') {
+                wVal       = w.ctr || 0;
+                mainStatVal = `${(wVal * 100).toFixed(2)}%`;
+                mainStatLbl = '평균 CTR';
+                subInfo     = `노출 ${formatNumber(w.impressions)}`;
+            } else {
+                // roas
+                wVal       = w.roas || 0;
+                mainStatVal = `${Math.round(wVal * 100)}%`;
+                mainStatLbl = '평균 ROAS';
+                subInfo     = `광고비 ₩${formatNumber(w.spend)}`;
+            }
+            const lift    = avgBase > 0 ? ((wVal / avgBase - 1) * 100) : 0;
             const liftTxt = lift > 0 ? `+${lift.toFixed(0)}%` : `${lift.toFixed(0)}%`;
             const topCreative = topCreativeLabel(w);
             const pickedCount = w.pickedCount || (w.pickedCreatives || []).length || 0;
-            const mainStatVal = isNoConvSide ? `${(w.ctr * 100).toFixed(2)}%` : `${Math.round(w.roas * 100)}%`;
-            const mainStatLbl = isNoConvSide ? '평균 CTR' : '평균 ROAS';
-            const subInfo = isNoConvSide ? `노출 ${formatNumber(w.impressions)}` : `광고비 ₩${formatNumber(w.spend)}`;
             return `
                 <div class="appeal-rank-row appeal-rank-winner">
                     <div class="appeal-rank-medal">${medal}</div>
@@ -2190,8 +2221,9 @@ function renderAppealInsight() {
                 </div>`;
         }).join('');
     }
-    const roasWinnersHtml = buildWinnersHtml(roasWinners, false, avgRoas);
-    const ctrWinnersHtml  = buildWinnersHtml(ctrWinners,  true,  avgCtr);
+    const roasWinnersHtml = buildWinnersHtml(roasWinners, 'roas', avgRoas);
+    const ctrAvgBase      = ctrCartMode ? avgAtcRate : avgCtr;
+    const ctrWinnersHtml  = buildWinnersHtml(ctrWinners, ctrSortKey, ctrAvgBase);
 
     const topWinner = winners[0];
     const recommendChips = (arr, cls) => arr.length
@@ -2301,7 +2333,25 @@ function renderAppealInsight() {
         `;
     }).join('') : '<div class="appeal-suggest-empty">데이터 부족</div>';
 
-    // 성과 분석 탭: Single one(ROAS) | 직매체(CTR) 두 열 나란히
+    // 우측 컬럼 헤더 — 지표 토글 버튼
+    const hasCartData = (() => {
+        let raw = Array.isArray(window.allCreatives) ? window.allCreatives : Array.isArray(allCreatives) ? allCreatives : [];
+        if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
+        if (currentEvent)       raw = raw.filter(c => (c.event||'').toString().trim() === currentEvent);
+        if (performanceProduct) raw = raw.filter(c => (c.product||'').trim() === performanceProduct);
+        return raw.some(c => (c.add_to_cart || 0) > 0);
+    })();
+    const rightMetricBtns = `
+        <div class="appeal-metric-tabs">
+            <button class="appeal-metric-tab${appealRightMetric === 'ctr' ? ' active' : ''}" data-metric="ctr">
+                <i class="fas fa-chart-line"></i> CTR
+            </button>
+            ${hasCartData ? `<button class="appeal-metric-tab${appealRightMetric === 'atc_rate' ? ' active' : ''}" data-metric="atc_rate">
+                <i class="fas fa-cart-shopping"></i> ATC율
+            </button>` : ''}
+        </div>`;
+
+    // 성과 분석 탭: Single one(ROAS) | 전체(지표 선택) 두 열 나란히
     container.innerHTML = `
         <div class="appeal-insight-dual-grid">
             <div class="appeal-section appeal-section-winner">
@@ -2312,14 +2362,28 @@ function renderAppealInsight() {
                 <div class="appeal-section-body">${roasWinnersHtml}</div>
             </div>
             <div class="appeal-section appeal-section-winner appeal-section-ctr">
-                <div class="appeal-section-header">
-                    <i class="fas fa-chart-line"></i>
-                    <span>${scopeText} · 직매체&nbsp;<span class="appeal-header-metric ctr">CTR 기준</span></span>
+                <div class="appeal-section-header appeal-section-header-flex">
+                    <div class="appeal-section-header-left">
+                        <i class="fas ${ctrCartMode ? 'fa-cart-shopping' : 'fa-chart-line'}"></i>
+                        <span>${scopeText} · 전체&nbsp;<span class="appeal-header-metric ${ctrCartMode ? 'atc' : 'ctr'}">${ctrCartMode ? 'ATC율 기준' : 'CTR 기준'}</span></span>
+                    </div>
+                    ${rightMetricBtns}
                 </div>
                 <div class="appeal-section-body">${ctrWinnersHtml}</div>
             </div>
         </div>
     `;
+
+    // 지표 토글 버튼 이벤트 바인딩
+    container.querySelectorAll('.appeal-metric-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const m = btn.getAttribute('data-metric');
+            if (m && m !== appealRightMetric) {
+                appealRightMetric = m;
+                renderAppealInsight();
+            }
+        });
+    });
 
     // AI 인사이트 탭: "다음 소재는 이렇게" 박스 렌더링
     const aiGuideContainer = document.getElementById('next-creative-ai-guide');
