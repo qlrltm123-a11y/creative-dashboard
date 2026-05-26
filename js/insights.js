@@ -111,7 +111,7 @@ function buildPreviewHtml(keyword, field) {
             : '';
 
         return `
-            <div class="preview-item">
+            <div class="preview-item" data-creative-id="${c.id || c.ad_name || ''}">
                 <div class="preview-medal">${medal}</div>
                 <div class="preview-thumb-wrap">
                     ${thumbHtml}
@@ -200,20 +200,28 @@ function showPreview(keyword, field, evt) {
         }
     };
 
-    // 클릭 시 첫 번째 대표 소재 모달 열기
+    // 클릭 시 해당 소재 모달 열기
     // ★ preview-body(스크롤 영역) 클릭은 무시 — 스크롤바 드래그/클릭이 모달을 여는 문제 방지
-    //   또한 개별 .preview-item 또는 footer 클릭 시에만 모달 열기
+    //   .preview-item 클릭 시 해당 소재 ID, footer 클릭 시 첫 번째 소재 열기
     const items = (keywordCreativeMap[field] && keywordCreativeMap[field].get(keyword)) || [];
     if (items.length && typeof window.openModal === 'function') {
         el.onclick = (e) => {
-            // 스크롤바 영역(.preview-body) 자체를 클릭한 경우는 무시 (스크롤 제스처)
-            // 단, 그 안의 .preview-item이나 footer는 정상 동작
             const target = e.target;
             const inItem = target.closest && target.closest('.preview-item');
             const inFooter = target.closest && target.closest('.preview-footer');
             const inBodyOnly = target.classList && target.classList.contains('preview-body');
             if (inBodyOnly && !inItem && !inFooter) return; // 빈 body 영역 클릭은 무시
-            window.openModal(items[0].id);
+
+            // ★ 클릭된 .preview-item의 data-creative-id 우선 사용, 없으면 첫 번째 소재
+            let targetId = items[0].id;
+            if (inItem) {
+                const cid = inItem.getAttribute('data-creative-id');
+                if (cid) {
+                    const matched = items.find(c => (c.id || c.ad_name || '') == cid);
+                    if (matched) targetId = matched.id || matched.ad_name;
+                }
+            }
+            window.openModal(targetId);
             forceHidePreview();
         };
     } else {
