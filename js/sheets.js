@@ -221,7 +221,7 @@ function csvToObjects(csvText) {
     console.log('[Sheets] 매핑된 헤더:', headers);
     console.log('[Sheets] 데이터 행 수:', rows.length - 1);
 
-    const numberFields = ['impressions', 'clicks', 'ctr', 'spend', 'conversions', 'cpa', 'roas', 'revenue', 'cpc', 'cvr'];
+    const numberFields = ['impressions', 'clicks', 'ctr', 'spend', 'conversions', 'cpa', 'roas', 'revenue', 'cpc', 'cvr', 'add_to_cart', 'atc_rate', 'cost_per_atc'];
     const arrayFields = ['appeal_points', 'hook_type', 'target_emotion'];
 
     // ★ 숫자 파싱 함수 (쉼표, 통화기호, 퍼센트 처리)
