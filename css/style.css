@@ -1128,6 +1128,29 @@ body {
 }
 
 /* Modal AI Section */
+/* 장바구니 최적화 지표 섹션 */
+.modal-atc-section {
+    background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+    border: 1px solid #6ee7b7;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 18px;
+}
+.modal-atc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #059669;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+}
+.modal-atc-section .modal-metrics {
+    gap: 8px;
+}
+
 .modal-ai-section {
     background: linear-gradient(135deg, #faf5ff, #fdf2f8);
     border: 1px solid #e9d5ff;

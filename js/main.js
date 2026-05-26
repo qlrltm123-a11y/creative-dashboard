@@ -875,6 +875,13 @@ function isNoConvPlatform(platform) {
     return NO_CONV_PLATFORMS.some(p => lc === p || lc.includes(p));
 }
 
+// ★ 장바구니 최적화 모드 감지
+// 현재 필터 기준 데이터에 add_to_cart 값이 있으면 장바구니 캠페인으로 판단
+function isCartMode(dataPool) {
+    if (!Array.isArray(dataPool) || !dataPool.length) return false;
+    return dataPool.some(c => (c.add_to_cart || 0) > 0);
+}
+
 // 캐시 (currentBrand/currentPlatform/currentRetail/performanceProduct/performanceCampaign 동일하면 재사용)
 let _performancePoolCache = null;
 function invalidatePerformancePoolCache() { _performancePoolCache = null; }
@@ -2960,12 +2967,16 @@ function populateProductOptions() {
 
 // 정렬 기준별 라벨/등급 기준
 const METRIC_CONFIG = {
-    roas:        { label: 'ROAS', format: v => Math.round((v||0) * 100) + '%', higherIsBetter: true },
-    ctr:         { label: 'CTR',  format: v => ((v||0) * 100).toFixed(2) + '%', higherIsBetter: true },
-    cvr:         { label: 'CVR',  format: v => ((v||0) * 100).toFixed(2) + '%', higherIsBetter: true },
-    revenue:     { label: '매출',  format: v => '₩' + formatNumber(v||0), higherIsBetter: true },
-    conversions: { label: '전환수', format: v => formatNumber(v||0) + '건', higherIsBetter: true },
-    impressions: { label: '노출수', format: v => formatNumber(v||0), higherIsBetter: true },
+    roas:         { label: 'ROAS',          format: v => Math.round((v||0) * 100) + '%',        higherIsBetter: true },
+    ctr:          { label: 'CTR',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    cvr:          { label: 'CVR',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    revenue:      { label: '매출',           format: v => '₩' + formatNumber(v||0),             higherIsBetter: true },
+    conversions:  { label: '전환수',         format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
+    impressions:  { label: '노출수',         format: v => formatNumber(v||0),                   higherIsBetter: true },
+    // 장바구니 최적화 지표
+    atc_rate:     { label: 'ATC율',          format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    add_to_cart:  { label: 'ATC 건수',       format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
+    cost_per_atc: { label: 'Cost per ATC',  format: v => '₩' + formatNumber(Math.round(v||0)), higherIsBetter: false },
 };
 
 // ============================
@@ -3074,20 +3085,22 @@ function aggregateByAdName(rows) {
         const sumConv        = items.reduce((s, x) => s + (x.conversions || 0), 0);
         const sumRev         = items.reduce((s, x) => s + (x.revenue || 0), 0);
         const sumRevJpy      = items.reduce((s, x) => s + (x.revenue_jpy || 0), 0);
+        const sumAtc         = items.reduce((s, x) => s + (x.add_to_cart || 0), 0);
 
         // 비율형 지표 재계산 (분모 0 방지)
         const ctr  = sumImpr   > 0 ? (sumClicks / sumImpr)        : 0;
         const cvr  = sumClicks > 0 ? (sumConv   / sumClicks)      : 0;
-        // spend 컬럼이 없는 시트(opa 등 다른 컬럼명 사용)는 sumSpend=0
-        // → 시트에 직접 입력된 roas 값들의 평균을 사용 (0은 제외)
         const rawRoasArr = items.map(x => Number(x.roas) || 0).filter(v => v > 0);
         const roas = sumSpend > 0
             ? (sumRev / sumSpend)
             : rawRoasArr.length > 0
                 ? rawRoasArr.reduce((a, b) => a + b, 0) / rawRoasArr.length
                 : 0;
-        const cpc  = sumClicks > 0 ? (sumSpend  / sumClicks)      : 0;
-        const cpa  = sumConv   > 0 ? (sumSpend  / sumConv)        : 0;
+        const cpc         = sumClicks > 0 ? (sumSpend / sumClicks) : 0;
+        const cpa         = sumConv   > 0 ? (sumSpend / sumConv)   : 0;
+        // 장바구니 파생 지표 재계산
+        const atc_rate    = sumClicks > 0 ? (sumAtc   / sumClicks) : 0;
+        const cost_per_atc = sumAtc   > 0 ? Math.round(sumSpend / sumAtc) : 0;
 
         // 날짜 범위 (가장 이른 시작일 ~ 가장 늦은 종료일)
         const dates = items.map(x => x.start_date).filter(Boolean).sort();
@@ -3126,6 +3139,7 @@ function aggregateByAdName(rows) {
             revenue_jpy: sumRevJpy,
             // 재계산 지표
             ctr, cvr, roas, cpc, cpa,
+            add_to_cart: sumAtc, atc_rate, cost_per_atc,
             // 날짜 범위
             start_date: dates[0] || first.start_date,
             end_date: endDates[endDates.length - 1] || first.end_date,
@@ -3202,11 +3216,37 @@ function renderProductPerformance() {
         return;
     }
 
-    // 정렬 지표: 전환 미측정 플랫폼은 CTR 강제
+    // 장바구니 모드 감지
+    const cartMode = isCartMode(data);
+
+    // 정렬 지표 결정
     let metric = metricSel?.value || 'ctr';
-    if (isNoConvPlatform(currentPlatform) && ['roas','cvr','conversions','revenue'].includes(metric)) {
+    if (cartMode && ['roas','cvr','conversions','revenue'].includes(metric)) {
+        // 장바구니 모드: ATC율 기준으로 자동 전환
+        metric = 'atc_rate';
+        if (metricSel) metricSel.value = 'atc_rate';
+    } else if (isNoConvPlatform(currentPlatform) && ['roas','cvr','conversions','revenue'].includes(metric)) {
         metric = 'ctr';
         if (metricSel) metricSel.value = 'ctr';
+    }
+
+    // 장바구니 모드일 때 셀렉트에 ATC 옵션 동적 추가
+    if (metricSel) {
+        const hasAtcOpt = metricSel.querySelector('option[value="atc_rate"]');
+        if (cartMode && !hasAtcOpt) {
+            const grp = document.createElement('optgroup');
+            grp.label = '🛒 장바구니';
+            grp.innerHTML = `
+                <option value="atc_rate">ATC율 (장바구니율)</option>
+                <option value="add_to_cart">ATC 건수</option>
+                <option value="cost_per_atc">Cost per ATC</option>`;
+            metricSel.appendChild(grp);
+        } else if (!cartMode && hasAtcOpt) {
+            // 장바구니 모드 해제 시 ATC 옵션 제거
+            metricSel.querySelectorAll('optgroup').forEach(g => {
+                if (g.label === '🛒 장바구니') g.remove();
+            });
+        }
     }
 
     // 지표값 > 0인 소재 우선, 없으면 impressions > 0, 그래도 없으면 전체
@@ -3214,25 +3254,35 @@ function renderProductPerformance() {
     if (!pool.length) pool = data.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0);
     if (!pool.length) pool = data;
 
-    const cfg = METRIC_CONFIG[metric] || METRIC_CONFIG['impressions'];
-    if (bestLabel) bestLabel.textContent = `${cfg.label} 최상위`;
-    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보</span>`;
+    const cfg = METRIC_CONFIG[metric] || { label: metric };
+    const cartLabel = cartMode ? '🛒 ' : '';
+    if (bestLabel) bestLabel.textContent = `${cartLabel}${cfg.label || metric} 최상위`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보${cartMode ? ' · 장바구니 최적화' : ''}</span>`;
 
-    // 정렬 → BEST 5
-    const best = [...pool].sort((a, b) => (b[metric] || 0) - (a[metric] || 0)).slice(0, 5);
+    // 정렬: cost_per_atc는 낮을수록 좋음 → 오름차순
+    const sortAsc = metric === 'cost_per_atc';
+    const best = [...pool]
+        .sort((a, b) => sortAsc
+            ? (a[metric] || Infinity) - (b[metric] || Infinity)
+            : (b[metric] || 0) - (a[metric] || 0))
+        .slice(0, 5);
 
-    // benchmark (가중평균)
+    // benchmark
     const totalSpend  = pool.reduce((s, x) => s + (x.spend || 0), 0);
     const totalRev    = pool.reduce((s, x) => s + (x.revenue || 0), 0);
     const totalImpr   = pool.reduce((s, x) => s + (x.impressions || 0), 0);
     const totalClicks = pool.reduce((s, x) => s + (x.clicks || 0), 0);
     const totalConv   = pool.reduce((s, x) => s + (x.conversions || 0), 0);
+    const totalAtc    = pool.reduce((s, x) => s + (x.add_to_cart || 0), 0);
     const benchmark = {
-        roas:        totalSpend  > 0 ? totalRev    / totalSpend  : 0,
-        ctr:         totalImpr   > 0 ? totalClicks / totalImpr   : 0,
-        cvr:         totalClicks > 0 ? totalConv   / totalClicks : 0,
-        revenue:     pool.length > 0 ? totalRev    / pool.length : 0,
-        conversions: pool.length > 0 ? totalConv   / pool.length : 0,
+        roas:         totalSpend  > 0 ? totalRev    / totalSpend  : 0,
+        ctr:          totalImpr   > 0 ? totalClicks / totalImpr   : 0,
+        cvr:          totalClicks > 0 ? totalConv   / totalClicks : 0,
+        revenue:      pool.length > 0 ? totalRev    / pool.length : 0,
+        conversions:  pool.length > 0 ? totalConv   / pool.length : 0,
+        atc_rate:     totalClicks > 0 ? totalAtc    / totalClicks : 0,
+        add_to_cart:  pool.length > 0 ? totalAtc    / pool.length : 0,
+        cost_per_atc: totalAtc   > 0 ? totalSpend  / totalAtc    : 0,
     };
 
     bestEl.innerHTML = best.map((c, i) => createRankRow(c, i + 1, metric, 'best', benchmark)).join('');
@@ -3619,6 +3669,24 @@ function openModal(id) {
                         <div class="value">${Math.round((c.roas || 0) * 100)}%</div>
                     </div>
                 </div>
+                ${(c.add_to_cart > 0) ? `
+                <div class="modal-atc-section">
+                    <div class="modal-atc-header"><i class="fas fa-cart-shopping"></i> 장바구니 최적화 지표</div>
+                    <div class="modal-metrics">
+                        <div class="metric-box">
+                            <div class="label">ATC 건수</div>
+                            <div class="value">${formatNumber(c.add_to_cart)}건</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="label">ATC율</div>
+                            <div class="value">${((c.atc_rate || 0) * 100).toFixed(2)}%</div>
+                        </div>
+                        <div class="metric-box highlight">
+                            <div class="label">Cost per ATC</div>
+                            <div class="value">₩${formatNumber(c.cost_per_atc || 0)}</div>
+                        </div>
+                    </div>
+                </div>` : ''}
             </div>
         </div>
     `;

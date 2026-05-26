@@ -179,7 +179,15 @@ const COLUMN_ALIASES = {
     'event_name': 'event',
     '이벤트': 'event',
     '이벤트명': 'event',
-    'campaign_event': 'event'
+    'campaign_event': 'event',
+    // 장바구니 추가 건수 (Add to Cart CV)
+    'add cart cv': 'add_to_cart',
+    'add_cart_cv': 'add_to_cart',
+    'add_to_cart': 'add_to_cart',
+    'atc': 'add_to_cart',
+    '장바구니': 'add_to_cart',
+    '장바구니추가': 'add_to_cart',
+    'cart_adds': 'add_to_cart'
 };
 
 // URL 또는 파일명에서 미디어 타입 자동 감지
@@ -292,6 +300,16 @@ function csvToObjects(csvText) {
             obj.event = String(obj.event).trim();
         }
 
+        // 장바구니(ATC) 파생 지표 자동 계산
+        if (obj.add_to_cart > 0) {
+            // ATC율: 장바구니추가 / 클릭수 (비율, 표시 시 ×100)
+            if (!obj.atc_rate && obj.clicks > 0) {
+                obj.atc_rate = obj.add_to_cart / obj.clicks;
+            }
+            // Cost per ATC: 광고비 / 장바구니추가건수 (KRW 환산 후 계산됨)
+            // → spend는 아직 환산 전이므로 환산 후 재계산 필요 — 아래 spend 환산 후 처리
+        }
+
         // ★ 통화 처리: Single One 플랫폼 → 엔화(JPY)→원화(KRW) 환산
         //              직매체(X/Meta/TikTok 등) → 이미 원화, 환산 불필요
         const _platLc = (obj.platform || '').toLowerCase();
@@ -340,6 +358,15 @@ function csvToObjects(csvText) {
         // CPA: 원화/전환 단위 (KRW 환산 후)
         if (!obj.cpa && obj.conversions > 0) {
             obj.cpa = Math.round(obj.spend / obj.conversions);
+        }
+
+        // Cost per ATC: spend 환산 완료 후 계산
+        if (obj.add_to_cart > 0 && obj.spend > 0) {
+            obj.cost_per_atc = Math.round(obj.spend / obj.add_to_cart);
+        }
+        // ATC율 재확인 (spend 환산과 무관하지만 여기서 통일)
+        if (obj.add_to_cart > 0 && !obj.atc_rate && obj.clicks > 0) {
+            obj.atc_rate = obj.add_to_cart / obj.clicks;
         }
 
         // ROAS: 비율 단위 (예: 7.3 = 730%)
