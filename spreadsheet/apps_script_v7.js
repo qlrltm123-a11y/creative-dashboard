@@ -68,7 +68,7 @@ function startAutoRunUntilDone() {
   for (let row = 2; row <= lastRow; row++) {
     const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
     const appealPoints = sheet.getRange(row, COLS.appeal_points).getValue();
-    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌'))) {
+    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌') || String(appealPoints).startsWith('⏳'))) {
       emptyCount++;
     }
   }
@@ -166,7 +166,7 @@ function autoRunContinue() {
     const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
     const appealPoints = sheet.getRange(row, COLS.appeal_points).getValue();
 
-    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌'))) {
+    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌') || String(appealPoints).startsWith('⏳'))) {
       // 일일 한도 체크
       try {
         checkDailyLimit();
@@ -379,7 +379,7 @@ function analyzeAllEmpty() {
     const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
     const appealPoints = sheet.getRange(row, COLS.appeal_points).getValue();
 
-    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌'))) {
+    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌') || String(appealPoints).startsWith('⏳'))) {
       try {
         checkDailyLimit();
       } catch (e) {
@@ -403,8 +403,12 @@ function analyzeAllEmpty() {
 function analyzeRow(sheet, row) {
   const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
   if (!mediaUrl) return false;
+
+  // ★ 1열에서 소재명 읽기 (텍스트 분석 fallback 시 컨텍스트용)
+  const adName = sheet.getRange(row, 1).getValue() || '';
+
   try {
-    const result = analyzeWithGemini(mediaUrl);
+    const result = analyzeWithGemini(mediaUrl, adName);
     sheet.getRange(row, COLS.appeal_points).setValue(result.appeal_points || '');
     sheet.getRange(row, COLS.hook_type).setValue(result.hook_type || '');
     sheet.getRange(row, COLS.target_emotion).setValue(result.target_emotion || '');
@@ -441,6 +445,7 @@ function getDriveThumbnailLink(fileId) {
   }
 }
 
+// ★ 썸네일 성공 시 blob 반환, 실패 시 null 반환 (throw 안 함)
 function fetchVideoThumbnail(fileId) {
   const attempts = [];
   const apiThumbUrl = getDriveThumbnailLink(fileId);
@@ -467,7 +472,39 @@ function fetchVideoThumbnail(fileId) {
       return blob;
     } catch (e) { continue; }
   }
-  throw new Error('영상 썸네일 생성 실패. Drive에서 영상 미리보기 재생 후 재시도하세요.');
+  // 썸네일 없음 — null 반환 (호출부에서 텍스트 분석으로 fallback)
+  return null;
+}
+
+// ★ 썸네일 없는 영상 전용: 파일명 기반 텍스트 분석
+function analyzeVideoByName(fileName, adName) {
+  checkDailyLimit();
+  const context = [fileName, adName].filter(Boolean).join(' / ');
+  const prompt = `일본 시장 광고 소재입니다. 영상 파일명과 광고명을 참고해 분석하세요.
+파일명/광고명: "${context}"
+
+반드시 JSON 형식으로만 답하세요.
+{
+  "appeal_points": "파일명에서 추정 가능한 소구포인트 1-3개 한국어 쉼표 구분",
+  "hook_type": "추정 후킹 방식 1개 한국어",
+  "target_emotion": "추정 감정 1개 한국어",
+  "key_message_jp": "",
+  "key_message_kr": "파일명 기반 추정 메시지"
+}`;
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+  };
+  const responseText = callGeminiAPI(payload);
+  const json = JSON.parse(responseText);
+  if (!json.candidates || !json.candidates[0]) throw new Error('API 응답 없음');
+  const text = json.candidates[0].content.parts[0].text;
+  try { return JSON.parse(text); }
+  catch (e) {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('JSON 파싱 실패');
+  }
 }
 
 function fetchImageBlob(url) {
@@ -530,11 +567,12 @@ function callGeminiAPI(payload, retryCount) {
   return responseText;
 }
 
-function analyzeWithGemini(mediaUrl) {
+// adName: 썸네일 없을 때 텍스트 분석 fallback용 (옵션)
+function analyzeWithGemini(mediaUrl, adName) {
   // 호출 직전에도 한도 체크 (이중 안전장치)
   checkDailyLimit();
 
-  let imageBlob, isVideo = false;
+  let imageBlob, isVideo = false, thumbnailFailed = false;
   const fileId = extractDriveFileId(mediaUrl);
 
   if (fileId) {
@@ -543,7 +581,14 @@ function analyzeWithGemini(mediaUrl) {
       const mimeType = file.getMimeType();
       if (mimeType.startsWith('video/')) {
         isVideo = true;
-        imageBlob = fetchVideoThumbnail(fileId);
+        imageBlob = fetchVideoThumbnail(fileId); // null이면 썸네일 미생성
+        if (!imageBlob) {
+          thumbnailFailed = true;
+          // ★ 파일명 기반 텍스트 분석으로 fallback
+          const fileName = file.getName();
+          Logger.log(`⚠️ 썸네일 없음 → 텍스트 분석 fallback: ${fileName}`);
+          return analyzeVideoByName(fileName, adName || '');
+        }
       } else if (mimeType.startsWith('image/')) {
         imageBlob = file.getBlob();
       } else {
