@@ -1741,6 +1741,7 @@ function renderPlatformCreativeMatrix() {
                     count: 0,
                     spend: 0, revenue: 0,
                     impressions: 0, clicks: 0, conversions: 0,
+                    add_to_cart: 0,
                     creatives: []
                 });
             }
@@ -1751,6 +1752,7 @@ function renderPlatformCreativeMatrix() {
             item.impressions += c.impressions || 0;
             item.clicks += c.clicks || 0;
             item.conversions += c.conversions || 0;
+            item.add_to_cart += c.add_to_cart || 0;
             item.creatives.push(c);
         });
     });
@@ -1764,9 +1766,11 @@ function renderPlatformCreativeMatrix() {
     // 파생 지표
     const enriched = Array.from(combos.values()).map(item => ({
         ...item,
-        roas: item.spend > 0 ? item.revenue / item.spend : 0,
-        ctr: item.impressions > 0 ? item.clicks / item.impressions : 0,
-        cvr: item.clicks > 0 ? item.conversions / item.clicks : 0,
+        roas:         item.spend > 0 ? item.revenue / item.spend : 0,
+        ctr:          item.impressions > 0 ? item.clicks / item.impressions : 0,
+        cvr:          item.clicks > 0 ? item.conversions / item.clicks : 0,
+        atc_rate:     item.clicks > 0 ? item.add_to_cart / item.clicks : 0,
+        cost_per_atc: item.add_to_cart > 0 ? Math.round(item.spend / item.add_to_cart) : 0,
     }));
 
     // 4) TOP 3 조합 카드 — metric 기준 상위
@@ -1778,10 +1782,13 @@ function renderPlatformCreativeMatrix() {
 
 // TOP 매체×소구 조합 카드 3개
 function renderTopPlatformCombos(enriched, metric, container) {
-    // count >= 1 + 지표 > 0 필터링
+    // count >= 1 + 지표 > 0 필터링 (cost_per_atc는 낮을수록 좋아 오름차순)
+    const lowerIsBetter = metric === 'cost_per_atc';
     const candidates = enriched
         .filter(c => (c[metric] || 0) > 0)
-        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+        .sort((a, b) => lowerIsBetter
+            ? (a[metric] || 0) - (b[metric] || 0)
+            : (b[metric] || 0) - (a[metric] || 0));
 
     // ★ 다양성 보장: 같은 대표 소재(ad_name)가 여러 카드에 중복 등장하지 않도록
     //   "같은 소재를 여러 번 쓸 필요 없고 필요에 따라 취합" 원칙
@@ -1823,10 +1830,12 @@ function renderTopPlatformCombos(enriched, metric, container) {
     }
 
     const metricCfg = {
-        roas:    { label: 'ROAS',  format: v => Math.round((v || 0) * 100) + '%' },
-        ctr:     { label: 'CTR',   format: v => ((v || 0) * 100).toFixed(2) + '%' },
-        cvr:     { label: 'CVR',   format: v => ((v || 0) * 100).toFixed(2) + '%' },
-        revenue: { label: '매출',   format: v => '₩' + formatNumber(v || 0) },
+        roas:         { label: 'ROAS',       format: v => Math.round((v || 0) * 100) + '%' },
+        ctr:          { label: 'CTR',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        cvr:          { label: 'CVR',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        revenue:      { label: '매출',        format: v => '₩' + formatNumber(v || 0) },
+        atc_rate:     { label: 'ATC율',       format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        cost_per_atc: { label: 'Cost/ATC',   format: v => '₩' + formatNumber(Math.round(v || 0)) },
     }[metric] || { label: metric, format: v => v };
 
     const medals = ['🥇', '🥈', '🥉'];
@@ -1913,20 +1922,23 @@ function renderPlatformMatrixHeatmap(enriched, platformTotals, appealTotals, met
     enriched.forEach(c => map.set(`${c.platform}::${c.appeal}`, c));
 
     const metricCfg = {
-        roas:    { label: 'ROAS',  format: v => Math.round((v || 0) * 100) + '%',         short: v => Math.round((v || 0) * 100) + '%' },
-        ctr:     { label: 'CTR',   format: v => ((v || 0) * 100).toFixed(2) + '%',        short: v => ((v || 0) * 100).toFixed(1) + '%' },
-        cvr:     { label: 'CVR',   format: v => ((v || 0) * 100).toFixed(2) + '%',        short: v => ((v || 0) * 100).toFixed(1) + '%' },
-        revenue: { label: '매출',   format: v => '₩' + formatNumber(v || 0),                short: v => '₩' + formatNumber(v || 0) },
-    }[metric] || { label: metric, format: v => v, short: v => v };
+        roas:         { label: 'ROAS',      format: v => Math.round((v||0)*100)+'%',           short: v => Math.round((v||0)*100)+'%',        lowerBetter: false },
+        ctr:          { label: 'CTR',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        cvr:          { label: 'CVR',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        revenue:      { label: '매출',       format: v => '₩'+formatNumber(v||0),               short: v => '₩'+formatNumber(v||0),            lowerBetter: false },
+        atc_rate:     { label: 'ATC율',      format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        cost_per_atc: { label: 'Cost/ATC',  format: v => '₩'+formatNumber(Math.round(v||0)),   short: v => '₩'+formatNumber(Math.round(v||0)), lowerBetter: true  },
+    }[metric] || { label: metric, format: v => v, short: v => v, lowerBetter: false };
 
-    // 색상 함수 — 값에 따라 인디고 그라데이션
+    // 색상 함수 — 값에 따라 인디고 그라데이션 (lowerBetter면 반전)
     const colorFor = (val) => {
         if (val <= 0) return { bg: '#f8fafc', color: '#cbd5e1', border: '#f1f5f9' };
-        const ratio = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal || 1)));
+        let ratio = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal || 1)));
+        if (metricCfg.lowerBetter) ratio = 1 - ratio; // 낮을수록 진하게
         // 0 ~ 1 → 연한 인디고 → 진한 인디고
-        const r = Math.round(238 - (238 - 79) * ratio);   // 238 → 79
-        const g = Math.round(242 - (242 - 70) * ratio);   // 242 → 70
-        const b = Math.round(255 - (255 - 229) * ratio);  // 255 → 229
+        const r = Math.round(238 - (238 - 79) * ratio);
+        const g = Math.round(242 - (242 - 70) * ratio);
+        const b = Math.round(255 - (255 - 229) * ratio);
         const textColor = ratio > 0.55 ? '#ffffff' : '#1e293b';
         return { bg: `rgb(${r}, ${g}, ${b})`, color: textColor, border: `rgb(${r-15}, ${g-15}, ${b-15})` };
     };
