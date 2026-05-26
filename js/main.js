@@ -968,17 +968,31 @@ function buildPerformanceCriteriaBadge() {
 window.buildPerformanceCriteriaBadge = buildPerformanceCriteriaBadge;
 
 function updateKPIs() {
-    const list = getBrandCreatives();
-    const impressions = list.reduce((s, c) => s + (c.impressions || 0), 0);
-    const clicks = list.reduce((s, c) => s + (c.clicks || 0), 0);
-    const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
-    const conversions = list.reduce((s, c) => s + (c.conversions || 0), 0);
-    const revenue = list.reduce((s, c) => s + (c.revenue || 0), 0);
-    const spendJpy = list.reduce((s, c) => s + (c.spend_jpy || 0), 0);
+    // ★ aggregateByAdName 적용 — 성과 분석 섹션과 동일한 소재 단위 집계
+    //   raw 일별 데이터를 직접 합산하면 숫자가 맞지만
+    //   성과 분석 섹션도 같은 집계 기준을 쓰므로 일관성 보장
+    const rawList  = getBrandCreatives();
+    const list = (typeof aggregateByAdName === 'function') ? aggregateByAdName(rawList) : rawList;
+
+    const impressions = list.reduce((s, c) => s + (Number(c.impressions) || 0), 0);
+    const clicks      = list.reduce((s, c) => s + (Number(c.clicks)      || 0), 0);
+    const spend       = list.reduce((s, c) => s + (Number(c.spend)       || 0), 0);
+    const conversions = list.reduce((s, c) => s + (Number(c.conversions) || 0), 0);
+    const revenue     = list.reduce((s, c) => s + (Number(c.revenue)     || 0), 0);
+    const spendJpy    = list.reduce((s, c) => s + (Number(c.spend_jpy)   || 0), 0);
+
+    // ★ 진단 로그 — raw vs 집계 차이 확인
+    const rawSpend = rawList.reduce((s, c) => s + (Number(c.spend) || 0), 0);
+    if (Math.abs(rawSpend - spend) > 1) {
+        console.warn(`[KPI] raw vs 집계 광고비 차이: raw=₩${Math.round(rawSpend).toLocaleString()} / 집계=₩${Math.round(spend).toLocaleString()} (rawRows=${rawList.length}, aggRows=${list.length})`);
+    }
+
     // CTR/CVR/ROAS는 비율(ratio) 기준 → 표시 시 ×100
     // ★ 가중평균 CTR = 전체 clicks / 전체 impressions (단순 평균보다 정확)
     const avgCtrRatio = impressions > 0 ? (clicks / impressions) : 0;
-    const roasRatio = spend ? (revenue / spend) : 0;
+    const roasRatio   = spend > 0 ? (revenue / spend) : 0;
+
+    console.log(`[KPI] brand=${currentBrand} event=${currentEvent} | 소재${list.length}개 | 광고비₩${Math.round(spend).toLocaleString()} | 노출${impressions.toLocaleString()} | ROAS${Math.round(roasRatio*100)}%`);
 
     // 노출/클릭/전환 — 풀 콤마 + 보조 한국어 단위
     document.getElementById('kpi-impressions').innerHTML = formatKpiCount(impressions);
