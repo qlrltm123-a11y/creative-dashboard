@@ -476,7 +476,161 @@ function fetchVideoThumbnail(fileId) {
   return null;
 }
 
-// ★ 썸네일 없는 영상 전용: 파일명 기반 텍스트 분석
+// ============================================
+// ★ 영상 직접 업로드 분석 (Gemini Files API)
+// 썸네일 생성 실패 시 영상 파일 자체를 Gemini에 올려 분석
+// ============================================
+
+const MAX_VIDEO_SIZE_MB = 50; // Apps Script UrlFetchApp payload 한계
+
+/**
+ * 영상 blob을 Gemini Files API에 업로드 (resumable upload)
+ * 반환: { name, uri, mimeType } 또는 throw
+ */
+function uploadVideoToGeminiFiles(videoBlob, displayName) {
+  const mimeType = videoBlob.getContentType() || 'video/mp4';
+  const bytes = videoBlob.getBytes();
+
+  // Step 1: 업로드 세션 시작
+  const initResp = UrlFetchApp.fetch(
+    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`,
+    {
+      method: 'post',
+      headers: {
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+        'X-Goog-Upload-Header-Content-Type': mimeType,
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify({ file: { display_name: displayName || 'ad_video' } }),
+      muteHttpExceptions: true
+    }
+  );
+  if (initResp.getResponseCode() !== 200) {
+    throw new Error(`Files API 초기화 실패 (${initResp.getResponseCode()})`);
+  }
+  const uploadUrl = initResp.getHeaders()['X-Goog-Upload-URL'] ||
+                    initResp.getHeaders()['x-goog-upload-url'];
+  if (!uploadUrl) throw new Error('업로드 URL을 받지 못했습니다');
+
+  // Step 2: 파일 업로드
+  const uploadResp = UrlFetchApp.fetch(uploadUrl, {
+    method: 'post',
+    headers: {
+      'Content-Length': String(bytes.length),
+      'X-Goog-Upload-Offset': '0',
+      'X-Goog-Upload-Command': 'upload, finalize'
+    },
+    payload: videoBlob,
+    muteHttpExceptions: true
+  });
+  if (uploadResp.getResponseCode() !== 200) {
+    throw new Error(`파일 업로드 실패 (${uploadResp.getResponseCode()}): ${uploadResp.getContentText().substring(0, 200)}`);
+  }
+  const fileInfo = JSON.parse(uploadResp.getContentText());
+  return fileInfo.file; // { name, uri, mimeType, state, ... }
+}
+
+/**
+ * Gemini Files API에서 영상 처리 완료 대기 (ACTIVE 상태가 될 때까지)
+ * 최대 60초 대기
+ */
+function waitForGeminiVideoProcessing(fileName) {
+  const maxWaitSec = 60;
+  for (let i = 0; i < maxWaitSec; i++) {
+    Utilities.sleep(1000);
+    const resp = UrlFetchApp.fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_API_KEY}`,
+      { muteHttpExceptions: true }
+    );
+    if (resp.getResponseCode() !== 200) continue;
+    const file = JSON.parse(resp.getContentText());
+    if (file.state === 'ACTIVE') return file;
+    if (file.state === 'FAILED') throw new Error('Gemini 영상 처리 실패');
+    Logger.log(`  ⏳ 영상 처리 중... (${i + 1}s / ${maxWaitSec}s)`);
+  }
+  throw new Error('영상 처리 타임아웃 (60초 초과)');
+}
+
+/**
+ * 이미 업로드된 Gemini Files URI로 영상 분석
+ */
+function analyzeGeminiVideoFile(fileUri, mimeType, adName) {
+  checkDailyLimit();
+  const context = adName ? ` (광고명: ${adName})` : '';
+  const prompt = `일본 시장 광고 영상 소재 분석${context}. 영상 전체를 보고 분석하세요.
+광고 소재가 아니면 appeal_points 필드에 "❌ 광고소재 아님"만 입력.
+반드시 JSON 형식으로만 답하세요.
+
+{
+  "appeal_points": "주요 소구포인트 3-5개를 한국어로 쉼표 구분 (예: 가성비, 디자인, 신뢰성)",
+  "hook_type": "후킹 방식 1-2개 한국어 (예: 호기심 유발, 문제 제기)",
+  "target_emotion": "유발하는 감정 1-2개 한국어 (예: 안도감, 기대감)",
+  "key_message_jp": "영상에 등장하는 핵심 카피 일본어 원문",
+  "key_message_kr": "위 카피의 자연스러운 한국어 번역"
+}`;
+  const payload = {
+    contents: [{
+      parts: [
+        { text: prompt },
+        { file_data: { mime_type: mimeType, file_uri: fileUri } }
+      ]
+    }],
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
+  };
+  const responseText = callGeminiAPI(payload);
+  const json = JSON.parse(responseText);
+  if (!json.candidates || !json.candidates[0]) throw new Error('API 응답 없음');
+  const text = json.candidates[0].content.parts[0].text;
+  try { return JSON.parse(text); }
+  catch (e) {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('JSON 파싱 실패');
+  }
+}
+
+/**
+ * Drive 영상 파일을 직접 Gemini에 업로드해서 분석
+ * 성공 시 분석 결과 반환, 실패 시 throw
+ */
+function analyzeVideoDirectly(fileId, adName) {
+  const file = DriveApp.getFileById(fileId);
+  const videoBlob = file.getBlob();
+  const sizeMB = videoBlob.getBytes().length / (1024 * 1024);
+
+  if (sizeMB > MAX_VIDEO_SIZE_MB) {
+    throw new Error(`영상 용량 초과 (${sizeMB.toFixed(1)}MB > ${MAX_VIDEO_SIZE_MB}MB)`);
+  }
+
+  const mimeType = videoBlob.getContentType() || 'video/mp4';
+  Logger.log(`📤 Gemini Files API 업로드 중 (${sizeMB.toFixed(1)}MB): ${file.getName()}`);
+
+  const uploadedFile = uploadVideoToGeminiFiles(videoBlob, file.getName());
+  Logger.log(`✅ 업로드 완료 → 처리 대기: ${uploadedFile.name}`);
+
+  let processedFile;
+  try {
+    processedFile = waitForGeminiVideoProcessing(uploadedFile.name);
+    Logger.log(`🎬 영상 처리 완료 → 분석 시작`);
+  } catch (procErr) {
+    // 처리 실패해도 파일 삭제
+    try { UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/${uploadedFile.name}?key=${GEMINI_API_KEY}`, { method: 'delete', muteHttpExceptions: true }); } catch(e) {}
+    throw procErr;
+  }
+
+  let result;
+  try {
+    result = analyzeGeminiVideoFile(processedFile.uri, mimeType, adName);
+  } finally {
+    // 분석 후 Gemini Files에서 삭제 (저장 비용 최소화)
+    try { UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/${uploadedFile.name}?key=${GEMINI_API_KEY}`, { method: 'delete', muteHttpExceptions: true }); } catch(e) {}
+  }
+  return result;
+}
+
+// ★ 썸네일 없는 영상 전용: 파일명 기반 텍스트 분석 (최후 fallback)
 function analyzeVideoByName(fileName, adName) {
   checkDailyLimit();
   const context = [fileName, adName].filter(Boolean).join(' / ');
@@ -584,10 +738,16 @@ function analyzeWithGemini(mediaUrl, adName) {
         imageBlob = fetchVideoThumbnail(fileId); // null이면 썸네일 미생성
         if (!imageBlob) {
           thumbnailFailed = true;
-          // ★ 파일명 기반 텍스트 분석으로 fallback
           const fileName = file.getName();
-          Logger.log(`⚠️ 썸네일 없음 → 텍스트 분석 fallback: ${fileName}`);
-          return analyzeVideoByName(fileName, adName || '');
+          Logger.log(`⚠️ 썸네일 없음 → 영상 직접 업로드 분석 시도: ${fileName}`);
+          // ★ Fallback 1: 영상 파일 직접 Gemini 업로드 분석
+          try {
+            return analyzeVideoDirectly(fileId, adName || '');
+          } catch (videoErr) {
+            Logger.log(`⚠️ 영상 업로드 분석 실패 (${videoErr.message}) → 파일명 텍스트 분석`);
+            // ★ Fallback 2: 파일명 기반 텍스트 분석 (최후 수단)
+            return analyzeVideoByName(fileName, adName || '');
+          }
         }
       } else if (mimeType.startsWith('image/')) {
         imageBlob = file.getBlob();
