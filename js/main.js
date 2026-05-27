@@ -140,11 +140,7 @@ function bindEvents() {
             performanceCampaign = '';
             aiProduct = '';
             aiCampaign = '';
-            // 전환 미측정 플랫폼(X/Meta/TikTok) 선택 시 정렬 기준 CTR로 자동 전환
-            if (isNoConvPlatform(currentPlatform)) {
-                const metricSel = document.getElementById('product-sort-metric');
-                if (metricSel) metricSel.value = 'ctr';
-            }
+
             invalidatePerformancePoolCache();
             updateDashboard();
         });
@@ -3308,16 +3304,8 @@ function renderProductPerformance() {
     // 장바구니 모드 감지
     const cartMode = isCartMode(data);
 
-    // 정렬 지표 결정
+    // 정렬 지표 결정 (사용자 선택 유지 — 자동 전환 없음)
     let metric = metricSel?.value || 'ctr';
-    if (cartMode && ['roas','cvr','conversions','revenue'].includes(metric)) {
-        // 장바구니 모드: ATC율 기준으로 자동 전환
-        metric = 'atc_rate';
-        if (metricSel) metricSel.value = 'atc_rate';
-    } else if (isNoConvPlatform(currentPlatform) && ['roas','cvr','conversions','revenue'].includes(metric)) {
-        metric = 'ctr';
-        if (metricSel) metricSel.value = 'ctr';
-    }
 
     // 장바구니 모드일 때 셀렉트에 ATC 옵션 동적 추가
     if (metricSel) {
