@@ -3646,7 +3646,22 @@ function normalizeArrayField(value) {
 // ============================
 function openModal(id, preloadedCreative) {
     // ★ preloadedCreative: ranking 등에서 집계 데이터를 직접 전달 (모달에서 0 표시 방지)
-    const c = preloadedCreative || allCreatives.find(x => x.id === id);
+    // preloadedCreative 없으면 같은 ad_name 행을 집계해서 사용 (ATC 등 누락 방지)
+    let c = preloadedCreative;
+    if (!c) {
+        const raw = allCreatives.find(x => x.id === id);
+        if (!raw) return;
+        const adName = (raw.ad_name || raw.creative_name || '').toString().trim();
+        if (adName && typeof aggregateByAdName === 'function') {
+            const sameAd = allCreatives.filter(x =>
+                (x.ad_name || x.creative_name || '').toString().trim() === adName
+            );
+            const agg = aggregateByAdName(sameAd);
+            c = (agg && agg.length) ? agg[0] : raw;
+        } else {
+            c = raw;
+        }
+    }
     if (!c) return;
 
     const mediaHtml = typeof window.createMediaElement === 'function'
