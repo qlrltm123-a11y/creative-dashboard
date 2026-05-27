@@ -3272,7 +3272,7 @@ function renderProductPerformance() {
     const metricSel = document.getElementById('product-sort-metric');
     const bestEl = document.getElementById('best-creatives-list');
     const summaryEl = document.getElementById('product-summary');
-    const bestLabel = document.getElementById('best-metric-label');
+    // best-metric-label 제거됨
     if (!bestEl) return;
 
     // ★ window.allCreatives 직접 사용 (getBrandCreatives 우회)
@@ -3300,8 +3300,7 @@ function renderProductPerformance() {
     console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
 
     if (!data.length) {
-        if (bestLabel) bestLabel.textContent = '소재 없음';
-        if (summaryEl) summaryEl.innerHTML = '';
+            if (summaryEl) summaryEl.innerHTML = '';
         bestEl.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>데이터 없음</div>`;
         return;
     }
@@ -3346,8 +3345,7 @@ function renderProductPerformance() {
 
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const cartLabel = cartMode ? '🛒 ' : '';
-    if (bestLabel) bestLabel.textContent = `${cartLabel}${cfg.label || metric} 최상위`;
-    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보${cartMode ? ' · 장바구니 최적화' : ''}</span>`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${cartMode ? ' · 장바구니 최적화' : ''}</span>`;
 
     // 정렬: cost_per_atc는 낮을수록 좋음 → 오름차순
     const sortAsc = metric === 'cost_per_atc';
@@ -3377,10 +3375,11 @@ function renderProductPerformance() {
 
     bestEl.innerHTML = best.map((c, i) => createRankRow(c, i + 1, metric, 'best', benchmark)).join('');
 
-    bestEl.querySelectorAll('.rank-row').forEach(row => {
+    // ★ 집계 creative 직접 전달 (allCreatives 단일 행 대신 합산 데이터 사용)
+    bestEl.querySelectorAll('.rank-row').forEach((row, idx) => {
         row.addEventListener('click', (e) => {
             if (e.target.closest('.rank-comment-toggle')) return;
-            openModal(row.dataset.id);
+            openModal(row.dataset.id, best[idx]);
         });
     });
     bestEl.querySelectorAll('.rank-comment-toggle').forEach(btn => {
@@ -3657,8 +3656,9 @@ function normalizeArrayField(value) {
 // ============================
 // Modal
 // ============================
-function openModal(id) {
-    const c = allCreatives.find(x => x.id === id);
+function openModal(id, preloadedCreative) {
+    // ★ preloadedCreative: ranking 등에서 집계 데이터를 직접 전달 (모달에서 0 표시 방지)
+    const c = preloadedCreative || allCreatives.find(x => x.id === id);
     if (!c) return;
 
     const mediaHtml = typeof window.createMediaElement === 'function'
