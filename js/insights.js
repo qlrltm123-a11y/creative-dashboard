@@ -10,7 +10,7 @@ const chartMetrics = {
     hook:    'roas',   // 후킹 방식 차트
     emotion: 'roas',   // 감정 차트
 };
-let _insightChartSelectsBound = false;
+// (바인딩 여부는 sel.dataset.bound 로 각 select 마다 추적)
 
 const INSIGHT_METRIC_CFG = {
     roas: {
@@ -547,20 +547,17 @@ function renderAIInsights() {
     attachInsightHoverEvents();
 }
 
-// ★ 차트별 지표 셀렉트 바인딩 (최초 1회만)
+// ★ 차트별 지표 셀렉트 바인딩
 function bindInsightChartSelects() {
-    if (_insightChartSelectsBound) return;
-    const configs = [
-        { selId: 'appeal-metric-select', lblId: 'appeal-metric-lbl', chartKey: 'appeal',  render: (list) => renderAppealRoasChart(list) },
-        { selId: 'hook-metric-select',   lblId: 'hook-metric-lbl',   chartKey: 'hook',    render: (list) => renderHookCtrChart(list) },
-        { selId: 'emotion-metric-select',lblId: 'emotion-metric-lbl',chartKey: 'emotion', render: (list) => renderEmotionChart(list) },
-    ];
-    let anyBound = false;
-    configs.forEach(({ selId, lblId, chartKey, render }) => {
+    [
+        { selId: 'appeal-metric-select',  lblId: 'appeal-metric-lbl',  chartKey: 'appeal'  },
+        { selId: 'hook-metric-select',    lblId: 'hook-metric-lbl',    chartKey: 'hook'    },
+        { selId: 'emotion-metric-select', lblId: 'emotion-metric-lbl', chartKey: 'emotion' },
+    ].forEach(({ selId, lblId, chartKey }) => {
         const sel = document.getElementById(selId);
         if (!sel || sel.dataset.bound === '1') return;
         sel.dataset.bound = '1';
-        anyBound = true;
+
         sel.addEventListener('change', () => {
             chartMetrics[chartKey] = sel.value || 'roas';
             // 차트 제목 업데이트
@@ -568,17 +565,18 @@ function bindInsightChartSelects() {
             if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
             // 해당 차트만 재렌더
             const list = getAIInsightsList();
-            render(list);
-            // 성공 패턴 카드도 갱신 (해당 차드 지표 반영)
+            if (chartKey === 'appeal')       renderAppealRoasChart(list);
+            else if (chartKey === 'hook')    renderHookCtrChart(list);
+            else                             renderEmotionChart(list);
             renderSuccessPatterns(list);
             attachInsightHoverEvents();
         });
-        // 현재 값 동기화
+
+        // 초기 값 동기화
         sel.value = chartMetrics[chartKey] || 'roas';
         const lbl = document.getElementById(lblId);
         if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
     });
-    if (anyBound) _insightChartSelectsBound = true;
 }
 
 // 선정 기준 안내 (헤더 옆에 칩으로 표시)
@@ -677,6 +675,26 @@ function attachInsightHoverEvents() {
 }
 
 // 성공 패턴 카드 (3개)
+// ★ canvas를 유지하면서 no-data 메시지 표시/숨김 헬퍼
+function _showChartNoData(ctx, message) {
+    const parent = ctx.parentElement;
+    let msg = parent.querySelector('.chart-no-data-msg');
+    if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'chart-no-data-msg text-center text-slate-400 text-sm py-12';
+        parent.appendChild(msg);
+    }
+    msg.textContent = message;
+    msg.style.display = '';
+    ctx.style.display = 'none';
+}
+function _hideChartNoData(ctx) {
+    const parent = ctx.parentElement;
+    const msg = parent.querySelector('.chart-no-data-msg');
+    if (msg) msg.style.display = 'none';
+    ctx.style.display = '';
+}
+
 // ★ AI 인사이트 공용 바 차트 렌더러 — metric 파라미터로 차트별 지표 지정
 function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, metric) {
     destroyInsightChart(chartKey);
@@ -686,8 +704,8 @@ function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, m
     const cfg = INSIGHT_METRIC_CFG[metric] || INSIGHT_METRIC_CFG.roas;
     const key = cfg.key;
     const sortFn = cfg.lowerBetter
-        ? (a, b) => (a[key] || 0) - (b[key] || 0)   // 낮을수록 좋음 (CPA)
-        : (a, b) => (b[key] || 0) - (a[key] || 0);   // 높을수록 좋음
+        ? (a, b) => (a[key] || 0) - (b[key] || 0)
+        : (a, b) => (b[key] || 0) - (a[key] || 0);
     const validFilter = d => (d[key] || 0) > 0;
 
     let data = aggregateByKeyword(list, fieldName)
@@ -702,9 +720,11 @@ function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, m
     }
 
     if (!data.length) {
-        ctx.parentElement.innerHTML = `<div class="text-center text-slate-400 text-sm py-12">${cfg.label} 데이터 없음 (최소 1개 소재 필요)</div>`;
+        // ✅ canvas 파괴 방지 — 메시지를 별도 div로 표시
+        _showChartNoData(ctx, `${cfg.label} 데이터 없음`);
         return;
     }
+    _hideChartNoData(ctx);
 
     const vals = data.map(d => cfg.fmtVal(d[key] || 0));
     const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
