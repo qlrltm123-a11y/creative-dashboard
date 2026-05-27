@@ -468,11 +468,20 @@
 
             <!-- Insights Charts Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                <!-- 소구포인트별 ROAS -->
+                <!-- 소구포인트별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-bullseye mr-2 text-purple-500"></i>소구포인트별 평균 ROAS</h3>
-                        <span class="text-xs text-slate-400">TOP 10</span>
+                        <h3 class="chart-title"><i class="fas fa-bullseye mr-2 text-purple-500"></i>소구포인트별 평균 <span id="appeal-metric-lbl">ROAS</span></h3>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-slate-500">지표</label>
+                            <select id="appeal-metric-select" class="insight-chart-metric-sel">
+                                <option value="roas" selected>ROAS</option>
+                                <option value="ctr">CTR</option>
+                                <option value="cvr">CVR</option>
+                                <option value="cpa">CPA</option>
+                                <option value="atc_rate">ATC율</option>
+                            </select>
+                        </div>
                     </div>
                     <div style="height: 340px;">
                         <canvas id="appealRoasChart"></canvas>
@@ -498,19 +507,39 @@
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                <!-- 후킹 방식별 CTR -->
+                <!-- 후킹 방식별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-fish mr-2 text-cyan-500"></i>후킹 방식별 평균 CTR</h3>
+                        <h3 class="chart-title"><i class="fas fa-fish mr-2 text-cyan-500"></i>후킹 방식별 평균 <span id="hook-metric-lbl">ROAS</span></h3>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-slate-500">지표</label>
+                            <select id="hook-metric-select" class="insight-chart-metric-sel">
+                                <option value="roas" selected>ROAS</option>
+                                <option value="ctr">CTR</option>
+                                <option value="cvr">CVR</option>
+                                <option value="cpa">CPA</option>
+                                <option value="atc_rate">ATC율</option>
+                            </select>
+                        </div>
                     </div>
                     <div style="height: 320px;">
                         <canvas id="hookCtrChart"></canvas>
                     </div>
                 </div>
-                <!-- 타겟 감정별 전환율 -->
+                <!-- 타겟 감정별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-heart mr-2 text-rose-500"></i>타겟 감정별 전환 효율</h3>
+                        <h3 class="chart-title"><i class="fas fa-heart mr-2 text-rose-500"></i>타겟 감정별 평균 <span id="emotion-metric-lbl">ROAS</span></h3>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-slate-500">지표</label>
+                            <select id="emotion-metric-select" class="insight-chart-metric-sel">
+                                <option value="roas" selected>ROAS</option>
+                                <option value="ctr">CTR</option>
+                                <option value="cvr">CVR</option>
+                                <option value="cpa">CPA</option>
+                                <option value="atc_rate">ATC율</option>
+                            </select>
+                        </div>
                     </div>
                     <div style="height: 320px;">
                         <canvas id="emotionChart"></canvas>

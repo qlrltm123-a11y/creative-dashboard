@@ -2032,6 +2032,82 @@ body {
     background: #16a34a;
 }
 
+/* ★ AI 인사이트 차트별 지표 드롭다운 */
+.insight-chart-metric-sel {
+    font-size: 11px;
+    font-weight: 500;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 3px 8px;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    appearance: auto;
+}
+.insight-chart-metric-sel:focus,
+.insight-chart-metric-sel:hover {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+    outline: none;
+    color: #7c3aed;
+}
+
+/* ★ AI 인사이트 섹션 지표 탭 */
+.insight-metric-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.insight-metric-tab {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1.5px solid #cbd5e1;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.4;
+}
+.insight-metric-tab:hover {
+    border-color: #8b5cf6;
+    color: #7c3aed;
+    background: #f5f3ff;
+}
+.insight-metric-tab.active {
+    border-color: #8b5cf6;
+    background: #8b5cf6;
+    color: #fff;
+}
+.insight-metric-tab.active[data-metric="ctr"] {
+    border-color: #0891b2;
+    background: #0891b2;
+}
+.insight-metric-tab.active[data-metric="cvr"] {
+    border-color: #e11d48;
+    background: #e11d48;
+}
+.insight-metric-tab.active[data-metric="cpa"] {
+    border-color: #d97706;
+    background: #d97706;
+}
+.insight-metric-tab.active[data-metric="atc_rate"] {
+    border-color: #16a34a;
+    background: #16a34a;
+}
+/* 성공 패턴 카드 지표 배지 */
+.pattern-metric-badge {
+    font-size: 10px;
+    font-weight: 500;
+    background: rgba(255,255,255,0.25);
+    border-radius: 10px;
+    padding: 1px 7px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
 @media (max-width: 900px) {
     .appeal-insight-grid, .appeal-insight-dual-grid {
         grid-template-columns: 1fr;

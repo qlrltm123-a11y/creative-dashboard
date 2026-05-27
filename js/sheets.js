@@ -110,7 +110,7 @@ const COLUMN_ALIASES = {
     '시작일': 'start_date',
     // 미디어 URL (통합)
     'media_url': 'media_url',
-    'thumbnail_url': 'media_url',
+    'thumbnail_url': 'thumbnail_url',
     'video_url': 'media_url',
     'url': 'media_url',
     '소재url': 'media_url',
@@ -395,9 +395,9 @@ function csvToObjects(csvText) {
         if (!obj.media_type || !['image', 'video'].includes(obj.media_type)) {
             obj.media_type = detectMediaType(obj.media_url);
         }
-        // 호환성: thumbnail_url과 video_url을 media_url로부터 채워줌
+        // 호환성: thumbnail_url 없으면 media_url로 fallback, video_url 채우기
         if (obj.media_url) {
-            obj.thumbnail_url = obj.media_url;
+            if (!obj.thumbnail_url) obj.thumbnail_url = obj.media_url;
             if (obj.media_type === 'video') {
                 obj.video_url = obj.media_url;
             }

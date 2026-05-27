@@ -4,6 +4,57 @@
 
 let insightCharts = {};
 
+// ★ AI 인사이트 차트별 선택 지표
+const chartMetrics = {
+    appeal:  'roas',   // 소구포인트 차트
+    hook:    'roas',   // 후킹 방식 차트
+    emotion: 'roas',   // 감정 차트
+};
+let _insightChartSelectsBound = false;
+
+const INSIGHT_METRIC_CFG = {
+    roas: {
+        key: 'roas', label: 'ROAS', unitLabel: '(%)', lowerBetter: false,
+        hue: 265, sat: '75%', minPad: 30,
+        fmtVal:  v => Math.round(v * 100),
+        fmtTick: v => v + '%',
+        fmtMean: v => Math.round(v) + '%',
+        fmtDev:  dev => (dev >= 0 ? '+' : '') + Math.round(dev) + '%p',
+    },
+    ctr: {
+        key: 'ctr', label: 'CTR', unitLabel: '(%)', lowerBetter: false,
+        hue: 195, sat: '78%', minPad: 0.3,
+        fmtVal:  v => Number((v * 100).toFixed(2)),
+        fmtTick: v => v + '%',
+        fmtMean: v => Number(v).toFixed(2) + '%',
+        fmtDev:  dev => (dev >= 0 ? '+' : '') + Number(dev).toFixed(2) + '%p',
+    },
+    cvr: {
+        key: 'cvr', label: 'CVR', unitLabel: '(%)', lowerBetter: false,
+        hue: 350, sat: '75%', minPad: 0.3,
+        fmtVal:  v => Number((v * 100).toFixed(2)),
+        fmtTick: v => v + '%',
+        fmtMean: v => Number(v).toFixed(2) + '%',
+        fmtDev:  dev => (dev >= 0 ? '+' : '') + Number(dev).toFixed(2) + '%p',
+    },
+    cpa: {
+        key: 'cpa', label: 'CPA', unitLabel: '(₩)', lowerBetter: true,
+        hue: 35, sat: '85%', minPad: 1000,
+        fmtVal:  v => Math.round(v),
+        fmtTick: v => '₩' + Math.round(v).toLocaleString(),
+        fmtMean: v => '₩' + Math.round(v).toLocaleString(),
+        fmtDev:  dev => (dev >= 0 ? '+' : '-') + '₩' + Math.round(Math.abs(dev)).toLocaleString(),
+    },
+    atc_rate: {
+        key: 'atc_rate', label: 'ATC율', unitLabel: '(%)', lowerBetter: false,
+        hue: 145, sat: '65%', minPad: 0.3,
+        fmtVal:  v => Number((v * 100).toFixed(2)),
+        fmtTick: v => v + '%',
+        fmtMean: v => Number(v).toFixed(2) + '%',
+        fmtDev:  dev => (dev >= 0 ? '+' : '') + Number(dev).toFixed(2) + '%p',
+    },
+};
+
 // 키워드별 대표 소재 (ROAS 상위 N개) 캐시
 let keywordCreativeMap = {
     appeal_points: new Map(),
@@ -344,6 +395,7 @@ function aggregateByKeyword(creatives, fieldName) {
         const clicks = Number(c.clicks) || 0;
         const conversions = Number(c.conversions) || 0;
 
+        const add_to_cart = Number(c.add_to_cart) || 0;
         keywords.forEach(k => {
             if (!k || k.startsWith('❌')) return;
             if (!map.has(k)) {
@@ -354,7 +406,8 @@ function aggregateByKeyword(creatives, fieldName) {
                     revenue: 0,
                     impressions: 0,
                     clicks: 0,
-                    conversions: 0
+                    conversions: 0,
+                    add_to_cart: 0,
                 });
             }
             const item = map.get(k);
@@ -364,16 +417,18 @@ function aggregateByKeyword(creatives, fieldName) {
             item.impressions += impressions;
             item.clicks += clicks;
             item.conversions += conversions;
+            item.add_to_cart += add_to_cart;
         });
     });
 
     // 파생 지표 계산 — ROAS/CTR/CVR은 "비율" 단위 (표시 시 ×100)
     return Array.from(map.values()).map(item => ({
         ...item,
-        roas: item.spend > 0 ? (item.revenue / item.spend) : 0,
-        ctr: item.impressions > 0 ? (item.clicks / item.impressions) : 0,
-        cvr: item.clicks > 0 ? (item.conversions / item.clicks) : 0,
-        cpa: item.conversions > 0 ? Math.round(item.spend / item.conversions) : 0
+        roas:     item.spend > 0       ? (item.revenue / item.spend) : 0,
+        ctr:      item.impressions > 0 ? (item.clicks / item.impressions) : 0,
+        cvr:      item.clicks > 0      ? (item.conversions / item.clicks) : 0,
+        cpa:      item.conversions > 0 ? Math.round(item.spend / item.conversions) : 0,
+        atc_rate: item.clicks > 0      ? (item.add_to_cart / item.clicks) : 0,
     }));
 }
 
@@ -485,8 +540,45 @@ function renderAIInsights() {
     // 선정 기준 안내 배지 갱신
     renderInsightThresholdBadge();
 
+    // ★ 차트별 지표 셀렉트 바인딩 (최초 1회)
+    bindInsightChartSelects();
+
     // ★ hover preview 이벤트 바인딩
     attachInsightHoverEvents();
+}
+
+// ★ 차트별 지표 셀렉트 바인딩 (최초 1회만)
+function bindInsightChartSelects() {
+    if (_insightChartSelectsBound) return;
+    const configs = [
+        { selId: 'appeal-metric-select', lblId: 'appeal-metric-lbl', chartKey: 'appeal',  render: (list) => renderAppealRoasChart(list) },
+        { selId: 'hook-metric-select',   lblId: 'hook-metric-lbl',   chartKey: 'hook',    render: (list) => renderHookCtrChart(list) },
+        { selId: 'emotion-metric-select',lblId: 'emotion-metric-lbl',chartKey: 'emotion', render: (list) => renderEmotionChart(list) },
+    ];
+    let anyBound = false;
+    configs.forEach(({ selId, lblId, chartKey, render }) => {
+        const sel = document.getElementById(selId);
+        if (!sel || sel.dataset.bound === '1') return;
+        sel.dataset.bound = '1';
+        anyBound = true;
+        sel.addEventListener('change', () => {
+            chartMetrics[chartKey] = sel.value || 'roas';
+            // 차트 제목 업데이트
+            const lbl = document.getElementById(lblId);
+            if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
+            // 해당 차트만 재렌더
+            const list = getAIInsightsList();
+            render(list);
+            // 성공 패턴 카드도 갱신 (해당 차드 지표 반영)
+            renderSuccessPatterns(list);
+            attachInsightHoverEvents();
+        });
+        // 현재 값 동기화
+        sel.value = chartMetrics[chartKey] || 'roas';
+        const lbl = document.getElementById(lblId);
+        if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
+    });
+    if (anyBound) _insightChartSelectsBound = true;
 }
 
 // 선정 기준 안내 (헤더 옆에 칩으로 표시)
@@ -585,58 +677,191 @@ function attachInsightHoverEvents() {
 }
 
 // 성공 패턴 카드 (3개)
+// ★ AI 인사이트 공용 바 차트 렌더러 — metric 파라미터로 차트별 지표 지정
+function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, metric) {
+    destroyInsightChart(chartKey);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    const cfg = INSIGHT_METRIC_CFG[metric] || INSIGHT_METRIC_CFG.roas;
+    const key = cfg.key;
+    const sortFn = cfg.lowerBetter
+        ? (a, b) => (a[key] || 0) - (b[key] || 0)   // 낮을수록 좋음 (CPA)
+        : (a, b) => (b[key] || 0) - (a[key] || 0);   // 높을수록 좋음
+    const validFilter = d => (d[key] || 0) > 0;
+
+    let data = aggregateByKeyword(list, fieldName)
+        .filter(a => a.count >= 3 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+    if (data.length < 5) {
+        data = aggregateByKeyword(list, fieldName)
+            .filter(a => a.count >= 2 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+    }
+    if (data.length < 5) {
+        data = aggregateByKeyword(list, fieldName)
+            .filter(a => a.count >= 1 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+    }
+
+    if (!data.length) {
+        ctx.parentElement.innerHTML = `<div class="text-center text-slate-400 text-sm py-12">${cfg.label} 데이터 없음 (최소 1개 소재 필요)</div>`;
+        return;
+    }
+
+    const vals = data.map(d => cfg.fmtVal(d[key] || 0));
+    const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const domain = computeCompressedDomain(vals, { paddingRatio: 0.18, minPadding: cfg.minPad });
+
+    const goodColor = `hsla(${cfg.hue}, ${cfg.sat}, 55%, 0.92)`;
+    const weakColor = 'hsla(220, 18%, 65%, 0.78)';
+    const midColor  = `hsla(${cfg.hue}, ${cfg.sat}, 65%, 0.80)`;
+    const THRESHOLD = 0.05;
+
+    const colors = vals.map(v => {
+        if (mean === 0) return midColor;
+        const dev = (v - mean) / mean;
+        if (cfg.lowerBetter) {
+            if (dev <= -THRESHOLD) return goodColor;
+            if (dev >= THRESHOLD) return weakColor;
+        } else {
+            if (dev >= THRESHOLD) return goodColor;
+            if (dev <= -THRESHOLD) return weakColor;
+        }
+        return midColor;
+    });
+
+    insightCharts[chartKey] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d.keyword),
+            datasets: [{
+                label: `평균 ${cfg.label} ${cfg.unitLabel}`,
+                data: vals,
+                backgroundColor: colors,
+                borderRadius: 6,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { right: 56 } },
+            animation: { duration: 400 },
+            onHover: (evt, els) => {
+                if (els && els.length) {
+                    showPreview(data[els[0].index].keyword, fieldName, evt.native || evt);
+                    evt.native.target.style.cursor = 'pointer';
+                } else {
+                    hidePreview();
+                    if (evt.native) evt.native.target.style.cursor = 'default';
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                meanLine: {
+                    value: Number(mean.toFixed(2)),
+                    axis: 'x',
+                    label: `평균 ${cfg.fmtMean(mean)}`,
+                    color: 'rgba(100, 116, 139, 0.85)'
+                },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: (tCtx) => {
+                            const d = data[tCtx.dataIndex];
+                            const dev = vals[tCtx.dataIndex] - mean;
+                            return [
+                                `평균 대비: ${cfg.fmtDev(dev)}`,
+                                `사용 소재: ${d.count}개`,
+                                `광고비: ₩${formatNumber(d.spend)}`,
+                                `매출: ₩${formatNumber(d.revenue)}`,
+                            ];
+                        }
+                    }
+                },
+                datalabels: false,
+            },
+            scales: {
+                x: {
+                    min: domain.min,
+                    max: domain.max,
+                    ticks: { callback: v => cfg.fmtTick(v), font: { size: 10 } },
+                    grid: { color: 'rgba(226, 232, 240, 0.6)' }
+                },
+                y: { ticks: { font: { size: 11 } }, grid: { display: false } }
+            }
+        },
+        plugins: [{
+            id: 'barEndLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx: c } = chart;
+                const meta = chart.getDatasetMeta(0);
+                c.save();
+                c.font = '600 11px Pretendard, sans-serif';
+                c.textBaseline = 'middle';
+                c.textAlign = 'left';
+                meta.data.forEach((bar, i) => {
+                    const v = vals[i];
+                    const dev = v - mean;
+                    const isBetter = cfg.lowerBetter ? dev < 0 : dev > 0;
+                    c.fillStyle = isBetter ? `hsl(${cfg.hue}, 60%, 38%)` : '#64748b';
+                    c.fillText(`${cfg.fmtTick(v)}  (${cfg.fmtDev(dev)})`, bar.x + 6, bar.y);
+                });
+                c.restore();
+            }
+        }]
+    });
+}
+
 function renderSuccessPatterns(list) {
     const container = document.getElementById('success-patterns');
     if (!container) return;
 
-    const appeals = aggregateByKeyword(list, 'appeal_points')
-        .filter(a => a.count >= 1)
-        .sort((a, b) => b.roas - a.roas);
-    const hooks = aggregateByKeyword(list, 'hook_type')
-        .filter(a => a.count >= 1)
-        .sort((a, b) => b.ctr - a.ctr);
-    const emotions = aggregateByKeyword(list, 'target_emotion')
-        .filter(a => a.count >= 1)
-        .sort((a, b) => b.cvr - a.cvr);
+    // 각 카드는 해당 차트의 현재 지표를 기준으로 TOP 키워드 표시
+    const getTop = (field, metricKey) => {
+        const cfg = INSIGHT_METRIC_CFG[metricKey] || INSIGHT_METRIC_CFG.roas;
+        const k = cfg.key;
+        const sortFn = cfg.lowerBetter
+            ? (a, b) => (a[k] || 0) - (b[k] || 0)
+            : (a, b) => (b[k] || 0) - (a[k] || 0);
+        const item = aggregateByKeyword(list, field)
+            .filter(a => a.count >= 1 && (a[k] || 0) > 0)
+            .sort(sortFn)[0];
+        return { item, cfg };
+    };
 
-    const topAppeal = appeals[0];
-    const topHook = hooks[0];
-    const topEmotion = emotions[0];
+    const { item: topAppeal,  cfg: cfgA } = getTop('appeal_points', chartMetrics.appeal);
+    const { item: topHook,    cfg: cfgH } = getTop('hook_type',     chartMetrics.hook);
+    const { item: topEmotion, cfg: cfgE } = getTop('target_emotion', chartMetrics.emotion);
+
+    const statLine = (item, cfg) => item
+        ? `${cfg.label} <b>${cfg.fmtMean(cfg.fmtVal(item[cfg.key] || 0))}</b> · ${item.count}개 소재`
+        : '데이터 없음';
 
     container.innerHTML = `
         <div class="pattern-card pattern-purple">
             <div class="pattern-icon"><i class="fas fa-trophy"></i></div>
-            <div class="pattern-label">최고 효율 소구포인트</div>
+            <div class="pattern-label">최고 효율 소구포인트 <span class="pattern-metric-badge">${cfgA.label} 기준</span></div>
             <div class="pattern-value">${topAppeal ? topAppeal.keyword : '-'}</div>
-            <div class="pattern-stats">
-                ${topAppeal ? `평균 ROAS <b>${Math.round(topAppeal.roas * 100)}%</b> · ${topAppeal.count}개 소재` : '데이터 없음'}
-            </div>
+            <div class="pattern-stats">${statLine(topAppeal, cfgA)}</div>
             <div class="pattern-recommend">
                 <i class="fas fa-lightbulb mr-1"></i>
                 ${topAppeal ? `"${topAppeal.keyword}" 소구포인트의 신규 소재 제작을 추천합니다` : ''}
             </div>
         </div>
-
         <div class="pattern-card pattern-cyan">
             <div class="pattern-icon"><i class="fas fa-fish"></i></div>
-            <div class="pattern-label">최고 CTR 후킹 방식</div>
+            <div class="pattern-label">최고 효율 후킹 방식 <span class="pattern-metric-badge">${cfgH.label} 기준</span></div>
             <div class="pattern-value">${topHook ? topHook.keyword : '-'}</div>
-            <div class="pattern-stats">
-                ${topHook ? `평균 CTR <b>${(topHook.ctr * 100).toFixed(2)}%</b> · ${topHook.count}개 소재` : '데이터 없음'}
-            </div>
+            <div class="pattern-stats">${statLine(topHook, cfgH)}</div>
             <div class="pattern-recommend">
                 <i class="fas fa-lightbulb mr-1"></i>
                 ${topHook ? `"${topHook.keyword}" 방식을 다른 소구포인트에도 적용해보세요` : ''}
             </div>
         </div>
-
         <div class="pattern-card pattern-rose">
             <div class="pattern-icon"><i class="fas fa-heart"></i></div>
-            <div class="pattern-label">최고 전환 감정 코드</div>
+            <div class="pattern-label">최고 효율 감정 코드 <span class="pattern-metric-badge">${cfgE.label} 기준</span></div>
             <div class="pattern-value">${topEmotion ? topEmotion.keyword : '-'}</div>
-            <div class="pattern-stats">
-                ${topEmotion ? `평균 CVR <b>${(topEmotion.cvr * 100).toFixed(2)}%</b> · ${topEmotion.count}개 소재` : '데이터 없음'}
-            </div>
+            <div class="pattern-stats">${statLine(topEmotion, cfgE)}</div>
             <div class="pattern-recommend">
                 <i class="fas fa-lightbulb mr-1"></i>
                 ${topEmotion ? `"${topEmotion.keyword}" 감정 자극 카피를 강화해보세요` : ''}
@@ -702,134 +927,9 @@ function computeCompressedDomain(values, opts = {}) {
     return { min: Math.floor(min), max: Math.ceil(max) };
 }
 
-// 소구포인트별 ROAS 차트 (평균선 + 평균 대비 색상 차등 + 도메인 압축)
+// 소구포인트별 지표 차트 (차트별 독립 지표 — chartMetrics.appeal)
 function renderAppealRoasChart(list) {
-    destroyInsightChart('appealRoas');
-    const ctx = document.getElementById('appealRoasChart');
-    if (!ctx) return;
-
-    // ★ 최소 3개 이상 소재로 검증된 키워드만 (단일/소수 소재로 인한 동일 효율 노이즈 제거)
-    let data = aggregateByKeyword(list, 'appeal_points')
-        .filter(a => a.count >= 3)
-        .sort((a, b) => b.roas - a.roas)
-        .slice(0, 10);
-    if (data.length < 5) {
-        // fallback 1단계: ≥2
-        data = aggregateByKeyword(list, 'appeal_points')
-            .filter(a => a.count >= 2)
-            .sort((a, b) => b.roas - a.roas)
-            .slice(0, 10);
-    }
-    if (data.length < 5) {
-        // fallback 2단계: ≥1
-        data = aggregateByKeyword(list, 'appeal_points')
-            .filter(a => a.count >= 1)
-            .sort((a, b) => b.roas - a.roas)
-            .slice(0, 10);
-    }
-
-    if (!data.length) {
-        ctx.parentElement.innerHTML = '<div class="text-center text-slate-400 text-sm py-12">데이터 없음 (최소 3개 이상 소재 필요)</div>';
-        return;
-    }
-
-    const vals = data.map(d => Math.round(d.roas * 100));
-    const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
-    const domain = computeCompressedDomain(vals, { paddingRatio: 0.18, minPadding: 30 });
-
-    // 평균 대비 색상: 평균 이상은 보라(우수), 평균 이하는 슬레이트(평이)
-    const colors = vals.map(v => {
-        const dev = (v - mean) / mean; // -1~+1
-        if (dev >= 0.05) return `hsla(265, 75%, 60%, 0.92)`;      // 평균 +5%↑ 보라
-        if (dev <= -0.05) return `hsla(220, 18%, 65%, 0.78)`;     // 평균 -5%↓ 회색
-        return `hsla(280, 35%, 70%, 0.80)`;                       // 평균 부근 옅은 보라
-    });
-
-    insightCharts.appealRoas = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: data.map(d => d.keyword),
-            datasets: [{
-                label: '평균 ROAS (%)',
-                data: vals,
-                backgroundColor: colors,
-                borderRadius: 6,
-                borderSkipped: false,
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { right: 50 } },
-            animation: { duration: 400 },
-            onHover: (evt, els) => {
-                if (els && els.length) {
-                    const d = data[els[0].index];
-                    showPreview(d.keyword, 'appeal_points', evt.native || evt);
-                    evt.native.target.style.cursor = 'pointer';
-                } else {
-                    hidePreview();
-                    if (evt.native) evt.native.target.style.cursor = 'default';
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                meanLine: {
-                    value: Math.round(mean),
-                    axis: 'x',
-                    label: `평균 ${Math.round(mean)}%`,
-                    color: 'rgba(100, 116, 139, 0.85)'
-                },
-                tooltip: {
-                    callbacks: {
-                        afterLabel: (ctx) => {
-                            const d = data[ctx.dataIndex];
-                            const dev = vals[ctx.dataIndex] - mean;
-                            const sign = dev >= 0 ? '+' : '';
-                            return [
-                                `평균 대비: ${sign}${Math.round(dev)}%p`,
-                                `사용 소재: ${d.count}개`,
-                                `광고비: ₩${formatNumber(d.spend)}`,
-                                `매출: ₩${formatNumber(d.revenue)}`
-                            ];
-                        }
-                    }
-                },
-                // ★ 데이터 라벨 (막대 끝에 값 표시)
-                datalabels: false,
-            },
-            scales: {
-                x: {
-                    min: domain.min,
-                    max: domain.max,
-                    ticks: { callback: v => v + '%', font: { size: 10 } },
-                    grid: { color: 'rgba(226, 232, 240, 0.6)' }
-                },
-                y: { ticks: { font: { size: 11 } }, grid: { display: false } }
-            }
-        },
-        plugins: [{
-            // 막대 끝에 값 표시 (커스텀)
-            id: 'barEndLabels',
-            afterDatasetsDraw(chart) {
-                const { ctx } = chart;
-                const meta = chart.getDatasetMeta(0);
-                ctx.save();
-                ctx.font = '600 11px Pretendard, sans-serif';
-                ctx.textBaseline = 'middle';
-                ctx.textAlign = 'left';
-                meta.data.forEach((bar, i) => {
-                    const v = vals[i];
-                    const dev = v - mean;
-                    const sign = dev >= 0 ? '+' : '';
-                    ctx.fillStyle = dev >= 0 ? '#7c3aed' : '#64748b';
-                    ctx.fillText(`${v}%  (${sign}${Math.round(dev)})`, bar.x + 6, bar.y);
-                });
-                ctx.restore();
-            }
-        }]
-    });
+    _renderInsightBarChart('appealRoas', 'appealRoasChart', list, 'appeal_points', 10, chartMetrics.appeal);
 }
 
 // 소구포인트 워드클라우드 (HTML 기반) — 키워드 군집화 적용
@@ -1040,297 +1140,14 @@ function bindWordCloudMetricSelect() {
     });
 }
 
-// 후킹 방식별 CTR (평균선 + 평균 대비 색상 차등 + 도메인 압축)
+// 후킹 방식별 지표 차트 (차트별 독립 지표 — chartMetrics.hook)
 function renderHookCtrChart(list) {
-    destroyInsightChart('hookCtr');
-    const ctx = document.getElementById('hookCtrChart');
-    if (!ctx) return;
-
-    // ★ 최소 3개 이상 소재로 검증된 후킹만 (단일/소수 소재 노이즈 제거)
-    let data = aggregateByKeyword(list, 'hook_type')
-        .filter(a => a.count >= 3)
-        .sort((a, b) => b.ctr - a.ctr)
-        .slice(0, 10);
-    if (data.length < 5) {
-        // fallback 1단계: ≥2
-        data = aggregateByKeyword(list, 'hook_type')
-            .filter(a => a.count >= 2)
-            .sort((a, b) => b.ctr - a.ctr)
-            .slice(0, 10);
-    }
-    if (data.length < 5) {
-        // fallback 2단계: ≥1
-        data = aggregateByKeyword(list, 'hook_type')
-            .filter(a => a.count >= 1)
-            .sort((a, b) => b.ctr - a.ctr)
-            .slice(0, 10);
-    }
-
-    if (!data.length) {
-        ctx.parentElement.innerHTML = '<div class="text-center text-slate-400 text-sm py-12">데이터 없음 (최소 3개 이상 소재 필요)</div>';
-        return;
-    }
-
-    const vals = data.map(d => Number((d.ctr * 100).toFixed(2)));
-    const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
-    // CTR은 소수점 단위라 padding을 작게
-    const domain = computeCompressedDomain(vals, { paddingRatio: 0.20, minPadding: 0.3 });
-
-    const colors = vals.map(v => {
-        const dev = (v - mean) / mean;
-        if (dev >= 0.03) return `hsla(195, 78%, 50%, 0.92)`;      // 평균 이상 시안
-        if (dev <= -0.03) return `hsla(210, 18%, 65%, 0.78)`;     // 평균 이하 회색
-        return `hsla(195, 40%, 70%, 0.80)`;                       // 평균 부근
-    });
-
-    insightCharts.hookCtr = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: data.map(d => d.keyword),
-            datasets: [{
-                label: '평균 CTR (%)',
-                data: vals,
-                backgroundColor: colors,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 24 } },
-            animation: { duration: 400 },
-            onHover: (evt, els) => {
-                if (els && els.length) {
-                    const d = data[els[0].index];
-                    showPreview(d.keyword, 'hook_type', evt.native || evt);
-                    evt.native.target.style.cursor = 'pointer';
-                } else {
-                    hidePreview();
-                    if (evt.native) evt.native.target.style.cursor = 'default';
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                meanLine: {
-                    value: Number(mean.toFixed(2)),
-                    axis: 'y',
-                    label: `평균 ${mean.toFixed(2)}%`,
-                    color: 'rgba(100, 116, 139, 0.85)'
-                },
-                tooltip: {
-                    callbacks: {
-                        afterLabel: (ctx) => {
-                            const d = data[ctx.dataIndex];
-                            const dev = vals[ctx.dataIndex] - mean;
-                            const sign = dev >= 0 ? '+' : '';
-                            return [
-                                `평균 대비: ${sign}${dev.toFixed(2)}%p`,
-                                `사용 소재: ${d.count}개`,
-                                `노출: ${formatNumber(d.impressions)}`,
-                                `클릭: ${formatNumber(d.clicks)}`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    min: domain.min,
-                    max: domain.max,
-                    ticks: { callback: v => v + '%', font: { size: 10 } },
-                    grid: { color: 'rgba(226, 232, 240, 0.6)' }
-                },
-                x: { ticks: { font: { size: 11 }, maxRotation: 30, minRotation: 0 }, grid: { display: false } }
-            }
-        },
-        plugins: [{
-            // 막대 위에 값 + 평균 대비 표시
-            id: 'barTopLabels',
-            afterDatasetsDraw(chart) {
-                const { ctx } = chart;
-                const meta = chart.getDatasetMeta(0);
-                ctx.save();
-                ctx.font = '600 10px Pretendard, sans-serif';
-                ctx.textBaseline = 'bottom';
-                ctx.textAlign = 'center';
-                meta.data.forEach((bar, i) => {
-                    const v = vals[i];
-                    const dev = v - mean;
-                    const sign = dev >= 0 ? '+' : '';
-                    ctx.fillStyle = dev >= 0 ? '#0891b2' : '#64748b';
-                    ctx.fillText(`${v.toFixed(2)}%`, bar.x, bar.y - 14);
-                    ctx.fillStyle = dev >= 0 ? '#0891b2' : '#94a3b8';
-                    ctx.font = '500 9px Pretendard, sans-serif';
-                    ctx.fillText(`${sign}${dev.toFixed(2)}`, bar.x, bar.y - 3);
-                    ctx.font = '600 10px Pretendard, sans-serif';
-                });
-                ctx.restore();
-            }
-        }]
-    });
+    _renderInsightBarChart('hookCtr', 'hookCtrChart', list, 'hook_type', 10, chartMetrics.hook);
 }
 
-// 감정별 전환 효율 (CVR + ROAS 더블 막대 + 도메인 압축 + 평균 대비 강조)
+// 감정별 지표 차트 (차트별 독립 지표 — chartMetrics.emotion)
 function renderEmotionChart(list) {
-    destroyInsightChart('emotion');
-    const ctx = document.getElementById('emotionChart');
-    if (!ctx) return;
-
-    // ★ 최소 3개 이상 소재로 검증된 감정만 (단일/소수 소재 노이즈 제거)
-    let data = aggregateByKeyword(list, 'target_emotion')
-        .filter(a => a.count >= 3)
-        .sort((a, b) => b.cvr - a.cvr)
-        .slice(0, 8);
-    if (data.length < 4) {
-        // fallback 1단계: ≥2
-        data = aggregateByKeyword(list, 'target_emotion')
-            .filter(a => a.count >= 2)
-            .sort((a, b) => b.cvr - a.cvr)
-            .slice(0, 8);
-    }
-    if (data.length < 4) {
-        // fallback 2단계: ≥1
-        data = aggregateByKeyword(list, 'target_emotion')
-            .filter(a => a.count >= 1)
-            .sort((a, b) => b.cvr - a.cvr)
-            .slice(0, 8);
-    }
-
-    if (!data.length) {
-        ctx.parentElement.innerHTML = '<div class="text-center text-slate-400 text-sm py-12">데이터 없음 (최소 3개 이상 소재 필요)</div>';
-        return;
-    }
-
-    const cvrVals = data.map(d => Number((d.cvr * 100).toFixed(2)));
-    const roasVals = data.map(d => Math.round(d.roas * 100));
-    const cvrMean = cvrVals.reduce((s, v) => s + v, 0) / cvrVals.length;
-    const roasMean = roasVals.reduce((s, v) => s + v, 0) / roasVals.length;
-
-    const cvrDomain = computeCompressedDomain(cvrVals, { paddingRatio: 0.20, minPadding: 0.5 });
-    const roasDomain = computeCompressedDomain(roasVals, { paddingRatio: 0.20, minPadding: 30 });
-
-    // 평균 대비 색상 차등 (CVR/ROAS 각각)
-    const cvrColors = cvrVals.map(v => {
-        const dev = (v - cvrMean) / cvrMean;
-        if (dev >= 0.05) return 'rgba(244, 63, 94, 0.95)';   // 진한 핑크
-        if (dev <= -0.05) return 'rgba(244, 63, 94, 0.40)';  // 옅은 핑크
-        return 'rgba(244, 63, 94, 0.70)';
-    });
-    const roasColors = roasVals.map(v => {
-        const dev = (v - roasMean) / roasMean;
-        if (dev >= 0.05) return 'rgba(139, 92, 246, 0.95)';  // 진한 보라
-        if (dev <= -0.05) return 'rgba(139, 92, 246, 0.40)'; // 옅은 보라
-        return 'rgba(139, 92, 246, 0.70)';
-    });
-
-    insightCharts.emotion = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: data.map(d => d.keyword),
-            datasets: [
-                {
-                    label: 'CVR (%)',
-                    data: cvrVals,
-                    backgroundColor: cvrColors,
-                    borderRadius: 6,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'ROAS (%)',
-                    data: roasVals,
-                    backgroundColor: roasColors,
-                    borderRadius: 6,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 24 } },
-            animation: { duration: 400 },
-            onHover: (evt, els) => {
-                if (els && els.length) {
-                    const d = data[els[0].index];
-                    showPreview(d.keyword, 'target_emotion', evt.native || evt);
-                    evt.native.target.style.cursor = 'pointer';
-                } else {
-                    hidePreview();
-                    if (evt.native) evt.native.target.style.cursor = 'default';
-                }
-            },
-            plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 11 } } },
-                meanLine: {
-                    value: Number(cvrMean.toFixed(2)),
-                    axis: 'y',
-                    label: `CVR 평균 ${cvrMean.toFixed(2)}%`,
-                    color: 'rgba(244, 63, 94, 0.6)'
-                },
-                tooltip: {
-                    callbacks: {
-                        afterLabel: (ctx) => {
-                            const d = data[ctx.dataIndex];
-                            const isCvr = ctx.datasetIndex === 0;
-                            const v = isCvr ? cvrVals[ctx.dataIndex] : roasVals[ctx.dataIndex];
-                            const m = isCvr ? cvrMean : roasMean;
-                            const dev = v - m;
-                            const sign = dev >= 0 ? '+' : '';
-                            const unit = isCvr ? '%p' : '%p';
-                            return [
-                                `평균 대비: ${sign}${isCvr ? dev.toFixed(2) : Math.round(dev)}${unit}`,
-                                `사용 소재: ${d.count}개`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    type: 'linear', position: 'left',
-                    min: cvrDomain.min, max: cvrDomain.max,
-                    title: { display: true, text: 'CVR (%)', font: { size: 10 } },
-                    ticks: { callback: v => v + '%', font: { size: 10 } },
-                    grid: { color: 'rgba(226, 232, 240, 0.6)' }
-                },
-                y1: {
-                    type: 'linear', position: 'right',
-                    min: roasDomain.min, max: roasDomain.max,
-                    title: { display: true, text: 'ROAS (%)', font: { size: 10 } },
-                    grid: { drawOnChartArea: false },
-                    ticks: { callback: v => v + '%', font: { size: 10 } }
-                },
-                x: { ticks: { font: { size: 11 } }, grid: { display: false } }
-            }
-        },
-        plugins: [{
-            id: 'emotionDualLabels',
-            afterDatasetsDraw(chart) {
-                const { ctx } = chart;
-                ctx.save();
-                ctx.font = '600 9px Pretendard, sans-serif';
-                ctx.textBaseline = 'bottom';
-                ctx.textAlign = 'center';
-                // CVR 라벨
-                const cvrMeta = chart.getDatasetMeta(0);
-                cvrMeta.data.forEach((bar, i) => {
-                    const v = cvrVals[i];
-                    const dev = v - cvrMean;
-                    ctx.fillStyle = dev >= 0 ? '#e11d48' : '#94a3b8';
-                    ctx.fillText(`${v.toFixed(1)}`, bar.x, bar.y - 2);
-                });
-                // ROAS 라벨
-                const roasMeta = chart.getDatasetMeta(1);
-                roasMeta.data.forEach((bar, i) => {
-                    const v = roasVals[i];
-                    const dev = v - roasMean;
-                    ctx.fillStyle = dev >= 0 ? '#7c3aed' : '#94a3b8';
-                    ctx.fillText(`${v}`, bar.x, bar.y - 2);
-                });
-                ctx.restore();
-            }
-        }]
-    });
+    _renderInsightBarChart('emotion', 'emotionChart', list, 'target_emotion', 8, chartMetrics.emotion);
 }
 
 // TOP 성과 카피 메시지
