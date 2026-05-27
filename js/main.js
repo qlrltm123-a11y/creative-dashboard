@@ -3762,13 +3762,13 @@ function openModal(id, preloadedCreative) {
                         <div class="value">${Math.round((c.roas || 0) * 100)}%</div>
                     </div>
                 </div>
-                ${(c.add_to_cart > 0) ? `
+                ${isCartMode(Array.isArray(allCreatives) ? allCreatives : []) ? `
                 <div class="modal-atc-section">
                     <div class="modal-atc-header"><i class="fas fa-cart-shopping"></i> 장바구니 최적화 지표</div>
                     <div class="modal-metrics">
                         <div class="metric-box">
                             <div class="label">ATC 건수</div>
-                            <div class="value">${formatNumber(c.add_to_cart)}건</div>
+                            <div class="value">${formatNumber(c.add_to_cart || 0)}건</div>
                         </div>
                         <div class="metric-box">
                             <div class="label">ATC율</div>
