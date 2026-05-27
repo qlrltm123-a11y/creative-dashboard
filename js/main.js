@@ -3333,7 +3333,7 @@ function renderProductPerformance() {
 
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const cartLabel = cartMode ? '🛒 ' : '';
-    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${cartMode ? ' · 장바구니 최적화' : ''}</span>`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준</span>`;
 
     // 정렬: cost_per_atc는 낮을수록 좋음 → 오름차순
     const sortAsc = metric === 'cost_per_atc';
