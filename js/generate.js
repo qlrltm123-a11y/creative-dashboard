@@ -119,30 +119,132 @@ Product prominently featured, lifestyle context, eye-catching text overlay with 
 // Higgsfield API 호출
 // ============================
 
+// 이미지 엔드포인트 우선순위 목록 (패턴별 6종 시도)
+// [ urlFn, bodyFn ]
+const HF_IMAGE_ENDPOINTS = [
+    // 패턴 1: /v1/text2image/{model} — 모델명 URL, body엔 model 없음
+    [
+        (base) => `${base}/v1/text2image/nano_banana_2`,
+        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 2: /v1/text2image/{model} — body에도 model 포함
+    [
+        (base) => `${base}/v1/text2image/nano_banana_2`,
+        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 3: /v1/image/generate — 통합 엔드포인트
+    [
+        (base) => `${base}/v1/image/generate`,
+        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 4: /v1/generate — 완전 통합
+    [
+        (base) => `${base}/v1/generate`,
+        ({ prompt, aspect_ratio, resolution }) => ({ type: 'image', model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 5: /v1/generations
+    [
+        (base) => `${base}/v1/generations`,
+        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 6: /v1/images — OpenAI 스타일
+    [
+        (base) => `${base}/v1/images/generations`,
+        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio }),
+    ],
+];
+
+// 이 응답코드는 "경로 자체가 없음" 으로 간주해 다음 엔드포인트 시도
+const HF_SKIP_STATUSES = new Set([404, 405, 500, 502, 503]);
+
+async function _tryImageEndpoint(base, apiKey, params) {
+    let lastRes  = null;
+    let lastText = '';
+
+    for (const [makeUrl, makeBody] of HF_IMAGE_ENDPOINTS) {
+        const url  = makeUrl(base);
+        const body = makeBody(params);
+        console.log('[HF] Trying POST', url, JSON.stringify(body));
+
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+        } catch (e) {
+            console.warn('[HF] Fetch error, trying next:', url, e.message);
+            continue;
+        }
+
+        const text = await res.text();
+        console.log('[HF] Status:', res.status, '| Body:', text.slice(0, 300));
+
+        // 401/403은 인증/권한 오류 → 즉시 중단 (재시도 의미없음)
+        if (res.status === 401 || res.status === 403) {
+            return _fakeResponse(res.status, text);
+        }
+
+        // 2xx = 성공
+        if (res.ok) {
+            return _fakeResponse(res.status, text);
+        }
+
+        // 500/404/405 등: "이 경로 없음" 으로 보고 다음 시도
+        if (HF_SKIP_STATUSES.has(res.status)) {
+            console.warn('[HF] Skipping endpoint (status', res.status, '):', url);
+            lastRes  = res;
+            lastText = text;
+            continue;
+        }
+
+        // 그 외 오류코드 (422 등): 경로는 맞는데 파라미터 오류 → 즉시 반환
+        return _fakeResponse(res.status, text);
+    }
+
+    // 모든 엔드포인트 실패 → 마지막 응답 반환 (에러 표시용)
+    console.error('[HF] All endpoints failed. Last status:', lastRes?.status, lastText);
+    return _fakeResponse(lastRes?.status || 500, lastText || '{"detail":"모든 엔드포인트 실패"}');
+}
+
+// fetch Response와 호환되는 가짜 객체 (text는 이미 소비했으므로 래핑)
+function _fakeResponse(status, text) {
+    return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => {
+            try { return JSON.parse(text); }
+            catch (_) { return { detail: text }; }
+        },
+        text: async () => text,
+    };
+}
+
 async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
-    // 이미지: nano_banana_2/text-to-image  |  영상: /v1/image2video/dop
     const base = _getBaseUrl();
-    const url  = type === 'video'
-        ? `${base}/v1/image2video/dop`
-        : `${base}/nano_banana_2/text-to-image`;
+    let res;
 
-    const body = type === 'video'
-        ? { model: 'dop-turbo', prompt, input_images: [] }
-        : { prompt, aspect_ratio: aspectRatio || '1:1' };
-
-    console.log('[HF] POST', url, JSON.stringify(body));
-
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Key ${apiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-    });
+    if (type === 'video') {
+        const url  = `${base}/v1/image2video/dop`;
+        const body = { model: 'dop-turbo', prompt, aspect_ratio: aspectRatio || '16:9' };
+        console.log('[HF] POST', url, JSON.stringify(body));
+        res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    } else {
+        // 이미지: 엔드포인트 자동 탐색
+        res = await _tryImageEndpoint(base, apiKey, {
+            prompt,
+            aspect_ratio: aspectRatio || '1:1',
+            resolution: '1k',
+        });
+    }
 
     // 상세 에러 메시지
     if (!res.ok) {
@@ -154,7 +256,7 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
             errMsg = `${res.status}: ${detail}`;
         } catch (_) {
             const errText = await res.text().catch(() => '');
-            errMsg = `${res.status}: ${errText.slice(0, 200)}`;
+            errMsg = `${res.status}: ${errText.slice(0, 300)}`;
             console.error('[HF Error raw]', errMsg);
         }
         if (res.status === 401) errMsg = '인증 실패 (401) — API 키를 확인해주세요 (KEY_ID:KEY_SECRET)';
@@ -163,33 +265,58 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     }
 
     const data = await res.json();
-    console.log('[HF] Response:', data);
+    console.log('[HF] Response:', JSON.stringify(data));
 
     if (data.status === 'completed') return _extractResultUrl(data, type);
+    // 즉시 URL이 있으면 반환 (일부 모델은 동기 응답)
+    const immediateUrl = _extractResultUrl(data, type);
+    if (immediateUrl) return immediateUrl;
     // 비동기: status_url 우선, 없으면 request_id로 구성
-    const requestId = data.request_id || data.id;
-    const statusUrl = data.status_url || null;
-    if (!requestId && !statusUrl) throw new Error('request_id를 받지 못했어요.');
+    const requestId = data.request_id || data.id || data.job_id;
+    const statusUrl = data.status_url || data.polling_url || null;
+    if (!requestId && !statusUrl) throw new Error(`request_id를 받지 못했어요. 응답: ${JSON.stringify(data).slice(0,200)}`);
     return { requestId, statusUrl, type };
 }
 
 async function _pollHiggsfieldStatus(requestId, statusUrl) {
     const apiKey = _getHfKey();
     const base   = _getBaseUrl();
-    const url = statusUrl || `${base}/requests/${requestId}/status`;
-    const res = await fetch(url, {
-        headers: { 'Authorization': `Key ${apiKey}` },
-    });
-    if (!res.ok) throw new Error(`폴링 오류 (${res.status})`);
-    return await res.json();
+    // 후보 URL 목록 (statusUrl이 있으면 그것만, 없으면 두 패턴 시도)
+    const urls = statusUrl
+        ? [statusUrl]
+        : [`${base}/v1/requests/${requestId}`, `${base}/requests/${requestId}/status`, `${base}/v1/jobs/${requestId}`];
+
+    for (const url of urls) {
+        try {
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Key ${apiKey}` },
+            });
+            if (res.status === 404) continue;
+            if (!res.ok) throw new Error(`폴링 오류 (${res.status})`);
+            return await res.json();
+        } catch (e) {
+            if (urls.indexOf(url) === urls.length - 1) throw e;
+        }
+    }
+    throw new Error('폴링 엔드포인트를 찾지 못했어요.');
 }
 
 function _extractResultUrl(data, type) {
     if (type === 'video') {
-        return data.video?.url || data.videos?.[0]?.url || data.output?.[0] || null;
+        return data.video?.url
+            || data.videos?.[0]?.url
+            || data.output?.[0]
+            || data.result?.url
+            || data.url
+            || null;
     }
-    return data.images?.[0]?.url || data.image?.url || data.output?.[0]
-        || data.results?.[0]?.url || null;
+    return data.images?.[0]?.url
+        || data.image?.url
+        || data.output?.[0]
+        || data.results?.[0]?.url
+        || data.result?.url
+        || data.url
+        || null;
 }
 
 // ============================
