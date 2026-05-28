@@ -162,20 +162,20 @@ function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     const product  = productName || patterns.selectedProduct || patterns.sampleName?.split('_')[0] || 'skincare product';
     const category = _guessProductCategory(product);
 
-    // 소구 → 영어 비주얼 (텍스트·숫자·배지·버블 없는 것만)
-    const appealVisuals = (patterns.topAppeal || []).slice(0, 2)
-        .map(a => _tagToVisual(a, _APPEAL_VISUAL, null)).filter(Boolean).join(', ')
+    // 소구 → 영어 비주얼 (맵에 없는 태그는 무조건 제외 — 한국어 그대로 들어가면 모델 혼란)
+    const appealVisuals = (patterns.topAppeal || []).slice(0, 3)
+        .map(a => _APPEAL_VISUAL[a] || null).filter(Boolean).join(', ')
         || 'radiant glowing skin, premium product elegance';
-    const hookVisual = _tagToVisual((patterns.topHook || [])[0], _HOOK_VISUAL,
-        'confident model with smooth luminous skin');
+    const hookVisual = _HOOK_VISUAL[(patterns.topHook || [])[0]]
+        || 'confident model with smooth luminous skin';
 
     const platform     = patterns.platform || '';
     const platformHint = platform ? ` Optimized for ${platform} vertical feed format.` : '';
 
-    // 참고 이미지
+    // 참고 이미지 — 있으면 스타일 강하게 지시
     const refUrls = _getAutoReferenceUrls();
     const refNote = refUrls.length > 0
-        ? `\nSTYLE REFERENCE (${refUrls.length} top-performing creatives): Match their exact composition, color palette, lighting mood, product angle, and model pose. Improve upon their winning formula with fresh visual execution.`
+        ? `\nSTYLE REFERENCE — ${refUrls.length} top-performing real ad images are attached. CLOSELY replicate: their exact color palette, product packaging color and shape, background color scheme, model styling, graphic layout, and overall visual mood. This is the most important instruction — the output must look like it belongs to the same creative family as the reference images.`
         : '';
 
     // 제품 이미지 힌트
@@ -183,27 +183,24 @@ function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
         ? `\nProduct visual reference: ${productImageUrl}` : '';
 
     // 핵심 금지 규칙 (항상 마지막에)
-    const noText = `\nCRITICAL — ZERO TEXT RULE: Absolutely NO text, letters, numbers, kanji, hangul, latin characters, or symbols anywhere in the image — not on the product bottle, not on the background, not as overlays, not anywhere. The product bottle must be plain clean white with no label, no brand mark, no writing of any kind. Pure visual photography only.`;
+    const noText = `\nCRITICAL — NO TEXT: Absolutely NO text, letters, numbers, kanji, hangul, or symbols anywhere — not on the bottle, not on background, not as overlays. Pure visual photography only.`;
 
     if (type === 'video') {
-        return `Cinematic K-beauty skincare advertisement video. ${category}. Clean minimalist white product packaging, no label, no text on bottle.${productImgNote}
+        return `Cinematic beauty skincare advertisement video. ${category}. Product packaging matches reference images exactly.${productImgNote}
 
 OPENING HOOK (0-2s): ${hookVisual}.
 VISUAL MOOD: ${appealVisuals}.
 SCENE: Asian woman model (late 20s, radiant clear skin) applying product. Skin appears luminous. Bright lifestyle studio setting.
-BACKGROUND: Soft pastel pink and white gradient. Clean modern studio.
-STYLE: Premium K-beauty aesthetic. Bright soft-box lighting. Elegant and fresh. Pastel color palette.
+STYLE: Premium beauty aesthetic. Bright soft-box lighting. Elegant and fresh.
 FORMAT: Vertical 9:16 social media video.${platformHint}${noText}${refNote}`;
     } else {
-        return `Premium K-beauty skincare product photography. ${category}. Clean minimalist white product packaging, no label, no text on bottle.${productImgNote}
+        return `Premium beauty skincare product advertisement photo. ${category}. Product packaging and color scheme must match the reference images exactly.${productImgNote}
 
-COMPOSITION: Product left-center foreground on white surface, Asian woman model (late 20s, clear radiant skin, natural soft expression) right background, slightly blurred.
+COMPOSITION: Product center-left foreground, Asian woman model (late 20s, clear radiant skin, natural soft expression) right side.
 VISUAL MOOD: ${hookVisual}.
-SKIN DETAIL: ${appealVisuals}.
-BACKGROUND: Soft gradient pastel pink-to-white studio backdrop.
-LIGHTING: Bright soft-box studio lighting. Skin appears luminous and poreless. Product has clean specular highlight.
-COLOR PALETTE: Pastel pink, soft peach, white. No harsh colors.
-STYLE: Editorial premium K-beauty cosmetics photography. Clean elegant minimal layout. Lifestyle beauty.${platformHint}${noText}${refNote}`;
+SKIN: ${appealVisuals}.
+LIGHTING: Bright soft-box studio lighting. Skin luminous and poreless. Clean product highlight.
+STYLE: Editorial premium beauty cosmetics photography. Clean elegant layout. Lifestyle beauty.${platformHint}${noText}${refNote}`;
     }
 }
 
