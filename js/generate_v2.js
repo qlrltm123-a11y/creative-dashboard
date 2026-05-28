@@ -153,37 +153,50 @@ function _buildImageBody({ prompt, aspect_ratio, resolution, workspace_id, model
     };
 }
 
-// 이미지 엔드포인트 우선순위 목록
+// ============================================================
+// SDK 분석 결과: Higgsfield V2 API 형식
+//   POST /{model}/text-to-image
+//   body: { input: { prompt, aspect_ratio, safety_tolerance, seed } }
+//   Auth: Authorization: Key KEY_ID:KEY_SECRET
+//   주의: 브라우저 직접 호출 차단 → Cloudflare Worker(서버) 통해야 함
+// ============================================================
+
+function _buildV2Body({ prompt, aspect_ratio }) {
+    return {
+        input: {
+            prompt,
+            aspect_ratio: aspect_ratio || '1:1',
+            safety_tolerance: 2,
+        },
+    };
+}
+
+// 이미지 엔드포인트 우선순위 목록 (V2 SDK 형식)
 const HF_IMAGE_ENDPOINTS = [
-    // 패턴 1: /v1/text2image/nano_banana_flash (실제 모델명)
+    // 패턴 1: nano_banana_flash (MCP 실제 사용 모델)
+    [
+        (base) => `${base}/nano_banana_flash/text-to-image`,
+        (p) => _buildV2Body(p),
+    ],
+    // 패턴 2: nano_banana_2 (원래 요청 모델)
+    [
+        (base) => `${base}/nano_banana_2/text-to-image`,
+        (p) => _buildV2Body(p),
+    ],
+    // 패턴 3: nano_banana (짧은 이름)
+    [
+        (base) => `${base}/nano_banana/text-to-image`,
+        (p) => _buildV2Body(p),
+    ],
+    // 패턴 4: flux-pro/kontext/max (SDK 예시에서 확인된 패턴)
+    [
+        (base) => `${base}/flux-pro/kontext/max/text-to-image`,
+        (p) => _buildV2Body(p),
+    ],
+    // 패턴 5: 구버전 V1 형식 (fallback)
     [
         (base) => `${base}/v1/text2image/nano_banana_flash`,
-        (p) => _buildImageBody({ ...p, model: 'nano_banana_flash' }),
-    ],
-    // 패턴 2: /v1/text2image/nano_banana_2 (원래 모델명)
-    [
-        (base) => `${base}/v1/text2image/nano_banana_2`,
-        (p) => _buildImageBody({ ...p, model: 'nano_banana_2' }),
-    ],
-    // 패턴 3: workspace URL 포함
-    [
-        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_flash`,
-        (p) => _buildImageBody({ ...p, model: 'nano_banana_flash' }),
-    ],
-    // 패턴 4: /v1/image/generate — 통합 엔드포인트
-    [
-        (base) => `${base}/v1/image/generate`,
-        (p) => _buildImageBody(p),
-    ],
-    // 패턴 5: /v1/generate
-    [
-        (base) => `${base}/v1/generate`,
-        (p) => ({ type: 'image', ..._buildImageBody(p) }),
-    ],
-    // 패턴 6: /v1/jobs (일부 플랫폼 스타일)
-    [
-        (base) => `${base}/v1/jobs`,
-        (p) => ({ type: 'text2image', ..._buildImageBody(p) }),
+        (p) => ({ prompt: p.prompt, aspect_ratio: p.aspect_ratio, resolution: '1k' }),
     ],
 ];
 
