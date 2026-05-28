@@ -757,10 +757,15 @@ async function _pollUntilUrl(requestId, statusUrl, type, resultEl) {
         await new Promise(r => setTimeout(r, HF_POLL_MS));
         try {
             const data = await _pollHiggsfieldStatus(requestId, statusUrl);
-            if (data.status === 'completed') return _extractResultUrl(data, type);
+            console.log(`[Poll ${type}] status=${data.status}`, JSON.stringify(data).slice(0, 300));
+            if (data.status === 'completed') {
+                const url = _extractResultUrl(data, type);
+                console.log(`[Poll ${type}] extracted url=`, url, 'raw keys=', Object.keys(data));
+                return url;
+            }
             if (data.status === 'failed' || data.status === 'nsfw') return null;
             _updateResultProgress(resultEl, Math.round((Date.now() - start) / 1000));
-        } catch (_) {}
+        } catch (e) { console.warn('[Poll error]', e.message); }
     }
     return null;
 }
