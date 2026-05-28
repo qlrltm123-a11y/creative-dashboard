@@ -125,83 +125,85 @@ function _guessProductCategory(name) {
     return 'premium K-beauty skincare product';
 }
 
-// ---- 한국어 소구 태그 → 영어 비주얼 묘사 ----
+// ---- 한국어 소구 태그 → 영어 순수 비주얼 묘사 (텍스트/배지/버블 완전 제외) ----
 const _APPEAL_VISUAL = {
-    '할인 혜택':       'bold discount percentage badge (red circle, top corner)',
-    '리프팅 효과':     'visibly lifted and sculpted facial contour on model',
-    '탄력 개선':       'firm, elastic, glowing skin close-up',
-    '가성비':          'value set bundle shot with price comparison',
-    '신제품 출시':     'new launch spotlight graphic',
-    '간편한 사용':     'simple one-step application gesture',
-    '문제 해결 제시':  'skin concern revealed then product solution',
-    '비포앤애프터 비교':'split before/after skin transformation',
-    '혜택 강조':       'benefit callout icons with graphic overlays',
-    '이미지 개선':     'confidence and beauty transformation moment',
-    '가격 경쟁력':     'competitive price highlight badge',
-    '신뢰감':          'credibility badge, ingredient highlight',
+    '할인 혜택':       'vibrant lifestyle energy, confident expression',
+    '리프팅 효과':     'visibly lifted and sculpted facial contour',
+    '탄력 개선':       'firm elastic luminous skin close-up',
+    '가성비':          'premium product elegance, aspirational feel',
+    '신제품 출시':     'fresh clean product reveal aesthetic',
+    '간편한 사용':     'effortless elegant one-step application gesture',
+    '문제 해결 제시':  'skin concern to radiant glow transformation',
+    '비포앤애프터 비교':'subtle skin texture improvement composition',
+    '혜택 강조':       'radiant beautiful skin result, glowing complexion',
+    '이미지 개선':     'confident glowing beauty transformation moment',
+    '가격 경쟁력':     'premium product hero shot, aspirational lifestyle',
+    '신뢰감':          'clean minimal ingredient close-up, clinical precision',
 };
 
 const _HOOK_VISUAL = {
-    '문제 해결 제시':  'skin problem close-up transitioning to glowing solution',
-    '비포앤애프터 비교':'dramatic split-screen before/after transformation',
-    '신제품 출시 알림':'bold new-launch announcement frame',
-    '혜택 강조':       'oversized benefit number graphic (e.g. 23% OFF)',
-    '가격/할인 강조':  'large striking discount badge with product',
-    '유명인 추천':     'celebrity endorsement quote bubble framing',
-    '신뢰감 형성':     'clinically-tested or award badge close-up',
+    '문제 해결 제시':  'model touching skin with concern, then confident glow',
+    '비포앤애프터 비교':'dramatic skin texture improvement, dull to radiant',
+    '신제품 출시 알림':'bold clean product launch composition',
+    '혜택 강조':       'model with radiantly glowing clear skin, confident pose',
+    '가격/할인 강조':  'product hero shot with dynamic lifestyle energy',
+    '유명인 추천':     'authentic approachable beauty moment, genuine smile',
+    '신뢰감 형성':     'extreme close-up of clear smooth skin, ingredient drop',
 };
 
 function _tagToVisual(tag, map, fallback) {
     return map[tag] || fallback || tag;
 }
 
-// ---- 프롬프트 빌더 (이미지 생성 모델용 영어 비주얼 지시) ----
+// ---- 프롬프트 빌더 (이미지 생성 모델용 — 순수 포토 지시어, 텍스트 완전 배제) ----
 function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     if (!patterns) return '';
 
     const product  = productName || patterns.selectedProduct || patterns.sampleName?.split('_')[0] || 'skincare product';
     const category = _guessProductCategory(product);
 
-    // 소구 → 영어 비주얼
-    const appealVisuals = (patterns.topAppeal || []).slice(0, 3)
-        .map(a => _tagToVisual(a, _APPEAL_VISUAL, null)).join(', ') || 'product benefits, clean layout';
-    const hookVisual = _tagToVisual((patterns.topHook || [])[0], _HOOK_VISUAL, 'striking product hero shot');
+    // 소구 → 영어 비주얼 (텍스트·숫자·배지·버블 없는 것만)
+    const appealVisuals = (patterns.topAppeal || []).slice(0, 2)
+        .map(a => _tagToVisual(a, _APPEAL_VISUAL, null)).filter(Boolean).join(', ')
+        || 'radiant glowing skin, premium product elegance';
+    const hookVisual = _tagToVisual((patterns.topHook || [])[0], _HOOK_VISUAL,
+        'confident model with smooth luminous skin');
 
-    // 성과 수치 (discountBadge 힌트)
-    const roas        = Math.round((patterns.avgRoas || 0) * 100);
-    const ctr         = ((patterns.avgCtr || 0) * 100).toFixed(2);
-    const platform    = patterns.platform || '';
-    const platformHint = platform ? ` Optimized for ${platform} feed ad format.` : '';
+    const platform     = patterns.platform || '';
+    const platformHint = platform ? ` Optimized for ${platform} vertical feed format.` : '';
 
     // 참고 이미지
     const refUrls = _getAutoReferenceUrls();
     const refNote = refUrls.length > 0
-        ? `\nREFERENCE IMAGES PROVIDED (${refUrls.length} top-performing creatives): Replicate their exact composition, color palette, lighting, product angle, model pose, and graphic layout. Improve upon their winning formula with fresh execution.`
+        ? `\nSTYLE REFERENCE (${refUrls.length} top-performing creatives): Match their exact composition, color palette, lighting mood, product angle, and model pose. Improve upon their winning formula with fresh visual execution.`
         : '';
 
     // 제품 이미지 힌트
-    const productImgNote = productImageUrl ? `\nProduct image reference for accurate rendering: ${productImageUrl}` : '';
+    const productImgNote = productImageUrl
+        ? `\nProduct visual reference: ${productImageUrl}` : '';
+
+    // 핵심 금지 규칙 (항상 마지막에)
+    const noText = `\nCRITICAL — ZERO TEXT RULE: Absolutely NO text, letters, numbers, kanji, hangul, latin characters, or symbols anywhere in the image — not on the product bottle, not on the background, not as overlays, not anywhere. The product bottle must be plain clean white with no label, no brand mark, no writing of any kind. Pure visual photography only.`;
 
     if (type === 'video') {
-        return `Japanese beauty product advertisement video. ${category}.${productImgNote}
+        return `Cinematic K-beauty skincare advertisement video. ${category}. Clean minimalist white product packaging, no label, no text on bottle.${productImgNote}
 
 OPENING HOOK (0-2s): ${hookVisual}.
-VISUAL APPEALS: ${appealVisuals}.
-SCENE: Asian woman model (20s-30s) applying product. Skin transformation visible. Bright lifestyle setting.
-STYLE: K-beauty aesthetic. Fast-paced cuts. Bright pastel tones. Graphic text placeholders (NO actual text rendered — use clean placeholder boxes only). Bold discount circle graphic.
-FORMAT: Vertical 9:16 social media ad.${platformHint}
-PERFORMANCE TARGET: ROAS ${roas}%+ | CTR ${ctr}%+
-IMPORTANT: Do NOT render garbled or hallucinated text. Show text areas as clean white/colored graphic placeholders only.${refNote}`;
+VISUAL MOOD: ${appealVisuals}.
+SCENE: Asian woman model (late 20s, radiant clear skin) applying product. Skin appears luminous. Bright lifestyle studio setting.
+BACKGROUND: Soft pastel pink and white gradient. Clean modern studio.
+STYLE: Premium K-beauty aesthetic. Bright soft-box lighting. Elegant and fresh. Pastel color palette.
+FORMAT: Vertical 9:16 social media video.${platformHint}${noText}${refNote}`;
     } else {
-        return `Japanese beauty product advertisement. ${category}.${productImgNote}
+        return `Premium K-beauty skincare product photography. ${category}. Clean minimalist white product packaging, no label, no text on bottle.${productImgNote}
 
-COMPOSITION: Product packaging center-left, Asian woman model (30s, smooth glowing skin) right side. Bright pastel pink/white background.
-VISUAL HOOK: ${hookVisual}.
-GRAPHIC ELEMENTS: ${appealVisuals}.
-STYLE: Clean K-beauty ad aesthetic. Bright studio lighting. Premium cosmetic layout. Pastel color palette. Soft lifestyle photography.
-TEXT AREAS: Show as clean colored graphic placeholders only (speech bubble, benefit icon boxes, discount badge circle). Do NOT render actual letters or garbled characters.
-IMPORTANT: No fake text, no hallucinated characters. Text zones = solid colored shapes only.${platformHint}
-PERFORMANCE TARGET: ROAS ${roas}%+ | CTR ${ctr}%+${refNote}`;
+COMPOSITION: Product left-center foreground on white surface, Asian woman model (late 20s, clear radiant skin, natural soft expression) right background, slightly blurred.
+VISUAL MOOD: ${hookVisual}.
+SKIN DETAIL: ${appealVisuals}.
+BACKGROUND: Soft gradient pastel pink-to-white studio backdrop.
+LIGHTING: Bright soft-box studio lighting. Skin appears luminous and poreless. Product has clean specular highlight.
+COLOR PALETTE: Pastel pink, soft peach, white. No harsh colors.
+STYLE: Editorial premium K-beauty cosmetics photography. Clean elegant minimal layout. Lifestyle beauty.${platformHint}${noText}${refNote}`;
     }
 }
 
