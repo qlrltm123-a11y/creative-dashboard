@@ -543,16 +543,7 @@ function _buildGeneratePanelHTML(p) {
             </button>
         </div>
 
-        <div class="gen-type-tabs">
-            <button id="gen-tab-image" class="gen-type-tab active">
-                <i class="fas fa-image mr-1.5"></i>이미지 광고
-            </button>
-            <button id="gen-tab-video" class="gen-type-tab">
-                <i class="fas fa-video mr-1.5"></i>영상 광고
-            </button>
-        </div>
-
-        <!-- 이미지 탭 -->
+        <!-- 이미지 생성 -->
         <div id="gen-brief-image">
             <textarea id="gen-prompt-image" class="gen-prompt-textarea" rows="8" spellcheck="false"
                 placeholder="프롬프트 자동 생성 중..."></textarea>
@@ -576,30 +567,6 @@ function _buildGeneratePanelHTML(p) {
             <!-- 결과 표시 -->
             <div id="gen-result-image" class="gen-result-area hidden"></div>
         </div>
-
-        <!-- 영상 탭 -->
-        <div id="gen-brief-video" class="hidden">
-            <textarea id="gen-prompt-video" class="gen-prompt-textarea" rows="8" spellcheck="false"
-                placeholder="프롬프트 자동 생성 중..."></textarea>
-            <div class="gen-aspect-row">
-                <label class="gen-input-label">비율</label>
-                <select id="gen-aspect-video" class="gen-select">
-                    <option value="9:16">9:16 (세로 / 릴스)</option>
-                    <option value="16:9" selected>16:9 (가로)</option>
-                    <option value="1:1">1:1 (정방형)</option>
-                </select>
-            </div>
-            <div class="gen-actions">
-                <button id="gen-copy-video" class="gen-btn-copy">
-                    <i class="fas fa-copy mr-1.5"></i>프롬프트 복사
-                </button>
-                <button id="gen-generate-video" class="gen-btn-generate">
-                    <i class="fas fa-sparkles mr-1.5"></i>영상 생성
-                </button>
-            </div>
-            <!-- 결과 표시 -->
-            <div id="gen-result-video" class="gen-result-area hidden"></div>
-        </div>
     </div>`;
 }
 
@@ -607,8 +574,6 @@ function _buildGeneratePanelHTML(p) {
 // 이벤트 바인딩
 // ============================
 function _bindGeneratePanelEvents() {
-    document.getElementById('gen-tab-image')?.addEventListener('click', () => _switchGenTab('image'));
-    document.getElementById('gen-tab-video')?.addEventListener('click', () => _switchGenTab('video'));
     document.getElementById('gen-refresh-btn')?.addEventListener('click', renderGeneratePanel);
 
     // API 키 저장
@@ -633,13 +598,9 @@ function _bindGeneratePanelEvents() {
         document.getElementById(id)?.addEventListener('input', _refreshPrompts);
     });
 
-    // 복사 버튼
+    // 복사 / 생성 버튼
     document.getElementById('gen-copy-image')?.addEventListener('click', () => _copyPrompt('image'));
-    document.getElementById('gen-copy-video')?.addEventListener('click', () => _copyPrompt('video'));
-
-    // 생성 버튼
     document.getElementById('gen-generate-image')?.addEventListener('click', () => _triggerGenerate('image'));
-    document.getElementById('gen-generate-video')?.addEventListener('click', () => _triggerGenerate('video'));
 }
 
 function _switchGenTab(type) {
@@ -757,6 +718,57 @@ async function _triggerGenerate(type) {
     }
 }
 
+// ============================
+// 영상 변환 (이미지 → 영상)
+// ============================
+async function _triggerVideoConvert(imageUrl) {
+    if (!confirm('이 이미지로 영상을 만들까요?\n예상 비용: ~25 크레딧\n\n계속하시겠어요?')) return;
+
+    const btn = document.getElementById('gen-to-video-btn');
+    const resultEl = document.getElementById('gen-video-from-image');
+    if (!resultEl) return;
+
+    // 버튼 로딩 상태
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>영상 변환 중...'; }
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = `<div class="gen-result-loading">
+        <div class="gen-spinner"></div>
+        <p class="text-sm text-slate-500 mt-2">영상 변환 중... (보통 30~60초)</p>
+    </div>`;
+
+    const prompt = document.getElementById('gen-prompt-image')?.value?.trim() || '';
+    const aspect = document.getElementById('gen-aspect-image')?.value || '1:1';
+    const safePrompt = prompt.split('\n')[0].slice(0, 120);
+    const vercelBase = _getVercelBase();
+
+    try {
+        const res = await fetch(`${vercelBase}/api/hf`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: safePrompt, aspect_ratio: aspect, type: 'video-step2', imageUrl }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `${res.status}`);
+
+        let videoUrl = data.url || null;
+        if (!videoUrl && data.requestId) {
+            videoUrl = await _pollUntilUrl(data.requestId, data.statusUrl, 'video', resultEl);
+        }
+
+        if (videoUrl) {
+            _showResultSuccess(resultEl, videoUrl, 'video');
+        } else {
+            resultEl.innerHTML = `<div class="gen-result-error"><i class="fas fa-triangle-exclamation text-rose-400"></i><span>영상 변환 결과를 받지 못했어요.</span></div>`;
+        }
+    } catch (e) {
+        resultEl.innerHTML = `<div class="gen-result-error"><i class="fas fa-triangle-exclamation text-rose-400"></i><span>${e.message}</span></div>`;
+        genToast(`❌ ${e.message}`, 4000);
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-video mr-2"></i>이 이미지로 영상 만들기 <span class="text-violet-200 font-normal text-xs">(~25 크레딧)</span>'; }
+    }
+}
+window._triggerVideoConvert = _triggerVideoConvert;
+
 // 폴링하면서 URL 반환 (영상 2단계용)
 async function _pollUntilUrl(requestId, statusUrl, type, resultEl) {
     const start = Date.now();
@@ -843,13 +855,15 @@ function _updateResultProgress(el, sec) {
 function _showResultSuccess(el, url, type) {
     if (!el) return;
     el.classList.remove('hidden');
+
     if (type === 'video') {
+        // 영상 결과 (변환 완료)
         const isVideo = url && (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov'));
         el.innerHTML = `
             <div class="gen-result-success">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-bold text-emerald-700 flex items-center gap-1.5">
-                        <i class="fas fa-circle-check"></i> 생성 완료!
+                        <i class="fas fa-circle-check"></i> 영상 변환 완료!
                     </span>
                     <a href="${url}" target="_blank" download
                        class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
@@ -858,15 +872,18 @@ function _showResultSuccess(el, url, type) {
                 </div>
                 ${isVideo
                     ? `<video src="${url}" controls autoplay muted loop playsinline class="gen-result-media"></video>`
-                    : `<img src="${url}" alt="생성된 광고 소재" class="gen-result-media" loading="lazy">`
+                    : `<img src="${url}" alt="생성된 영상 소재" class="gen-result-media" loading="lazy">`
                 }
             </div>`;
+        genToast('🎬 영상 변환 완료!', 3000);
     } else {
+        // 이미지 결과 + 영상 변환 옵션
+        const safeUrl = url.replace(/'/g, "\\'");
         el.innerHTML = `
             <div class="gen-result-success">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-bold text-emerald-700 flex items-center gap-1.5">
-                        <i class="fas fa-circle-check"></i> 생성 완료!
+                        <i class="fas fa-circle-check"></i> 이미지 생성 완료!
                     </span>
                     <a href="${url}" target="_blank" download
                        class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
@@ -874,9 +891,20 @@ function _showResultSuccess(el, url, type) {
                     </a>
                 </div>
                 <img src="${url}" alt="생성된 광고 이미지" class="gen-result-media" loading="lazy">
+                <!-- 영상 변환 버튼 -->
+                <div class="mt-3 pt-3 border-t border-slate-200">
+                    <button id="gen-to-video-btn"
+                        onclick="_triggerVideoConvert('${safeUrl}')"
+                        class="w-full py-2.5 px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
+                        <i class="fas fa-video"></i> 이 이미지로 영상 만들기
+                        <span class="text-violet-200 font-normal text-xs">(~25 크레딧)</span>
+                    </button>
+                </div>
+                <!-- 영상 변환 결과 -->
+                <div id="gen-video-from-image" class="mt-3 hidden"></div>
             </div>`;
+        genToast('✨ 이미지 생성 완료!', 3000);
     }
-    genToast('✨ 생성 완료!', 3000);
 }
 
 function _showResultError(el, msg) {
