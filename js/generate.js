@@ -2,10 +2,16 @@
 // 광고 생성 패널 — Higgsfield 직접 API 연동
 // ============================
 
-const HF_BASE_URL   = 'https://platform.higgsfield.ai';
+const HF_DIRECT_URL  = 'https://platform.higgsfield.ai';
 const HF_STORAGE_KEY = 'hf_api_key';
-const HF_POLL_MS    = 3000;   // 폴링 간격
-const HF_MAX_WAIT   = 180000; // 최대 대기 3분
+const HF_PROXY_KEY   = 'hf_proxy_url';  // Cloudflare Worker 프록시 URL
+const HF_POLL_MS     = 3000;
+const HF_MAX_WAIT    = 180000;
+
+// 프록시 URL이 설정되어 있으면 프록시 사용, 없으면 직접 호출
+function _getBaseUrl() {
+    return (localStorage.getItem(HF_PROXY_KEY) || '').trim().replace(/\/$/, '') || HF_DIRECT_URL;
+}
 
 let _genPatterns   = null;
 let _genCurrentTab = 'image';
@@ -117,10 +123,11 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
-    // 이미지: /v1/text2image/soul  |  영상: /v1/image2video/dop (참조 이미지 없으면 안내)
+    // 이미지: /v1/text2image/soul  |  영상: /v1/image2video/dop
+    const base = _getBaseUrl();
     const url  = type === 'video'
-        ? `${HF_BASE_URL}/v1/image2video/dop`
-        : `${HF_BASE_URL}/v1/text2image/soul`;
+        ? `${base}/v1/image2video/dop`
+        : `${base}/v1/text2image/soul`;
 
     const body = type === 'video'
         ? { model: 'dop-turbo', prompt, input_images: [] }
@@ -166,8 +173,8 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
 
 async function _pollHiggsfieldStatus(requestId, statusUrl) {
     const apiKey = _getHfKey();
-    // status_url이 있으면 그것을 사용, 없으면 직접 구성
-    const url = statusUrl || `${HF_BASE_URL}/requests/${requestId}/status`;
+    const base   = _getBaseUrl();
+    const url = statusUrl || `${base}/requests/${requestId}/status`;
     const res = await fetch(url, {
         headers: { 'Authorization': `Key ${apiKey}` },
     });
@@ -270,25 +277,55 @@ function _buildGeneratePanelHTML(p) {
         </div>
     </div>
 
-    <!-- Higgsfield API 키 -->
+    <!-- 연결 설정 -->
     <div class="gen-section">
         <div class="gen-section-header">
-            <i class="fas fa-key text-amber-500"></i>
-            <span>Higgsfield API 키</span>
-            <a href="https://cloud.higgsfield.ai/api-keys" target="_blank"
-               class="ml-auto text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
-                <i class="fas fa-external-link-alt text-[10px]"></i> 키 발급받기
-            </a>
+            <i class="fas fa-plug text-amber-500"></i>
+            <span>연결 설정</span>
         </div>
-        <div class="flex gap-2 mt-3">
-            <input id="gen-api-key" type="password" class="gen-input flex-1"
-                placeholder="KEY_ID:KEY_SECRET"
-                value="${savedKey}">
-            <button id="gen-save-key" class="gen-btn-copy whitespace-nowrap">
-                <i class="fas fa-save mr-1.5"></i>저장
-            </button>
+
+        <!-- API 키 -->
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-1">
+                <label class="gen-input-label">Higgsfield API 키 (KEY_ID:KEY_SECRET)</label>
+                <a href="https://cloud.higgsfield.ai/api-keys" target="_blank"
+                   class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
+                    <i class="fas fa-external-link-alt text-[10px]"></i> 키 발급
+                </a>
+            </div>
+            <div class="flex gap-2">
+                <input id="gen-api-key" type="password" class="gen-input flex-1"
+                    placeholder="abc123:xxxxxxxxxxxxxxxx"
+                    value="${savedKey}">
+                <button id="gen-save-key" class="gen-btn-copy whitespace-nowrap">
+                    <i class="fas fa-save mr-1.5"></i>저장
+                </button>
+            </div>
+            ${savedKey ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> 저장됨: ${maskedKey}</p>` : ''}
         </div>
-        ${savedKey ? `<p class="text-xs text-emerald-600 mt-1.5 flex items-center gap-1"><i class="fas fa-circle-check"></i> 저장된 키: ${maskedKey}</p>` : '<p class="text-xs text-slate-400 mt-1.5">cloud.higgsfield.ai → API Keys에서 발급받은 KEY_ID:KEY_SECRET 형식</p>'}
+
+        <!-- 프록시 URL -->
+        <div class="mt-4">
+            <div class="flex items-center justify-between mb-1">
+                <label class="gen-input-label">CORS 프록시 URL
+                    <span class="text-slate-400 font-normal ml-1">(Cloudflare Worker — 필수)</span>
+                </label>
+                <a href="https://workers.cloudflare.com" target="_blank"
+                   class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
+                    <i class="fas fa-external-link-alt text-[10px]"></i> 워커 만들기
+                </a>
+            </div>
+            <div class="flex gap-2">
+                <input id="gen-proxy-url" type="url" class="gen-input flex-1"
+                    placeholder="https://hf-proxy.이름.workers.dev"
+                    value="${localStorage.getItem('hf_proxy_url') || ''}">
+                <button id="gen-save-proxy" class="gen-btn-copy whitespace-nowrap">
+                    <i class="fas fa-save mr-1.5"></i>저장
+                </button>
+            </div>
+            ${(localStorage.getItem('hf_proxy_url') || '') ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> 프록시 설정됨</p>` :
+              `<p class="text-xs text-amber-600 mt-1 flex items-center gap-1"><i class="fas fa-triangle-exclamation"></i> 프록시 없으면 CORS 오류 발생 — workers.cloudflare.com에서 무료로 5분 만에 설정 가능</p>`}
+        </div>
     </div>
 
     <!-- 생성 브리프 -->
@@ -375,7 +412,15 @@ function _bindGeneratePanelEvents() {
         if (!key) return genToast('API 키를 입력해주세요.', 2500);
         _saveHfKey(key);
         genToast('✅ API 키가 저장됐어요!');
-        renderGeneratePanel(); // 새로고침
+        renderGeneratePanel();
+    });
+
+    document.getElementById('gen-save-proxy')?.addEventListener('click', () => {
+        const url = document.getElementById('gen-proxy-url')?.value?.trim();
+        if (!url) return genToast('프록시 URL을 입력해주세요.', 2500);
+        localStorage.setItem(HF_PROXY_KEY, url);
+        genToast('✅ 프록시 URL이 저장됐어요!');
+        renderGeneratePanel();
     });
 
     // 제품 정보 변경 시 프롬프트 갱신
