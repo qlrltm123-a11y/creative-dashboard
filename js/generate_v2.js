@@ -691,6 +691,10 @@ async function _triggerGenerate(type) {
         return;
     }
 
+    // 크레딧 경고 (영상은 더 많이 소모)
+    const creditCost = type === 'video' ? '~25 크레딧 (이미지+영상 2단계)' : '~2 크레딧';
+    if (!confirm(`생성하면 Higgsfield 크레딧이 소모됩니다.\n예상 비용: ${creditCost}\n\n계속하시겠어요?`)) return;
+
     const aspectEl = document.getElementById(`gen-aspect-${type}`);
     const aspect   = aspectEl?.value || '9:16';
     const resultEl = document.getElementById(`gen-result-${type}`);
@@ -713,13 +717,15 @@ async function _triggerGenerate(type) {
             }
             if (!imageUrl) throw new Error('소스 이미지 생성 실패');
 
-            // Step2: 이미지→영상 변환
+            // Step2: 이미지→영상 변환 (안전한 짧은 프롬프트 사용)
             genToast('⏳ [2/2] 영상 변환 중... (1분 소요)', 0);
             const vercelBase = _getVercelBase();
+            // NSFW 오탐 방지: 첫 문장만 추출해서 간결하게
+            const safePrompt = prompt.split('\n')[0].slice(0, 120);
             const vidRes = await fetch(`${vercelBase}/api/hf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, aspect_ratio: aspect, type: 'video-step2', imageUrl }),
+                body: JSON.stringify({ prompt: safePrompt, aspect_ratio: aspect, type: 'video-step2', imageUrl }),
             });
             const vidData = await vidRes.json();
             if (!vidRes.ok) throw new Error(`영상 변환 실패: ${vidData.error || vidRes.status}`);

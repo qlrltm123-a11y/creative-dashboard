@@ -159,7 +159,12 @@ module.exports = async function handler(req, res) {
         method: 'POST',
         headers: { 'Authorization': authKey, 'Content-Type': 'application/json', 'User-Agent': 'higgsfield-server-js/2.0' },
         body: JSON.stringify({
-          params: { input_images: [{ url: imageUrl }], prompt, aspect_ratio },
+          params: {
+            input_images: [{ url: imageUrl }],
+            prompt: prompt.slice(0, 200), // 짧고 안전한 프롬프트
+            aspect_ratio,
+            safety_tolerance: 6,
+          },
         }),
       });
       const text = await r.text();
