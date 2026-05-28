@@ -63,11 +63,24 @@ export default async function handler(req, res) {
       logs.push({ path: reqLog, status: hfRes.status, body: text.slice(0, 200) });
       console.log(`[HF] ${ep.path} → ${hfRes.status}: ${text.slice(0, 200)}`);
 
-      // 404/405 = 경로 없음 → 다음 시도
-      if (hfRes.status === 404 || hfRes.status === 405) continue;
+      // 2xx = 성공 → 즉시 반환
+      if (hfRes.status >= 200 && hfRes.status < 300) {
+        return res.status(hfRes.status).json({ ...data, _used_endpoint: ep.path, _logs: logs });
+      }
 
-      // 200~299 또는 다른 코드 → 결과 반환
-      return res.status(hfRes.status).json({ ...data, _used_endpoint: ep.path, _logs: logs });
+      // 401/403 = 인증 오류 → 재시도 의미없음
+      if (hfRes.status === 401 || hfRes.status === 403) {
+        return res.status(hfRes.status).json({ ...data, _used_endpoint: ep.path, _logs: logs });
+      }
+
+      // 422 = 파라미터 오류 (경로는 맞음) → 즉시 반환
+      if (hfRes.status === 422) {
+        return res.status(hfRes.status).json({ ...data, _used_endpoint: ep.path, _logs: logs });
+      }
+
+      // 404/405/500/502/503 = 경로 없음으로 간주 → 다음 시도
+      console.log(`[HF] Skipping ${ep.path} (status ${hfRes.status}), trying next...`);
+      continue;
 
     } catch (e) {
       logs.push({ path: reqLog, error: e.message });
