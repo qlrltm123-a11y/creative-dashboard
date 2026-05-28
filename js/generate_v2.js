@@ -347,26 +347,22 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
 }
 
 async function _pollHiggsfieldStatus(requestId, statusUrl) {
-    const apiKey = _getHfKey();
-    const base   = _getBaseUrl();
-    // 후보 URL 목록 (statusUrl이 있으면 그것만, 없으면 두 패턴 시도)
-    const urls = statusUrl
-        ? [statusUrl]
-        : [`${base}/v1/requests/${requestId}`, `${base}/requests/${requestId}/status`, `${base}/v1/jobs/${requestId}`];
-
-    for (const url of urls) {
-        try {
-            const res = await fetch(url, {
-                headers: { 'Authorization': `Key ${apiKey}` },
-            });
-            if (res.status === 404) continue;
-            if (!res.ok) throw new Error(`폴링 오류 (${res.status})`);
-            return await res.json();
-        } catch (e) {
-            if (urls.indexOf(url) === urls.length - 1) throw e;
-        }
+    // Vercel 프록시를 통해 폴링 (CORS 우회)
+    const vercelBase = _getVercelBase();
+    if (vercelBase) {
+        const proxyUrl = `${vercelBase}/api/hf?poll=${encodeURIComponent(requestId)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`폴링 오류 (${res.status})`);
+        return await res.json();
     }
-    throw new Error('폴링 엔드포인트를 찾지 못했어요.');
+    // fallback: 직접 호출
+    const apiKey = _getHfKey();
+    const pollUrl = statusUrl || `https://platform.higgsfield.ai/requests/${requestId}/status`;
+    const res = await fetch(pollUrl, {
+        headers: { 'Authorization': `Key ${apiKey}` },
+    });
+    if (!res.ok) throw new Error(`폴링 오류 (${res.status})`);
+    return await res.json();
 }
 
 function _extractResultUrl(data, type) {

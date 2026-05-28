@@ -6,6 +6,25 @@ module.exports = async function handler(req, res) {
 
   const apiKey = process.env.HF_CREDENTIALS || '';
 
+  // ── 폴링 프록시: GET /api/hf?poll=REQUEST_ID ─────────────────
+  if (req.method === 'GET' && req.query?.poll) {
+    if (!apiKey) return res.status(401).json({ error: 'HF_CREDENTIALS 없음' });
+    const requestId = req.query.poll;
+    const pollUrl = `https://platform.higgsfield.ai/requests/${requestId}/status`;
+    try {
+      const r = await fetch(pollUrl, {
+        headers: {
+          'Authorization': `Key ${apiKey}`,
+          'User-Agent': 'higgsfield-server-js/2.0',
+        },
+      });
+      const data = await r.json();
+      return res.status(r.status).json(data);
+    } catch (e) {
+      return res.status(502).json({ error: e.message });
+    }
+  }
+
   // ── 디버그: GET /api/hf?debug=1 ──────────────────────────────
   if (req.method === 'GET' && req.query?.debug === '1') {
     const keyInfo = apiKey
@@ -113,6 +132,15 @@ module.exports = async function handler(req, res) {
           logs.push({ url, format: isInputWrapper ? 'wrapped' : 'flat', status: r.status, body: text.slice(0,200) });
 
           if (r.status >= 200 && r.status < 300) {
+            // 비동기 큐 응답 (queued / in_progress)
+            if (data.request_id) {
+              return res.status(200).json({
+                requestId: data.request_id,
+                statusUrl: data.status_url || null,
+                _ep: url,
+              });
+            }
+            // 즉시 완료 — URL 추출
             const resultUrl =
               data.images?.[0]?.url ||
               data.image?.url ||
@@ -127,13 +155,6 @@ module.exports = async function handler(req, res) {
 
           if (r.status === 401 || r.status === 403) {
             return res.status(401).json({ error: '인증 실패 - API 키를 확인해주세요', status: r.status });
-          }
-
-          if (data.request_id || data.id || data.job_id) {
-            return res.status(200).json({
-              requestId: data.request_id || data.id || data.job_id,
-              _ep: url,
-            });
           }
 
         } catch (e) {
