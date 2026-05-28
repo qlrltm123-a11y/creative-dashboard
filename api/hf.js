@@ -166,11 +166,14 @@ module.exports = async function handler(req, res) {
 
   // ── 비디오 생성 ────────────────────────────────────────────────
   if (type === 'video') {
+    // grok_video: text-to-video (이미지 불필요)
+    // 바디 형식: flat { prompt, aspect_ratio }
     const videoEndpoints = [
-      'https://platform.higgsfield.ai/v1/image2video/dop',
-      'https://platform.higgsfield.ai/image2video/dop',
+      { url: 'https://platform.higgsfield.ai/grok_video/text-to-video',   body: { prompt, aspect_ratio } },
+      { url: 'https://platform.higgsfield.ai/v1/grok_video/text-to-video', body: { prompt, aspect_ratio } },
+      { url: 'https://platform.higgsfield.ai/v1/image2video/dop',          body: { params: { prompt, aspect_ratio } } },
     ];
-    for (const url of videoEndpoints) {
+    for (const { url, body } of videoEndpoints) {
       try {
         const r = await fetch(url, {
           method: 'POST',
@@ -179,18 +182,27 @@ module.exports = async function handler(req, res) {
             'Content-Type': 'application/json',
             'User-Agent': 'higgsfield-server-js/2.0',
           },
-          body: JSON.stringify({ input: { model: 'dop-turbo', prompt, aspect_ratio } }),
+          body: JSON.stringify(body),
         });
         const text = await r.text();
         let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
         logs.push({ url, status: r.status, body: text.slice(0,200) });
 
+        if (r.status === 404 || r.status === 422) continue; // 다음 엔드포인트 시도
+
         if (r.status >= 200 && r.status < 300) {
+          if (data.request_id) {
+            return res.status(200).json({
+              requestId: data.request_id,
+              statusUrl: data.status_url || null,
+              _ep: url,
+            });
+          }
           const resultUrl = data.video?.url || data.url || data.results?.[0]?.rawUrl || null;
           return res.status(200).json({ url: resultUrl, raw: data, _ep: url });
         }
-        if (data.request_id || data.id || data.job_id) {
-          return res.status(200).json({ requestId: data.request_id || data.id || data.job_id, _ep: url });
+        if (r.status === 401 || r.status === 403) {
+          return res.status(401).json({ error: '인증 실패', status: r.status });
         }
       } catch (e) {
         logs.push({ url, error: e.message });
