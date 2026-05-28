@@ -404,12 +404,13 @@ function _getAutoReferenceUrls() {
     return [...new Set([...auto, ...manual])].slice(0, 5);
 }
 
-async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
+async function _callHiggsfieldGenerate(prompt, type, aspectRatio, extraRefs = []) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
     const vercelBase = _getVercelBase();
-    const referenceUrls = type === 'image' ? _getAutoReferenceUrls() : [];
+    const baseRefs = type === 'image' ? _getAutoReferenceUrls() : [];
+    const referenceUrls = [...new Set([...baseRefs, ...extraRefs])].slice(0, 5);
     let res;
 
     if (vercelBase) {
@@ -605,6 +606,7 @@ function _buildGeneratePanelHTML(p) {
         return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
             <img src="${thumb}" class="gen-ref-thumb" loading="lazy" onerror="this.style.opacity='0.15'">
             <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
+            <button class="gen-ref-insert-btn" onclick="event.stopPropagation();_insertRefToPrompt('${refUrl}')">📎 삽입</button>
         </div>`;
     }).join('') || '<p class="text-xs text-slate-400 py-2">소재 없음</p>';
 
@@ -750,8 +752,15 @@ function _buildGeneratePanelHTML(p) {
         <!-- 참조 이미지 상태 표시 -->
         <div id="gen-ref-status" class="mb-2"></div>
         <div id="gen-brief-image">
-            <textarea id="gen-prompt-image" class="gen-prompt-textarea" rows="9" spellcheck="false"
-                placeholder="프롬프트 자동 생성 중..."></textarea>
+            <div id="gen-prompt-image"
+                class="gen-prompt-editor"
+                contenteditable="true"
+                spellcheck="false"
+                data-placeholder="프롬프트 자동 생성 중... ✦ 이미지를 여기에 Ctrl+V 붙여넣거나 드래그하세요"></div>
+            <p class="text-xs text-slate-400 mt-1 mb-2 flex items-center gap-1.5">
+                <i class="fas fa-image text-indigo-400"></i>
+                이미지 <b class="text-slate-500">Ctrl+V 붙여넣기</b> · <b class="text-slate-500">드래그 앤 드롭</b> · 아래 썸네일 <b class="text-slate-500">📎 삽입</b> 버튼
+            </p>
             <div class="gen-aspect-row">
                 <label class="gen-input-label">비율</label>
                 <select id="gen-aspect-image" class="gen-select">
@@ -827,6 +836,9 @@ function _bindGeneratePanelEvents() {
     _restoreRefSelections();
     _updateRefPreview();
     _updateRefStatus();
+
+    // 프롬프트 에디터 초기화 (이미지 붙여넣기/드롭)
+    _initPromptEditor();
 }
 
 // ROAS 상위 소재 썸네일 클릭 토글
@@ -960,20 +972,148 @@ function _switchGenTab(type) {
     document.getElementById('gen-brief-video')?.classList.toggle('hidden', type !== 'video');
 }
 
+// ── 프롬프트 에디터 초기화 (이미지 붙여넣기 / 드래그앤드롭) ──────────────
+function _initPromptEditor() {
+    const editor = document.getElementById('gen-prompt-image');
+    if (!editor) return;
+
+    // Ctrl+V 붙여넣기
+    editor.addEventListener('paste', (e) => {
+        const items = [...(e.clipboardData?.items || [])];
+        const imgItem = items.find(it => it.type.startsWith('image/'));
+        if (!imgItem) return; // 텍스트는 기본 동작 유지
+        e.preventDefault();
+        const file = imgItem.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => _insertImgChip(editor, ev.target.result);
+        reader.readAsDataURL(file);
+    });
+
+    // 드래그오버
+    editor.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        editor.classList.add('drag-over');
+    });
+    editor.addEventListener('dragleave', () => editor.classList.remove('drag-over'));
+
+    // 드롭 (파일 or URL)
+    editor.addEventListener('drop', (e) => {
+        e.preventDefault();
+        editor.classList.remove('drag-over');
+        const files = [...(e.dataTransfer.files || [])].filter(f => f.type.startsWith('image/'));
+        if (files.length) {
+            files.forEach(f => {
+                const reader = new FileReader();
+                reader.onload = (ev) => _insertImgChip(editor, ev.target.result);
+                reader.readAsDataURL(f);
+            });
+            return;
+        }
+        const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+        if (url?.startsWith('http')) _insertImgChip(editor, url);
+    });
+}
+
+// 에디터 커서 위치에 이미지 칩 삽입
+function _insertImgChip(editor, src) {
+    editor.focus();
+    const chip = document.createElement('span');
+    chip.className = 'prompt-img-chip';
+    chip.contentEditable = 'false';
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.className = 'prompt-img-thumb';
+    img.alt = '';
+
+    const del = document.createElement('button');
+    del.className = 'prompt-img-del';
+    del.innerHTML = '×';
+    del.type = 'button';
+    del.addEventListener('click', (e) => { e.stopPropagation(); chip.remove(); });
+
+    chip.appendChild(img);
+    chip.appendChild(del);
+
+    const sel = window.getSelection();
+    if (sel?.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(chip);
+        range.setStartAfter(chip);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } else {
+        editor.appendChild(chip);
+    }
+    genToast('📎 이미지 삽입됨', 1500);
+}
+
+// 외부(썸네일 삽입 버튼)에서 호출
+function _insertRefToPrompt(url) {
+    const editor = document.getElementById('gen-prompt-image');
+    if (!editor) return;
+    _insertImgChip(editor, _toDirectImageUrl(url) || url);
+}
+window._insertRefToPrompt = _insertRefToPrompt;
+
+// 에디터 텍스트 추출 (이미지 칩 제외)
+function _getEditorText(editor) {
+    if (!editor) return '';
+    const clone = editor.cloneNode(true);
+    clone.querySelectorAll('.prompt-img-chip').forEach(c => c.remove());
+    clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+    clone.querySelectorAll('div, p').forEach(el => {
+        el.insertAdjacentText('afterend', '\n');
+        el.replaceWith(...el.childNodes);
+    });
+    return clone.textContent.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// 에디터에서 인라인 이미지 URL 추출
+function _getEditorImages(editor) {
+    if (!editor) return [];
+    return [...editor.querySelectorAll('.prompt-img-chip img')].map(i => i.src).filter(Boolean);
+}
+
 function _refreshPrompts() {
     if (!_genPatterns) return;
     const productName     = document.getElementById('gen-product-name')?.value  || '';
     const productImageUrl = document.getElementById('gen-product-image')?.value || '';
-    const imgTA = document.getElementById('gen-prompt-image');
+
+    const editor = document.getElementById('gen-prompt-image');
+    if (editor) {
+        // 이미 삽입된 이미지 칩 보존
+        const existingChips = [...editor.querySelectorAll('.prompt-img-chip')].map(c => c.cloneNode(true));
+        const newText = buildHiggsfieldPrompt(_genPatterns, productName, productImageUrl, 'image');
+        // 텍스트를 안전하게 HTML 인코딩해서 세팅
+        editor.innerHTML = newText
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+        // 칩 복원
+        if (existingChips.length) {
+            editor.appendChild(document.createElement('br'));
+            existingChips.forEach(chip => {
+                // 삭제 버튼 이벤트 재연결
+                chip.querySelector('.prompt-img-del')?.addEventListener('click', (e) => {
+                    e.stopPropagation(); chip.remove();
+                });
+                editor.appendChild(chip);
+            });
+        }
+    }
+
     const vidTA = document.getElementById('gen-prompt-video');
-    if (imgTA) imgTA.value = buildHiggsfieldPrompt(_genPatterns, productName, productImageUrl, 'image');
     if (vidTA) vidTA.value = buildHiggsfieldPrompt(_genPatterns, productName, productImageUrl, 'video');
 }
 
 function _copyPrompt(type) {
-    const ta = document.getElementById(`gen-prompt-${type}`);
-    if (!ta?.value) return;
-    navigator.clipboard.writeText(ta.value).then(() => {
+    const editor = document.getElementById(`gen-prompt-${type}`);
+    if (!editor) return;
+    const text = type === 'image' ? _getEditorText(editor) : (editor.value || '');
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
         const btn = document.getElementById(`gen-copy-${type}`);
         if (btn) {
             const orig = btn.innerHTML;
@@ -995,11 +1135,13 @@ async function _triggerGenerate(type) {
     }
 
     const promptEl = document.getElementById(`gen-prompt-${type}`);
-    const prompt   = promptEl?.value?.trim();
+    const prompt   = type === 'image' ? _getEditorText(promptEl) : (promptEl?.value?.trim() || '');
     if (!prompt) {
         genToast('프롬프트가 비어있어요.', 2500);
         return;
     }
+    // 에디터에 직접 삽입된 이미지를 참고 소재로 추가
+    const inlineImgs = type === 'image' ? _getEditorImages(promptEl) : [];
 
     // 크레딧 경고 (영상은 더 많이 소모)
     const creditCost = type === 'video' ? '~25 크레딧 (이미지+영상 2단계)' : '~2 크레딧';
@@ -1050,7 +1192,7 @@ async function _triggerGenerate(type) {
             }
         } else {
             // 이미지: 기존 흐름
-            const result = await _callHiggsfieldGenerate(prompt, type, aspect);
+            const result = await _callHiggsfieldGenerate(prompt, type, aspect, inlineImgs);
             if (result && typeof result === 'string') {
                 _showResultSuccess(resultEl, result, type);
             } else if (result?.requestId || result?.statusUrl) {
@@ -1085,7 +1227,7 @@ async function _triggerVideoConvert(imageUrl) {
         <p class="text-sm text-slate-500 mt-2">영상 변환 중... (보통 30~60초)</p>
     </div>`;
 
-    const prompt = document.getElementById('gen-prompt-image')?.value?.trim() || '';
+    const prompt = _getEditorText(document.getElementById('gen-prompt-image'));
     const aspect = document.getElementById('gen-aspect-image')?.value || '1:1';
     const safePrompt = prompt.split('\n')[0].slice(0, 120);
     const vercelBase = _getVercelBase();
