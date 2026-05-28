@@ -4947,3 +4947,74 @@ body {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
+
+/* ---- 생성 패널 추가 스타일 ----  */
+.gen-aspect-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+.gen-select {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: #1e293b;
+    background: #fff;
+    cursor: pointer;
+}
+.gen-select:focus { outline: none; border-color: #818cf8; }
+
+/* 결과 영역 */
+.gen-result-area {
+    margin-top: 16px;
+    border-radius: 14px;
+    overflow: hidden;
+}
+.gen-result-loading {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 24px;
+}
+.gen-result-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #7c3aed;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.gen-result-success {
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    border-radius: 14px;
+    padding: 16px;
+}
+.gen-result-media {
+    width: 100%;
+    max-height: 480px;
+    object-fit: contain;
+    border-radius: 10px;
+    display: block;
+    background: #000;
+}
+.gen-result-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff1f2;
+    border: 1.5px solid #fecdd3;
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: #be123c;
+    font-size: 13px;
+    font-weight: 600;
+}
