@@ -117,12 +117,16 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
-    const model    = type === 'video' ? 'kling3_0'      : 'nano_banana_2';
-    const endpoint = type === 'video' ? 'text-to-video' : 'text-to-image';
-    const url      = `${HF_BASE_URL}/${model}/${endpoint}`;
+    // 이미지: /v1/text2image/soul  |  영상: /v1/image2video/dop (참조 이미지 없으면 안내)
+    const url  = type === 'video'
+        ? `${HF_BASE_URL}/v1/image2video/dop`
+        : `${HF_BASE_URL}/v1/text2image/soul`;
 
-    const body = { prompt, aspect_ratio: aspectRatio || '9:16' };
-    if (type === 'image') body.resolution = '1k';
+    const body = type === 'video'
+        ? { model: 'dop-turbo', prompt, input_images: [] }
+        : { prompt, resolution: '1080p', batch_size: 1 };
+
+    console.log('[HF] POST', url, body);
 
     const res = await fetch(url, {
         method: 'POST',
@@ -133,23 +137,37 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
         body: JSON.stringify(body),
     });
 
+    // 상세 에러 메시지
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || err.error || `API 오류 (${res.status})`);
+        let errMsg = `API 오류 (${res.status})`;
+        try {
+            const errBody = await res.json();
+            errMsg = errBody.message || errBody.error || errBody.detail || errMsg;
+            console.error('[HF Error]', res.status, errBody);
+        } catch (_) {
+            const errText = await res.text().catch(() => '');
+            if (errText) { errMsg += ': ' + errText.slice(0, 100); console.error('[HF Error]', errText); }
+        }
+        if (res.status === 401) errMsg = '인증 실패 (401) — API 키를 확인해주세요. KEY_ID:KEY_SECRET 형식인지 확인하세요.';
+        if (res.status === 403) errMsg = '권한 없음 (403) — 크레딧이 부족하거나 플랜을 확인해주세요.';
+        throw new Error(errMsg);
     }
 
     const data = await res.json();
-    // 즉시 완료인 경우
+    console.log('[HF] Response:', data);
+
     if (data.status === 'completed') return _extractResultUrl(data, type);
-    // 비동기 처리: request_id 반환
+    // 비동기: status_url 우선, 없으면 request_id로 구성
     const requestId = data.request_id || data.id;
-    if (!requestId) throw new Error('request_id를 받지 못했어요.');
-    return { requestId, type };
+    const statusUrl = data.status_url || null;
+    if (!requestId && !statusUrl) throw new Error('request_id를 받지 못했어요.');
+    return { requestId, statusUrl, type };
 }
 
-async function _pollHiggsfieldStatus(requestId) {
+async function _pollHiggsfieldStatus(requestId, statusUrl) {
     const apiKey = _getHfKey();
-    const url    = `${HF_BASE_URL}/requests/${requestId}/status`;
+    // status_url이 있으면 그것을 사용, 없으면 직접 구성
+    const url = statusUrl || `${HF_BASE_URL}/requests/${requestId}/status`;
     const res = await fetch(url, {
         headers: { 'Authorization': `Key ${apiKey}` },
     });
@@ -161,7 +179,8 @@ function _extractResultUrl(data, type) {
     if (type === 'video') {
         return data.video?.url || data.videos?.[0]?.url || data.output?.[0] || null;
     }
-    return data.images?.[0]?.url || data.image?.url || data.output?.[0] || null;
+    return data.images?.[0]?.url || data.image?.url || data.output?.[0]
+        || data.results?.[0]?.url || null;
 }
 
 // ============================
@@ -437,10 +456,10 @@ async function _triggerGenerate(type) {
         if (result && typeof result === 'string') {
             // 즉시 완료
             _showResultSuccess(resultEl, result, type);
-        } else if (result?.requestId) {
+        } else if (result?.requestId || result?.statusUrl) {
             // 비동기 폴링
             genToast('⏳ 생성 중... 잠시 기다려주세요.');
-            await _pollUntilDone(result.requestId, result.type, resultEl);
+            await _pollUntilDone(result.requestId, result.statusUrl, result.type, resultEl);
         }
     } catch (e) {
         _showResultError(resultEl, e.message);
@@ -451,12 +470,12 @@ async function _triggerGenerate(type) {
     }
 }
 
-async function _pollUntilDone(requestId, type, resultEl) {
+async function _pollUntilDone(requestId, statusUrl, type, resultEl) {
     const start = Date.now();
     while (Date.now() - start < HF_MAX_WAIT) {
         await new Promise(r => setTimeout(r, HF_POLL_MS));
         try {
-            const data = await _pollHiggsfieldStatus(requestId);
+            const data = await _pollHiggsfieldStatus(requestId, statusUrl);
             const status = data.status;
 
             if (status === 'completed') {
