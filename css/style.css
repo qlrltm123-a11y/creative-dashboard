@@ -5067,6 +5067,37 @@ body {
 }
 .gen-product-filter-badge::before { content: '📦'; font-size: 11px; }
 
+/* ── 참조 이미지 상태 배지 ── */
+.gen-ref-status-auto,
+.gen-ref-status-manual,
+.gen-ref-status-none {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+.gen-ref-status-auto {
+    background: #eef2ff;
+    border: 1.5px solid #c7d2fe;
+    color: #3730a3;
+}
+.gen-ref-status-auto i { color: #6366f1; }
+.gen-ref-status-manual {
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+    color: #166534;
+}
+.gen-ref-status-manual i { color: #22c55e; }
+.gen-ref-status-none {
+    background: #f8fafc;
+    border: 1.5px dashed #cbd5e1;
+    color: #94a3b8;
+}
+
 /* ── 참고 소재 썸네일 선택 UI ── */
 .gen-ref-item {
     position: relative;

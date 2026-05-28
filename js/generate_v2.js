@@ -113,29 +113,63 @@ function getWinningPatterns() {
 // ---- 프롬프트 빌더 ----
 function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     if (!patterns) return '';
-    const brand    = patterns.brand || 'Brand';
-    const product  = productName || (patterns.sampleName ? patterns.sampleName.split('_')[0] : 'product');
-    const appeals  = patterns.topAppeal.slice(0, 3).join(', ');
-    const hookMain = patterns.topHook[0] || 'engaging visual hook';
-    const emotions = patterns.topEmotion.slice(0, 3).join(', ');
-    const roas     = Math.round(patterns.avgRoas * 100);
-    const ctr      = (patterns.avgCtr * 100).toFixed(2);
-    const imgNote  = productImageUrl ? `\nProduct image reference: ${productImageUrl}` : '';
-    const platformNote = patterns.platform ? ` Optimized for ${patterns.platform} feed ads.` : '';
+
+    const brand   = patterns.brand || 'Brand';
+    const product = productName || (patterns.selectedProduct || patterns.sampleName?.split('_')[0] || 'product');
+
+    // 소구/훅/감정 (순위 기반)
+    const appealTop  = (patterns.topAppeal  || []).slice(0, 3);
+    const hookAll    = (patterns.topHook    || []).slice(0, 3);
+    const emoAll     = (patterns.topEmotion || []).slice(0, 3);
+
+    const appealStr  = appealTop.join(' / ') || 'value proposition';
+    const hookMain   = hookAll[0] || 'product close-up';
+    const hookSub    = hookAll.slice(1).join(', ');
+    const emoStr     = emoAll.join(' / ') || 'trust, desire';
+
+    // 실제 상위 소재의 카피/메시지 추출
+    const topCopies = (patterns.top5 || [])
+        .map(c => c.key_message_kr || c.key_message_jp || '')
+        .filter(Boolean).slice(0, 3);
+    const topAdNames = (patterns.top5 || [])
+        .map(c => (c.ad_name || c.creative_name || '').replace(/_/g, ' ').slice(0, 40))
+        .filter(Boolean).slice(0, 3);
+
+    // 성과 수치
+    const roas = Math.round((patterns.avgRoas || 0) * 100);
+    const ctr  = ((patterns.avgCtr || 0) * 100).toFixed(2);
+
+    // 참고 이미지 있으면 스타일 매칭 지시 추가
+    const refUrls = _getAutoReferenceUrls();
+    const refDirective = refUrls.length > 0
+        ? `\n\n[VISUAL REFERENCE DIRECTIVE]\nReference images provided (${refUrls.length} top-performing creatives). Closely replicate their: composition layout, color palette & tone, typography placement, product presentation angle, lifestyle context. Improve upon their formula — same winning structure, fresh execution.`
+        : '';
+
+    const imgNote      = productImageUrl ? `\nProduct image: ${productImageUrl}` : '';
+    const platformNote = patterns.platform ? `\nPlatform: ${patterns.platform} feed ad format.` : '';
+    const copyNote     = topCopies.length
+        ? `\nTop-performing copy patterns: ${topCopies.map(c => `"${c}"`).join(' | ')}`
+        : (topAdNames.length ? `\nWinning creative context: ${topAdNames.join(', ')}` : '');
 
     if (type === 'video') {
-        return `High-converting DTC video ad for ${brand}'s ${product}.${imgNote}
-Opening hook (0-2s): ${hookMain} — stop-the-scroll moment.
-Core appeal: ${appeals}.
-Emotional arc: ${emotions}.
-Bright, fast-paced product showcase with text overlay highlighting key value proposition. Premium ${brand} aesthetic.${platformNote}
-Performance target: ROAS ${roas}%+ CTR ${ctr}%+`;
+        return `[HIGH-CONVERTING VIDEO AD] ${brand} × ${product}${imgNote}${copyNote}
+
+HOOK (0-2s): ${hookMain} — immediate scroll-stop.
+${hookSub ? `Secondary hooks: ${hookSub}` : ''}
+CORE APPEALS (performance-ranked): ${appealStr}
+EMOTIONAL JOURNEY: ${emoStr}
+STRUCTURE: Problem → Solution → Product showcase → Social proof → CTA
+STYLE: Fast-paced cuts, bright lifestyle footage, bold Korean text overlays, premium ${brand} aesthetic.${platformNote}
+PERFORMANCE BENCHMARK: ROAS ${roas}%+ | CTR ${ctr}%+${refDirective}`;
     } else {
-        return `High-converting DTC advertisement image for ${brand}'s ${product}.${imgNote}
-Key appeal: ${appeals}.
-Visual hook: ${hookMain}.
-Emotional response: ${emotions}.
-Product prominently featured, lifestyle context, eye-catching text overlay with price/value proposition. Clean, aspirational, bright colors matching ${brand} brand aesthetic.${platformNote}`;
+        return `[HIGH-CONVERTING AD IMAGE] ${brand} × ${product}${imgNote}${copyNote}
+
+VISUAL HOOK: ${hookMain}
+CORE APPEALS (performance-ranked): ${appealStr}
+TARGET EMOTION: ${emoStr}
+COMPOSITION: Product hero shot, lifestyle integration, bold Korean copy overlay (price/benefit), strong CTA element.
+STYLE: Clean, aspirational, bright & saturated colors, ${brand} brand aesthetic, premium feel.${platformNote}
+PERFORMANCE BENCHMARK: ROAS ${roas}%+ | CTR ${ctr}%+${refDirective}`;
     }
 }
 
@@ -317,12 +351,26 @@ function _getReferenceUrls() {
         .slice(0, 3);
 }
 
+// 최종 참고 소재 URL 결정
+// ① 사용자가 클릭 선택한 소재 우선
+// ② 없으면 _genPatterns.top5 중 URL 있는 소재 상위 3개 자동 사용
+function _getAutoReferenceUrls() {
+    const manual = _getReferenceUrls();
+    if (manual.length > 0) return manual;
+    // 자동 fallback: 현재 분석 결과의 top3 이미지
+    return (_genPatterns?.top5 || [])
+        .filter(c => c.media_url || c.thumbnail_url)
+        .slice(0, 3)
+        .map(c => _toDirectImageUrl(c.media_url || c.thumbnail_url))
+        .filter(Boolean);
+}
+
 async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
     const vercelBase = _getVercelBase();
-    const referenceUrls = type === 'image' ? _getReferenceUrls() : [];
+    const referenceUrls = type === 'image' ? _getAutoReferenceUrls() : [];
     let res;
 
     if (vercelBase) {
@@ -660,8 +708,10 @@ function _buildGeneratePanelHTML(p) {
                 <i class="fas fa-rotate-right"></i> 분석 새로고침
             </button>
         </div>
+        <!-- 참조 이미지 상태 표시 -->
+        <div id="gen-ref-status" class="mb-2"></div>
         <div id="gen-brief-image">
-            <textarea id="gen-prompt-image" class="gen-prompt-textarea" rows="8" spellcheck="false"
+            <textarea id="gen-prompt-image" class="gen-prompt-textarea" rows="9" spellcheck="false"
                 placeholder="프롬프트 자동 생성 중..."></textarea>
             <div class="gen-aspect-row">
                 <label class="gen-input-label">비율</label>
@@ -737,6 +787,7 @@ function _bindGeneratePanelEvents() {
     // 초기 미리보기 + 저장된 선택 복원
     _restoreRefSelections();
     _updateRefPreview();
+    _updateRefStatus();
 }
 
 // ROAS 상위 소재 썸네일 클릭 토글
@@ -750,6 +801,7 @@ function _toggleRefItem(el) {
     const all = [...new Set([...selected, ...manual])].slice(0, 10);
     localStorage.setItem('hf_reference_urls', all.join('\n'));
     _updateRefPreview();
+    _updateRefStatus();
     const count = all.length;
     if (el.classList.contains('selected')) {
         genToast(`✅ 참고 소재 추가됨 (총 ${count}개)`, 2000);
@@ -794,14 +846,55 @@ window._applySelectedRefs = _applySelectedRefs;
 function _updateRefPreview() {
     const previewEl = document.getElementById('gen-ref-preview');
     if (!previewEl) return;
-    const urls = _getReferenceUrls();
-    if (!urls.length) { previewEl.innerHTML = ''; return; }
+
+    const manual = _getReferenceUrls();
+    const auto   = _getAutoReferenceUrls();
+    const isAuto = manual.length === 0 && auto.length > 0;
+    const urls   = manual.length > 0 ? manual : auto;
+
+    if (!urls.length) {
+        previewEl.innerHTML = `<p class="text-xs text-slate-400 italic">참고 소재 미선택 — 썸네일 클릭해서 추가하거나 자동 사용됩니다</p>`;
+        return;
+    }
+
+    const badge = isAuto
+        ? `<p class="text-xs text-indigo-500 self-center font-semibold ml-1">⚡ ${urls.length}개 자동 참조 (ROAS 상위)</p>`
+        : `<p class="text-xs text-emerald-600 self-center font-semibold ml-1">✅ ${urls.length}개 선택됨</p>`;
+
     previewEl.innerHTML = urls.map(u =>
-        `<div class="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+        `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 ${isAuto ? 'border-indigo-300' : 'border-emerald-400'} bg-slate-100 flex-shrink-0">
             <img src="${u}" class="w-full h-full object-cover" loading="lazy"
-                 onerror="this.parentElement.innerHTML='<span class=\\'text-xs text-slate-400 p-1\\'>로드 실패</span>'">
+                 onerror="this.parentElement.innerHTML='<span class=\\'text-xs text-slate-400 p-1\\'>-</span>'">
+            ${isAuto ? '<span style="position:absolute;top:2px;right:2px;background:#4f46e5;color:#fff;font-size:8px;padding:1px 3px;border-radius:3px;font-weight:700;">AUTO</span>' : ''}
         </div>`
-    ).join('') + `<p class="text-xs text-emerald-600 self-center font-semibold ml-1">✅ ${urls.length}개 참고 소재 적용</p>`;
+    ).join('') + badge;
+}
+
+// 프롬프트 섹션 상단 - 참조 이미지 현황 배지
+function _updateRefStatus() {
+    const el = document.getElementById('gen-ref-status');
+    if (!el) return;
+    const manual = _getReferenceUrls();
+    const auto   = _getAutoReferenceUrls();
+    const isAuto = manual.length === 0 && auto.length > 0;
+    const count  = manual.length > 0 ? manual.length : auto.length;
+
+    if (count === 0) {
+        el.innerHTML = `<div class="gen-ref-status-none">
+            <i class="fas fa-image opacity-40"></i>
+            <span>참고 이미지 없음 — 위 섹션에서 소재 선택 시 AI가 스타일 학습</span>
+        </div>`;
+        return;
+    }
+    el.innerHTML = isAuto
+        ? `<div class="gen-ref-status-auto">
+            <i class="fas fa-bolt"></i>
+            <span>ROAS 상위 ${count}개 소재 <b>자동 참조 중</b> — AI가 해당 소재의 구도·색감·스타일을 학습해서 생성합니다</span>
+           </div>`
+        : `<div class="gen-ref-status-manual">
+            <i class="fas fa-circle-check"></i>
+            <span>선택된 소재 ${count}개 <b>참조 중</b> — AI가 스타일·구도를 학습해서 생성합니다</span>
+           </div>`;
 }
 
 function _switchGenTab(type) {
