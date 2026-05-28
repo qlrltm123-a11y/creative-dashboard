@@ -127,9 +127,9 @@ function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     const hookSub    = hookAll.slice(1).join(', ');
     const emoStr     = emoAll.join(' / ') || 'trust, desire';
 
-    // 실제 상위 소재의 카피/메시지 추출
+    // 상위 소재 카피 — 일본어(key_message_jp) 우선
     const topCopies = (patterns.top5 || [])
-        .map(c => c.key_message_kr || c.key_message_jp || '')
+        .map(c => c.key_message_jp || c.key_message_kr || '')
         .filter(Boolean).slice(0, 3);
     const topAdNames = (patterns.top5 || [])
         .map(c => (c.ad_name || c.creative_name || '').replace(/_/g, ' ').slice(0, 40))
@@ -142,34 +142,34 @@ function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     // 참고 이미지 있으면 스타일 매칭 지시 추가
     const refUrls = _getAutoReferenceUrls();
     const refDirective = refUrls.length > 0
-        ? `\n\n[VISUAL REFERENCE DIRECTIVE]\nReference images provided (${refUrls.length} top-performing creatives). Closely replicate their: composition layout, color palette & tone, typography placement, product presentation angle, lifestyle context. Improve upon their formula — same winning structure, fresh execution.`
+        ? `\n\n【参考画像指示】\n高成約率クリエイティブ${refUrls.length}点を参照。以下を忠実に再現すること：構図・レイアウト、カラーパレット・トーン、テキスト配置・フォントスタイル、商品の見せ角度、ライフスタイル演出。勝ちパターンの構造を踏襲しつつ、新鮮な表現で仕上げること。`
         : '';
 
-    const imgNote      = productImageUrl ? `\nProduct image: ${productImageUrl}` : '';
-    const platformNote = patterns.platform ? `\nPlatform: ${patterns.platform} feed ad format.` : '';
+    const imgNote      = productImageUrl ? `\n商品画像参照: ${productImageUrl}` : '';
+    const platformNote = patterns.platform ? `\n配信面: ${patterns.platform}フィード広告。` : '';
     const copyNote     = topCopies.length
-        ? `\nTop-performing copy patterns: ${topCopies.map(c => `"${c}"`).join(' | ')}`
-        : (topAdNames.length ? `\nWinning creative context: ${topAdNames.join(', ')}` : '');
+        ? `\n高成約コピー例: ${topCopies.map(c => `「${c}」`).join(' / ')}`
+        : (topAdNames.length ? `\n参考クリエイティブ: ${topAdNames.join(' / ')}` : '');
 
     if (type === 'video') {
-        return `[HIGH-CONVERTING VIDEO AD] ${brand} × ${product}${imgNote}${copyNote}
+        return `[高成約率 日本向け動画広告] ${brand} × ${product}${imgNote}${copyNote}
 
-HOOK (0-2s): ${hookMain} — immediate scroll-stop.
-${hookSub ? `Secondary hooks: ${hookSub}` : ''}
-CORE APPEALS (performance-ranked): ${appealStr}
-EMOTIONAL JOURNEY: ${emoStr}
-STRUCTURE: Problem → Solution → Product showcase → Social proof → CTA
-STYLE: Fast-paced cuts, bright lifestyle footage, bold Korean text overlays, premium ${brand} aesthetic.${platformNote}
-PERFORMANCE BENCHMARK: ROAS ${roas}%+ | CTR ${ctr}%+${refDirective}`;
+冒頭フック（0〜2秒）: ${hookMain} — スクロールを止める瞬間。
+${hookSub ? `サブフック: ${hookSub}` : ''}
+訴求ポイント（成果順）: ${appealStr}
+感情導線: ${emoStr}
+構成: 課題提示 → 解決 → 商品紹介 → 社会的証明 → CTA
+スタイル: テンポの良いカット、明るいライフスタイル映像、日本語テキストオーバーレイ、${brand}プレミアム感。${platformNote}
+パフォーマンス目標: ROAS ${roas}%以上 | CTR ${ctr}%以上${refDirective}`;
     } else {
-        return `[HIGH-CONVERTING AD IMAGE] ${brand} × ${product}${imgNote}${copyNote}
+        return `[高成約率 日本向け広告画像] ${brand} × ${product}${imgNote}${copyNote}
 
-VISUAL HOOK: ${hookMain}
-CORE APPEALS (performance-ranked): ${appealStr}
-TARGET EMOTION: ${emoStr}
-COMPOSITION: Product hero shot, lifestyle integration, bold Korean copy overlay (price/benefit), strong CTA element.
-STYLE: Clean, aspirational, bright & saturated colors, ${brand} brand aesthetic, premium feel.${platformNote}
-PERFORMANCE BENCHMARK: ROAS ${roas}%+ | CTR ${ctr}%+${refDirective}`;
+ビジュアルフック: ${hookMain}
+訴求ポイント（成果順）: ${appealStr}
+ターゲット感情: ${emoStr}
+構図: 商品メインショット、ライフスタイルとの融合、価格・ベネフィットを強調した日本語コピーオーバーレイ、明確なCTA。
+スタイル: 清潔感・上品さ・明るい色彩、${brand}ブランド審美性、プレミアム感。${platformNote}
+パフォーマンス目標: ROAS ${roas}%以上 | CTR ${ctr}%以上${refDirective}`;
     }
 }
 
