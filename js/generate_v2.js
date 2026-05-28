@@ -119,38 +119,41 @@ Product prominently featured, lifestyle context, eye-catching text overlay with 
 // Higgsfield API 호출
 // ============================
 
-// 이미지 엔드포인트 우선순위 목록 (패턴별 6종 시도)
+// 워크스페이스 ID (Higgsfield 계정 고유값)
+const HF_WORKSPACE_ID = 'b3a6bab3-3047-49bf-9dd8-0fd38e8fda8f';
+
+// 이미지 엔드포인트 우선순위 목록 — workspace_id 포함/미포함 패턴
 // [ urlFn, bodyFn ]
 const HF_IMAGE_ENDPOINTS = [
-    // 패턴 1: /v1/text2image/{model} — 모델명 URL, body엔 model 없음
+    // 패턴 1: workspace URL 포함 — body에 workspace_id도 포함
+    [
+        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_2`,
+        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
+    ],
+    // 패턴 2: workspace URL 포함 — body엔 없음
+    [
+        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_2`,
+        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution }),
+    ],
+    // 패턴 3: /v1/text2image/{model} + workspace_id in body
+    [
+        (base) => `${base}/v1/text2image/nano_banana_2`,
+        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
+    ],
+    // 패턴 4: /v1/text2image/{model} — body 없음
     [
         (base) => `${base}/v1/text2image/nano_banana_2`,
         ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution }),
     ],
-    // 패턴 2: /v1/text2image/{model} — body에도 model 포함
-    [
-        (base) => `${base}/v1/text2image/nano_banana_2`,
-        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
-    ],
-    // 패턴 3: /v1/image/generate — 통합 엔드포인트
-    [
-        (base) => `${base}/v1/image/generate`,
-        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
-    ],
-    // 패턴 4: /v1/generate — 완전 통합
+    // 패턴 5: 통합 generate + workspace_id
     [
         (base) => `${base}/v1/generate`,
-        ({ prompt, aspect_ratio, resolution }) => ({ type: 'image', model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
+        ({ prompt, aspect_ratio, resolution }) => ({ type: 'image', model: 'nano_banana_2', prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
     ],
-    // 패턴 5: /v1/generations
+    // 패턴 6: /v1/image/generate
     [
-        (base) => `${base}/v1/generations`,
-        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution }),
-    ],
-    // 패턴 6: /v1/images — OpenAI 스타일
-    [
-        (base) => `${base}/v1/images/generations`,
-        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio }),
+        (base) => `${base}/v1/image/generate`,
+        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
     ],
 ];
 
