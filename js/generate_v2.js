@@ -372,7 +372,8 @@ function _extractResultUrl(data, type) {
     if (firstResult?.minUrl) return firstResult.minUrl;
 
     if (type === 'video') {
-        return data.video?.url
+        return data.images?.[0]?.url   // Higgsfield video도 images[] 필드로 반환
+            || data.video?.url
             || data.videos?.[0]?.url
             || data.output?.[0]
             || data.result?.url
