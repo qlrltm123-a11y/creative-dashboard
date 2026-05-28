@@ -123,17 +123,17 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
-    // 이미지: /v1/text2image/soul  |  영상: /v1/image2video/dop
+    // 이미지: nano_banana_2/text-to-image  |  영상: /v1/image2video/dop
     const base = _getBaseUrl();
     const url  = type === 'video'
         ? `${base}/v1/image2video/dop`
-        : `${base}/v1/text2image/soul`;
+        : `${base}/nano_banana_2/text-to-image`;
 
     const body = type === 'video'
         ? { model: 'dop-turbo', prompt, input_images: [] }
-        : { prompt, resolution: '1080p', batch_size: 1 };
+        : { prompt, aspect_ratio: aspectRatio || '1:1' };
 
-    console.log('[HF] POST', url, body);
+    console.log('[HF] POST', url, JSON.stringify(body));
 
     const res = await fetch(url, {
         method: 'POST',
@@ -149,14 +149,16 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
         let errMsg = `API 오류 (${res.status})`;
         try {
             const errBody = await res.json();
-            errMsg = errBody.message || errBody.error || errBody.detail || errMsg;
-            console.error('[HF Error]', res.status, errBody);
+            const detail = errBody.message || errBody.error || errBody.detail || JSON.stringify(errBody);
+            console.error('[HF Error]', res.status, JSON.stringify(errBody));
+            errMsg = `${res.status}: ${detail}`;
         } catch (_) {
             const errText = await res.text().catch(() => '');
-            if (errText) { errMsg += ': ' + errText.slice(0, 100); console.error('[HF Error]', errText); }
+            errMsg = `${res.status}: ${errText.slice(0, 200)}`;
+            console.error('[HF Error raw]', errMsg);
         }
-        if (res.status === 401) errMsg = '인증 실패 (401) — API 키를 확인해주세요. KEY_ID:KEY_SECRET 형식인지 확인하세요.';
-        if (res.status === 403) errMsg = '권한 없음 (403) — 크레딧이 부족하거나 플랜을 확인해주세요.';
+        if (res.status === 401) errMsg = '인증 실패 (401) — API 키를 확인해주세요 (KEY_ID:KEY_SECRET)';
+        if (res.status === 403) errMsg = '권한 없음 (403) — 크레딧 부족 또는 플랜 확인';
         throw new Error(errMsg);
     }
 
