@@ -372,13 +372,16 @@ function _extractResultUrl(data, type) {
     if (firstResult?.minUrl) return firstResult.minUrl;
 
     if (type === 'video') {
-        return data.images?.[0]?.url   // Higgsfield video도 images[] 필드로 반환
+        const rawUrl = data.images?.[0]?.url
             || data.video?.url
             || data.videos?.[0]?.url
             || data.output?.[0]
             || data.result?.url
             || data.url
             || null;
+        // Higgsfield는 PNG 썸네일 URL 반환 → 같은 UUID의 .mp4로 교체
+        if (rawUrl && rawUrl.endsWith('.png')) return rawUrl.replace(/\.png$/, '.mp4');
+        return rawUrl;
     }
     return data.images?.[0]?.url
         || data.image?.url
@@ -856,11 +859,11 @@ function _showResultSuccess(el, url, type) {
                     </a>
                 </div>
                 <video controls autoplay muted loop playsinline crossorigin="anonymous" class="gen-result-media"
-                       onerror="this.parentElement.insertAdjacentHTML('beforeend','<p class=\\'text-xs text-red-500 mt-1\\'>재생 오류 — 아래 링크로 직접 확인</p>')">
+                       onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
                     <source src="${url}" type="video/mp4">
-                    <source src="${url}" type="video/webm">
                 </video>
-                <a href="${url}" target="_blank" class="text-xs text-blue-500 underline mt-1 block break-all">${url}</a>
+                <img src="${url.replace(/\\.mp4$/, '.png')}" alt="생성된 영상 (미리보기)" class="gen-result-media" style="display:none">
+                <a href="${url}" target="_blank" class="text-xs text-blue-500 underline mt-1 block break-all">🎬 영상 직접 열기</a>
             </div>`;
     } else {
         el.innerHTML = `
