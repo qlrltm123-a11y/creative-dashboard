@@ -84,24 +84,20 @@ module.exports = async function handler(req, res) {
 
   // ── 이미지 생성 ────────────────────────────────────────────────
   if (type !== 'video' && type !== 'video-step2') {
-    // 참고 소재가 있으면 flux-kontext(스타일 참조) 우선, 없으면 nano_banana_2 우선
     const hasRefs = Array.isArray(referenceUrls) && referenceUrls.length > 0;
     const medias = hasRefs
       ? referenceUrls.slice(0, 3).map(u => ({ url: u, role: 'image' }))
       : undefined;
 
-    const imageEndpoints = hasRefs
-      ? [
-          'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
-          'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
-        ]
-      : [
-          'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
-          'https://platform.higgsfield.ai/nano_banana/text-to-image',
-          'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
-        ];
+    // ★ 항상 고품질 flux-pro 계열 먼저 — nano는 마지막 fallback
+    const imageEndpoints = [
+      'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
+      'https://platform.higgsfield.ai/flux-pro/kontext/text-to-image',
+      'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
+      'https://platform.higgsfield.ai/nano_banana/text-to-image',
+    ];
 
-    // flat body (medias 포함 시 참고 이미지 스타일 반영)
+    // medias 있으면 포함, 없으면 제외
     const bodyVariants = medias
       ? [{ prompt, aspect_ratio, safety_tolerance: 2, medias }]
       : [{ prompt, aspect_ratio, safety_tolerance: 2 }];
