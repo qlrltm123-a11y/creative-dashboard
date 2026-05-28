@@ -385,6 +385,8 @@ function switchSection(sectionName) {
             renderPlatformCreativeMatrix();
         } else if (sectionName === 'ai') {
             if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
+        } else if (sectionName === 'generate') {
+            if (typeof window.renderGeneratePanel === 'function') window.renderGeneratePanel();
         }
     }
 
