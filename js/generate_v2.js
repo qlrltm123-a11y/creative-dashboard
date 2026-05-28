@@ -352,17 +352,22 @@ function _getReferenceUrls() {
 }
 
 // 최종 참고 소재 URL 결정
-// ① 사용자가 클릭 선택한 소재 우선
-// ② 없으면 _genPatterns.top5 중 URL 있는 소재 상위 3개 자동 사용
+// ① 현재 브랜드/제품의 ROAS top3 자동 포함 (항상)
+// ② 사용자가 수동 선택한 소재 추가 (+)
+// → 브랜드/제품 바뀌면 ①이 즉시 교체되어 항상 현재 컨텍스트에 맞는 참조 사용
 function _getAutoReferenceUrls() {
-    const manual = _getReferenceUrls();
-    if (manual.length > 0) return manual;
-    // 자동 fallback: 현재 분석 결과의 top3 이미지
-    return (_genPatterns?.top5 || [])
+    // 자동: 현재 분석 중인 top3 이미지
+    const auto = (_genPatterns?.top5 || [])
         .filter(c => c.media_url || c.thumbnail_url)
         .slice(0, 3)
         .map(c => _toDirectImageUrl(c.media_url || c.thumbnail_url))
         .filter(Boolean);
+
+    // 수동: 사용자가 추가로 클릭/입력한 소재
+    const manual = _getReferenceUrls();
+
+    // 합치되 중복 제거, 최대 5개 (API는 3개까지 반영)
+    return [...new Set([...auto, ...manual])].slice(0, 5);
 }
 
 async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
@@ -847,54 +852,70 @@ function _updateRefPreview() {
     const previewEl = document.getElementById('gen-ref-preview');
     if (!previewEl) return;
 
-    const manual = _getReferenceUrls();
-    const auto   = _getAutoReferenceUrls();
-    const isAuto = manual.length === 0 && auto.length > 0;
-    const urls   = manual.length > 0 ? manual : auto;
+    // 자동(현재 제품 top3) + 수동(사용자 선택)
+    const autoUrls   = (_genPatterns?.top5 || [])
+        .filter(c => c.media_url || c.thumbnail_url).slice(0, 3)
+        .map(c => _toDirectImageUrl(c.media_url || c.thumbnail_url)).filter(Boolean);
+    const manualUrls = _getReferenceUrls();
+    const extraUrls  = manualUrls.filter(u => !autoUrls.includes(u));
+    const allUrls    = [...autoUrls, ...extraUrls].slice(0, 5);
 
-    if (!urls.length) {
-        previewEl.innerHTML = `<p class="text-xs text-slate-400 italic">참고 소재 미선택 — 썸네일 클릭해서 추가하거나 자동 사용됩니다</p>`;
+    if (!allUrls.length) {
+        previewEl.innerHTML = `<p class="text-xs text-slate-400 italic">소재 데이터 없음</p>`;
         return;
     }
 
-    const badge = isAuto
-        ? `<p class="text-xs text-indigo-500 self-center font-semibold ml-1">⚡ ${urls.length}개 자동 참조 (ROAS 상위)</p>`
-        : `<p class="text-xs text-emerald-600 self-center font-semibold ml-1">✅ ${urls.length}개 선택됨</p>`;
+    const autoCount  = autoUrls.length;
+    const extraCount = extraUrls.length;
 
-    previewEl.innerHTML = urls.map(u =>
-        `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 ${isAuto ? 'border-indigo-300' : 'border-emerald-400'} bg-slate-100 flex-shrink-0">
-            <img src="${u}" class="w-full h-full object-cover" loading="lazy"
-                 onerror="this.parentElement.innerHTML='<span class=\\'text-xs text-slate-400 p-1\\'>-</span>'">
-            ${isAuto ? '<span style="position:absolute;top:2px;right:2px;background:#4f46e5;color:#fff;font-size:8px;padding:1px 3px;border-radius:3px;font-weight:700;">AUTO</span>' : ''}
-        </div>`
-    ).join('') + badge;
+    previewEl.innerHTML =
+        autoUrls.map(u =>
+            `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-indigo-300 bg-slate-100 flex-shrink-0" title="자동 참조 (ROAS 상위)">
+                <img src="${u}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.opacity='0.2'">
+                <span style="position:absolute;bottom:2px;right:2px;background:#4f46e5;color:#fff;font-size:7px;padding:1px 3px;border-radius:3px;font-weight:700;line-height:1.4">AUTO</span>
+            </div>`
+        ).join('')
+        + extraUrls.map(u =>
+            `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-emerald-400 bg-slate-100 flex-shrink-0" title="수동 추가">
+                <img src="${u}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.opacity='0.2'">
+                <span style="position:absolute;bottom:2px;right:2px;background:#059669;color:#fff;font-size:7px;padding:1px 3px;border-radius:3px;font-weight:700;line-height:1.4">+</span>
+            </div>`
+        ).join('')
+        + `<div class="self-center ml-1 text-xs leading-5">
+            <p class="text-indigo-600 font-semibold">⚡ ${autoCount}개 자동 (${_genPatterns?.selectedProduct || _genPatterns?.brand || '현재 컨텍스트'})</p>
+            ${extraCount > 0 ? `<p class="text-emerald-600 font-semibold">✅ ${extraCount}개 수동 추가</p>` : ''}
+           </div>`;
 }
 
 // 프롬프트 섹션 상단 - 참조 이미지 현황 배지
 function _updateRefStatus() {
     const el = document.getElementById('gen-ref-status');
     if (!el) return;
-    const manual = _getReferenceUrls();
-    const auto   = _getAutoReferenceUrls();
-    const isAuto = manual.length === 0 && auto.length > 0;
-    const count  = manual.length > 0 ? manual.length : auto.length;
 
-    if (count === 0) {
+    const autoUrls  = (_genPatterns?.top5 || [])
+        .filter(c => c.media_url || c.thumbnail_url).slice(0, 3)
+        .map(c => _toDirectImageUrl(c.media_url || c.thumbnail_url)).filter(Boolean);
+    const manualUrls = _getReferenceUrls();
+    const total      = new Set([...autoUrls, ...manualUrls]).size;
+    const ctx        = _genPatterns?.selectedProduct
+        ? `${_genPatterns.brand} › ${_genPatterns.selectedProduct}`
+        : (_genPatterns?.brand || '현재 필터');
+
+    if (total === 0) {
         el.innerHTML = `<div class="gen-ref-status-none">
             <i class="fas fa-image opacity-40"></i>
-            <span>참고 이미지 없음 — 위 섹션에서 소재 선택 시 AI가 스타일 학습</span>
+            <span>소재 이미지 없음 — 위에서 ROAS 상위 소재를 선택하거나 데이터를 확인하세요</span>
         </div>`;
         return;
     }
-    el.innerHTML = isAuto
-        ? `<div class="gen-ref-status-auto">
-            <i class="fas fa-bolt"></i>
-            <span>ROAS 상위 ${count}개 소재 <b>자동 참조 중</b> — AI가 해당 소재의 구도·색감·스타일을 학습해서 생성합니다</span>
-           </div>`
-        : `<div class="gen-ref-status-manual">
-            <i class="fas fa-circle-check"></i>
-            <span>선택된 소재 ${count}개 <b>참조 중</b> — AI가 스타일·구도를 학습해서 생성합니다</span>
-           </div>`;
+    el.innerHTML = `<div class="gen-ref-status-auto">
+        <i class="fas fa-bolt"></i>
+        <span>
+            <b>${ctx}</b> ROAS 상위 ${autoUrls.length}개 소재 자동 참조 중
+            ${manualUrls.length > 0 ? `+ 수동 ${manualUrls.length}개` : ''} —
+            AI가 구도·색감·카피 스타일을 학습해서 생성합니다
+        </span>
+    </div>`;
 }
 
 function _switchGenTab(type) {

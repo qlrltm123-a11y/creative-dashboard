@@ -793,8 +793,9 @@ function updateDashboard() {
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
     }
-    // 생성 패널: 패널이 한 번이라도 열렸고 현재 활성 탭이면 갱신
-    if (_renderedSections.generate && _currentSection === 'generate' && typeof window.renderGeneratePanel === 'function') {
+    // 생성 패널: 한 번이라도 열린 적 있으면 항상 갱신 (현재 섹션 무관)
+    // → 브랜드/매체/이벤트 바꾸면 generate 탭이 열려있든 아니든 패턴이 최신화됨
+    if (_renderedSections.generate && typeof window.renderGeneratePanel === 'function') {
         window.renderGeneratePanel();
     }
 }
