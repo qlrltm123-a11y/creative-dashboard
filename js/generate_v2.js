@@ -372,16 +372,13 @@ function _extractResultUrl(data, type) {
     if (firstResult?.minUrl) return firstResult.minUrl;
 
     if (type === 'video') {
-        const rawUrl = data.images?.[0]?.url
+        return data.images?.[0]?.url
             || data.video?.url
             || data.videos?.[0]?.url
             || data.output?.[0]
             || data.result?.url
             || data.url
             || null;
-        // Higgsfield는 PNG 썸네일 URL 반환 → 같은 UUID의 .mp4로 교체
-        if (rawUrl && rawUrl.endsWith('.png')) return rawUrl.replace(/\.png$/, '.mp4');
-        return rawUrl;
     }
     return data.images?.[0]?.url
         || data.image?.url
@@ -847,6 +844,7 @@ function _showResultSuccess(el, url, type) {
     if (!el) return;
     el.classList.remove('hidden');
     if (type === 'video') {
+        const isVideo = url && (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov'));
         el.innerHTML = `
             <div class="gen-result-success">
                 <div class="flex items-center justify-between mb-2">
@@ -858,12 +856,10 @@ function _showResultSuccess(el, url, type) {
                         <i class="fas fa-download"></i> 다운로드
                     </a>
                 </div>
-                <video controls autoplay muted loop playsinline crossorigin="anonymous" class="gen-result-media"
-                       onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-                    <source src="${url}" type="video/mp4">
-                </video>
-                <img src="${url.replace(/\\.mp4$/, '.png')}" alt="생성된 영상 (미리보기)" class="gen-result-media" style="display:none">
-                <a href="${url}" target="_blank" class="text-xs text-blue-500 underline mt-1 block break-all">🎬 영상 직접 열기</a>
+                ${isVideo
+                    ? `<video src="${url}" controls autoplay muted loop playsinline class="gen-result-media"></video>`
+                    : `<img src="${url}" alt="생성된 광고 소재" class="gen-result-media" loading="lazy">`
+                }
             </div>`;
     } else {
         el.innerHTML = `
