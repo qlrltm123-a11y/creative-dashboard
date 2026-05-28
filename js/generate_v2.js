@@ -758,10 +758,11 @@ async function _pollUntilUrl(requestId, statusUrl, type, resultEl) {
         await new Promise(r => setTimeout(r, HF_POLL_MS));
         try {
             const data = await _pollHiggsfieldStatus(requestId, statusUrl);
-            console.log(`[Poll ${type}] status=${data.status}`, JSON.stringify(data).slice(0, 300));
+            console.log(`[Poll ${type}] status=${data.status}`, JSON.stringify(data).slice(0, 600));
             if (data.status === 'completed') {
                 const url = _extractResultUrl(data, type);
-                console.log(`[Poll ${type}] extracted url=`, url, 'raw keys=', Object.keys(data));
+                console.log(`[Poll ${type}] FULL URL=`, url);
+                console.log(`[Poll ${type}] ALL FIELDS=`, JSON.stringify(data));
                 return url;
             }
             if (data.status === 'failed' || data.status === 'nsfw') return null;
@@ -848,9 +849,12 @@ function _showResultSuccess(el, url, type) {
                         <i class="fas fa-download"></i> 다운로드
                     </a>
                 </div>
-                <video controls autoplay muted loop playsinline class="gen-result-media">
+                <video controls autoplay muted loop playsinline crossorigin="anonymous" class="gen-result-media"
+                       onerror="this.parentElement.insertAdjacentHTML('beforeend','<p class=\\'text-xs text-red-500 mt-1\\'>재생 오류 — 아래 링크로 직접 확인</p>')">
                     <source src="${url}" type="video/mp4">
+                    <source src="${url}" type="video/webm">
                 </video>
+                <a href="${url}" target="_blank" class="text-xs text-blue-500 underline mt-1 block break-all">${url}</a>
             </div>`;
     } else {
         el.innerHTML = `
