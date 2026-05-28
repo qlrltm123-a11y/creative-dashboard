@@ -362,7 +362,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, performance: false, ai: false };
+let _renderedSections = { overview: true, performance: false, ai: false, generate: false };
 let _currentSection = 'overview';
 
 function switchSection(sectionName) {
@@ -792,6 +792,10 @@ function updateDashboard() {
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
+    }
+    // 생성 패널: 현재 활성 탭일 때만 갱신 (필터 변경 시 워킹 패턴 즉시 반영)
+    if (_currentSection === 'generate' && typeof window.renderGeneratePanel === 'function') {
+        window.renderGeneratePanel();
     }
 }
 

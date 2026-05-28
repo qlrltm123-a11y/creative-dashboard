@@ -273,12 +273,16 @@ function _fakeResponse(status, text) {
 }
 
 // Google Drive / 다양한 링크 → 직접 이미지 URL 변환
+// drive-converter.js의 convertDriveImageUrl 사용 (thumbnail API — CORS 안전)
 function _toDirectImageUrl(url) {
     if (!url) return null;
     url = url.trim();
-    // Drive: /file/d/ID/view 또는 /open?id=ID
-    const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (driveMatch) return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+    if (typeof convertDriveImageUrl === 'function' && /drive\.google\.com|docs\.google\.com/.test(url)) {
+        return convertDriveImageUrl(url);
+    }
+    // Drive fallback: /file/d/ID 또는 ?id=ID → thumbnail API
+    const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (driveMatch) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
     // 이미 직접 URL이면 그대로
     if (url.startsWith('http')) return url;
     return null;
@@ -425,11 +429,16 @@ function _buildGeneratePanelHTML(p) {
         return `<span class="gen-tag ${styles[idx % styles.length]}">${rankIcon} ${tag}</span>`;
     }
 
-    const thumbsHtml = p.top5.filter(c => c.thumbnail_url)
-        .map((c, i) => `<div class="gen-thumb" title="${c.ad_name || ''}">
-            <img src="${c.thumbnail_url}" alt="" loading="lazy">
-            <span class="gen-thumb-rank">${i+1}</span>
-        </div>`).join('');
+    const thumbsHtml = p.top5.filter(c => c.thumbnail_url || c.media_url)
+        .map((c, i) => {
+            const raw = c.thumbnail_url || c.media_url || '';
+            const src = _toDirectImageUrl(raw) || raw;
+            return `<div class="gen-thumb" title="${c.ad_name || ''}">
+                <img src="${src}" alt="" loading="lazy"
+                     onerror="this.style.opacity='0.15'">
+                <span class="gen-thumb-rank">${i+1}</span>
+            </div>`;
+        }).join('');
 
     const savedKey = _getHfKey();
     const maskedKey = savedKey ? savedKey.slice(0, 6) + '••••••••••' : '';
@@ -519,12 +528,13 @@ function _buildGeneratePanelHTML(p) {
                 </p>
                 <div class="flex gap-2 flex-wrap" id="gen-top-refs">
                     ${p.top5.filter(c => c.thumbnail_url || c.media_url).slice(0, 8).map((c, i) => {
-                        const thumb = c.thumbnail_url || c.media_url || '';
-                        const refUrl = c.media_url || c.thumbnail_url || '';
-                        const label = c.ad_name ? c.ad_name.slice(0, 15) : `#${i+1}`;
+                        const rawThumb = c.thumbnail_url || c.media_url || '';
+                        const rawRef   = c.media_url || c.thumbnail_url || '';
+                        const thumb    = _toDirectImageUrl(rawThumb) || rawThumb;
+                        const refUrl   = _toDirectImageUrl(rawRef)   || rawRef;
                         return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
                             <img src="${thumb}" class="gen-ref-thumb" loading="lazy"
-                                 onerror="this.parentElement.style.display='none'">
+                                 onerror="this.style.opacity='0.15'">
                             <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
                         </div>`;
                     }).join('')}
