@@ -110,66 +110,98 @@ function getWinningPatterns() {
     };
 }
 
-// ---- 프롬프트 빌더 ----
+// ---- 제품명 → 시각적 카테고리 추측 ----
+function _guessProductCategory(name) {
+    const n = (name || '').toLowerCase();
+    if (/cream|크림|refill|リフィル|lift|ハリ/.test(n))  return 'anti-aging lifting face cream in elegant jar packaging';
+    if (/serum|세럼|精華|essence|에센스/.test(n))          return 'premium facial serum in dropper bottle';
+    if (/lip|リップ|글로스|tint/.test(n))                  return 'lip care product (tube or compact)';
+    if (/toner|토너|化粧水|lotion/.test(n))                return 'facial toner in clean bottle';
+    if (/mask|마스크|パック|pack/.test(n))                  return 'face mask / sheet pack product';
+    if (/eye|아이|アイ/.test(n))                            return 'eye cream in small jar';
+    if (/sun|サン|선크림|spf/.test(n))                     return 'sunscreen in tube';
+    if (/cleansing|클렌징|クレンジング/.test(n))            return 'facial cleanser';
+    if (/3d|3D/.test(n))                                    return 'anti-aging 3D lifting skincare cream';
+    return 'premium K-beauty skincare product';
+}
+
+// ---- 한국어 소구 태그 → 영어 비주얼 묘사 ----
+const _APPEAL_VISUAL = {
+    '할인 혜택':       'bold discount percentage badge (red circle, top corner)',
+    '리프팅 효과':     'visibly lifted and sculpted facial contour on model',
+    '탄력 개선':       'firm, elastic, glowing skin close-up',
+    '가성비':          'value set bundle shot with price comparison',
+    '신제품 출시':     'new launch spotlight graphic',
+    '간편한 사용':     'simple one-step application gesture',
+    '문제 해결 제시':  'skin concern revealed then product solution',
+    '비포앤애프터 비교':'split before/after skin transformation',
+    '혜택 강조':       'benefit callout icons with graphic overlays',
+    '이미지 개선':     'confidence and beauty transformation moment',
+    '가격 경쟁력':     'competitive price highlight badge',
+    '신뢰감':          'credibility badge, ingredient highlight',
+};
+
+const _HOOK_VISUAL = {
+    '문제 해결 제시':  'skin problem close-up transitioning to glowing solution',
+    '비포앤애프터 비교':'dramatic split-screen before/after transformation',
+    '신제품 출시 알림':'bold new-launch announcement frame',
+    '혜택 강조':       'oversized benefit number graphic (e.g. 23% OFF)',
+    '가격/할인 강조':  'large striking discount badge with product',
+    '유명인 추천':     'celebrity endorsement quote bubble framing',
+    '신뢰감 형성':     'clinically-tested or award badge close-up',
+};
+
+function _tagToVisual(tag, map, fallback) {
+    return map[tag] || fallback || tag;
+}
+
+// ---- 프롬프트 빌더 (이미지 생성 모델용 영어 비주얼 지시) ----
 function buildHiggsfieldPrompt(patterns, productName, productImageUrl, type) {
     if (!patterns) return '';
 
-    const brand   = patterns.brand || 'Brand';
-    const product = productName || (patterns.selectedProduct || patterns.sampleName?.split('_')[0] || 'product');
+    const product  = productName || patterns.selectedProduct || patterns.sampleName?.split('_')[0] || 'skincare product';
+    const category = _guessProductCategory(product);
 
-    // 소구/훅/감정 (순위 기반)
-    const appealTop  = (patterns.topAppeal  || []).slice(0, 3);
-    const hookAll    = (patterns.topHook    || []).slice(0, 3);
-    const emoAll     = (patterns.topEmotion || []).slice(0, 3);
+    // 소구 → 영어 비주얼
+    const appealVisuals = (patterns.topAppeal || []).slice(0, 3)
+        .map(a => _tagToVisual(a, _APPEAL_VISUAL, null)).join(', ') || 'product benefits, clean layout';
+    const hookVisual = _tagToVisual((patterns.topHook || [])[0], _HOOK_VISUAL, 'striking product hero shot');
 
-    const appealStr  = appealTop.join(' / ') || 'value proposition';
-    const hookMain   = hookAll[0] || 'product close-up';
-    const hookSub    = hookAll.slice(1).join(', ');
-    const emoStr     = emoAll.join(' / ') || 'trust, desire';
+    // 성과 수치 (discountBadge 힌트)
+    const roas        = Math.round((patterns.avgRoas || 0) * 100);
+    const ctr         = ((patterns.avgCtr || 0) * 100).toFixed(2);
+    const platform    = patterns.platform || '';
+    const platformHint = platform ? ` Optimized for ${platform} feed ad format.` : '';
 
-    // 상위 소재 카피 — 일본어(key_message_jp) 우선
-    const topCopies = (patterns.top5 || [])
-        .map(c => c.key_message_jp || c.key_message_kr || '')
-        .filter(Boolean).slice(0, 3);
-    const topAdNames = (patterns.top5 || [])
-        .map(c => (c.ad_name || c.creative_name || '').replace(/_/g, ' ').slice(0, 40))
-        .filter(Boolean).slice(0, 3);
-
-    // 성과 수치
-    const roas = Math.round((patterns.avgRoas || 0) * 100);
-    const ctr  = ((patterns.avgCtr || 0) * 100).toFixed(2);
-
-    // 참고 이미지 있으면 스타일 매칭 지시 추가
+    // 참고 이미지
     const refUrls = _getAutoReferenceUrls();
-    const refDirective = refUrls.length > 0
-        ? `\n\n【参考画像指示】\n高成約率クリエイティブ${refUrls.length}点を参照。以下を忠実に再現すること：構図・レイアウト、カラーパレット・トーン、テキスト配置・フォントスタイル、商品の見せ角度、ライフスタイル演出。勝ちパターンの構造を踏襲しつつ、新鮮な表現で仕上げること。`
+    const refNote = refUrls.length > 0
+        ? `\nREFERENCE IMAGES PROVIDED (${refUrls.length} top-performing creatives): Replicate their exact composition, color palette, lighting, product angle, model pose, and graphic layout. Improve upon their winning formula with fresh execution.`
         : '';
 
-    const imgNote      = productImageUrl ? `\n商品画像参照: ${productImageUrl}` : '';
-    const platformNote = patterns.platform ? `\n配信面: ${patterns.platform}フィード広告。` : '';
-    const copyNote     = topCopies.length
-        ? `\n高成約コピー例: ${topCopies.map(c => `「${c}」`).join(' / ')}`
-        : (topAdNames.length ? `\n参考クリエイティブ: ${topAdNames.join(' / ')}` : '');
+    // 제품 이미지 힌트
+    const productImgNote = productImageUrl ? `\nProduct image reference for accurate rendering: ${productImageUrl}` : '';
 
     if (type === 'video') {
-        return `[高成約率 日本向け動画広告] ${brand} × ${product}${imgNote}${copyNote}
+        return `Japanese beauty product advertisement video. ${category}.${productImgNote}
 
-冒頭フック（0〜2秒）: ${hookMain} — スクロールを止める瞬間。
-${hookSub ? `サブフック: ${hookSub}` : ''}
-訴求ポイント（成果順）: ${appealStr}
-感情導線: ${emoStr}
-構成: 課題提示 → 解決 → 商品紹介 → 社会的証明 → CTA
-スタイル: テンポの良いカット、明るいライフスタイル映像、日本語テキストオーバーレイ、${brand}プレミアム感。${platformNote}
-パフォーマンス目標: ROAS ${roas}%以上 | CTR ${ctr}%以上${refDirective}`;
+OPENING HOOK (0-2s): ${hookVisual}.
+VISUAL APPEALS: ${appealVisuals}.
+SCENE: Asian woman model (20s-30s) applying product. Skin transformation visible. Bright lifestyle setting.
+STYLE: K-beauty aesthetic. Fast-paced cuts. Bright pastel tones. Graphic text placeholders (NO actual text rendered — use clean placeholder boxes only). Bold discount circle graphic.
+FORMAT: Vertical 9:16 social media ad.${platformHint}
+PERFORMANCE TARGET: ROAS ${roas}%+ | CTR ${ctr}%+
+IMPORTANT: Do NOT render garbled or hallucinated text. Show text areas as clean white/colored graphic placeholders only.${refNote}`;
     } else {
-        return `[高成約率 日本向け広告画像] ${brand} × ${product}${imgNote}${copyNote}
+        return `Japanese beauty product advertisement. ${category}.${productImgNote}
 
-ビジュアルフック: ${hookMain}
-訴求ポイント（成果順）: ${appealStr}
-ターゲット感情: ${emoStr}
-構図: 商品メインショット、ライフスタイルとの融合、価格・ベネフィットを強調した日本語コピーオーバーレイ、明確なCTA。
-スタイル: 清潔感・上品さ・明るい色彩、${brand}ブランド審美性、プレミアム感。${platformNote}
-パフォーマンス目標: ROAS ${roas}%以上 | CTR ${ctr}%以上${refDirective}`;
+COMPOSITION: Product packaging center-left, Asian woman model (30s, smooth glowing skin) right side. Bright pastel pink/white background.
+VISUAL HOOK: ${hookVisual}.
+GRAPHIC ELEMENTS: ${appealVisuals}.
+STYLE: Clean K-beauty ad aesthetic. Bright studio lighting. Premium cosmetic layout. Pastel color palette. Soft lifestyle photography.
+TEXT AREAS: Show as clean colored graphic placeholders only (speech bubble, benefit icon boxes, discount badge circle). Do NOT render actual letters or garbled characters.
+IMPORTANT: No fake text, no hallucinated characters. Text zones = solid colored shapes only.${platformHint}
+PERFORMANCE TARGET: ROAS ${roas}%+ | CTR ${ctr}%+${refNote}`;
     }
 }
 
