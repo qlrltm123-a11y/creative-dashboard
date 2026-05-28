@@ -2,15 +2,19 @@
 // 광고 생성 패널 — Higgsfield 직접 API 연동
 // ============================
 
-const HF_DIRECT_URL  = 'https://platform.higgsfield.ai';
-const HF_STORAGE_KEY = 'hf_api_key';
-const HF_PROXY_KEY   = 'hf_proxy_url';  // Cloudflare Worker 프록시 URL
-const HF_POLL_MS     = 3000;
-const HF_MAX_WAIT    = 180000;
+const HF_STORAGE_KEY  = 'hf_api_key';
+const HF_VERCEL_KEY   = 'hf_vercel_url';   // Vercel 함수 기본 URL (예: https://xxx.vercel.app)
+const HF_PROXY_KEY    = 'hf_proxy_url';    // 구버전 Cloudflare Worker (fallback)
+const HF_POLL_MS      = 3000;
+const HF_MAX_WAIT     = 180000;
 
-// 프록시 URL이 설정되어 있으면 프록시 사용, 없으면 직접 호출
-function _getBaseUrl() {
-    return (localStorage.getItem(HF_PROXY_KEY) || '').trim().replace(/\/$/, '') || HF_DIRECT_URL;
+// Vercel URL이 설정돼 있으면 /api/hf 사용, 없으면 같은 origin의 /api/hf 시도
+function _getVercelBase() {
+    const stored = (localStorage.getItem(HF_VERCEL_KEY) || '').trim().replace(/\/$/, '');
+    if (stored) return stored;
+    // Vercel 배포 환경이면 같은 origin
+    if (window.location.hostname.includes('vercel.app')) return window.location.origin;
+    return null;
 }
 
 let _genPatterns   = null;
@@ -272,26 +276,40 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
-    const base = _getBaseUrl();
+    const vercelBase = _getVercelBase();
     let res;
 
-    if (type === 'video') {
-        const url  = `${base}/v1/image2video/dop`;
-        const body = { model: 'dop-turbo', prompt, aspect_ratio: aspectRatio || '16:9' };
-        console.log('[HF] POST', url, JSON.stringify(body));
+    if (vercelBase) {
+        // ✅ Vercel 서버리스 함수 사용 (IP 차단 없음)
+        const url = `${vercelBase}/api/hf`;
+        const body = { prompt, aspect_ratio: aspectRatio || (type === 'video' ? '16:9' : '1:1'), type };
+        console.log('[HF→Vercel] POST', url, JSON.stringify(body));
         res = await fetch(url, {
             method: 'POST',
-            headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Hf-Key': apiKey,
+            },
             body: JSON.stringify(body),
         });
     } else {
-        // 이미지: 엔드포인트 자동 탐색
-        res = await _tryImageEndpoint(base, apiKey, {
-            prompt,
-            aspect_ratio: aspectRatio || '1:1',
-            resolution: '1k',
-            workspace_id: HF_WORKSPACE_ID,
-        });
+        // ⚠️ Vercel URL 미설정 — 구 Worker 방식 시도
+        const base = (localStorage.getItem(HF_PROXY_KEY) || '').trim().replace(/\/$/, '') || 'https://platform.higgsfield.ai';
+        if (type === 'video') {
+            const url  = `${base}/v1/image2video/dop`;
+            const body = { model: 'dop-turbo', prompt, aspect_ratio: aspectRatio || '16:9' };
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+        } else {
+            res = await _tryImageEndpoint(base, apiKey, {
+                prompt,
+                aspect_ratio: aspectRatio || '1:1',
+                workspace_id: HF_WORKSPACE_ID,
+            });
+        }
     }
 
     // 상세 에러 메시지
@@ -485,27 +503,34 @@ function _buildGeneratePanelHTML(p) {
             ${savedKey ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> 저장됨: ${maskedKey}</p>` : ''}
         </div>
 
-        <!-- 프록시 URL -->
+        <!-- Vercel URL -->
         <div class="mt-4">
             <div class="flex items-center justify-between mb-1">
-                <label class="gen-input-label">CORS 프록시 URL
-                    <span class="text-slate-400 font-normal ml-1">(Cloudflare Worker — 필수)</span>
+                <label class="gen-input-label">Vercel 배포 URL
+                    <span class="text-slate-400 font-normal ml-1">(필수 — 아래 안내 참고)</span>
                 </label>
-                <a href="https://workers.cloudflare.com" target="_blank"
+                <a href="https://vercel.com/new" target="_blank"
                    class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
-                    <i class="fas fa-external-link-alt text-[10px]"></i> 워커 만들기
+                    <i class="fas fa-external-link-alt text-[10px]"></i> Vercel 배포
                 </a>
             </div>
             <div class="flex gap-2">
-                <input id="gen-proxy-url" type="url" class="gen-input flex-1"
-                    placeholder="https://hf-proxy.이름.workers.dev"
-                    value="${localStorage.getItem('hf_proxy_url') || ''}">
-                <button id="gen-save-proxy" class="gen-btn-copy whitespace-nowrap">
+                <input id="gen-vercel-url" type="url" class="gen-input flex-1"
+                    placeholder="https://creative-dashboard-xxx.vercel.app"
+                    value="${localStorage.getItem('hf_vercel_url') || ''}">
+                <button id="gen-save-vercel" class="gen-btn-copy whitespace-nowrap">
                     <i class="fas fa-save mr-1.5"></i>저장
                 </button>
             </div>
-            ${(localStorage.getItem('hf_proxy_url') || '') ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> 프록시 설정됨</p>` :
-              `<p class="text-xs text-amber-600 mt-1 flex items-center gap-1"><i class="fas fa-triangle-exclamation"></i> 프록시 없으면 CORS 오류 발생 — workers.cloudflare.com에서 무료로 5분 만에 설정 가능</p>`}
+            ${(localStorage.getItem('hf_vercel_url') || '')
+                ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> Vercel 연결됨 ✅</p>`
+                : `<div class="mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800 space-y-1">
+                    <p class="font-semibold">⚡ Vercel 설정 방법 (2분)</p>
+                    <p>1. <a href="https://vercel.com" target="_blank" class="underline">vercel.com</a> → GitHub 로그인</p>
+                    <p>2. "Add New Project" → 이 저장소(creative-dashboard) 선택</p>
+                    <p>3. Settings → Environment Variables → <code class="bg-amber-100 px-1 rounded">HF_CREDENTIALS</code> = <code class="bg-amber-100 px-1 rounded">API키(KEY_ID:KEY_SECRET)</code> 추가</p>
+                    <p>4. Deploy → 완료 후 URL 복붙</p>
+                   </div>`}
         </div>
     </div>
 
@@ -596,11 +621,11 @@ function _bindGeneratePanelEvents() {
         renderGeneratePanel();
     });
 
-    document.getElementById('gen-save-proxy')?.addEventListener('click', () => {
-        const url = document.getElementById('gen-proxy-url')?.value?.trim();
-        if (!url) return genToast('프록시 URL을 입력해주세요.', 2500);
-        localStorage.setItem(HF_PROXY_KEY, url);
-        genToast('✅ 프록시 URL이 저장됐어요!');
+    document.getElementById('gen-save-vercel')?.addEventListener('click', () => {
+        const url = document.getElementById('gen-vercel-url')?.value?.trim();
+        if (!url) return genToast('Vercel URL을 입력해주세요.', 2500);
+        localStorage.setItem(HF_VERCEL_KEY, url.replace(/\/$/, ''));
+        genToast('✅ Vercel URL이 저장됐어요!');
         renderGeneratePanel();
     });
 
