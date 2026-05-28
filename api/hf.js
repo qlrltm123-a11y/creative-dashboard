@@ -76,25 +76,35 @@ module.exports = async function handler(req, res) {
     fix: 'Vercel → Settings → Environment Variables → HF_CREDENTIALS 추가 후 Redeploy',
   });
 
-  const { prompt, aspect_ratio = '1:1', type = 'image' } = req.body || {};
-  if (!prompt) return res.status(400).json({ error: 'prompt 필드 필요' });
+  const { prompt, aspect_ratio = '1:1', type = 'image', referenceUrls } = req.body || {};
+  if (!prompt) return res.status(400).json({ error: 'prompt 필요' });
 
   const authKey = `Key ${apiKey}`;
   const logs = [];
 
   // ── 이미지 생성 ────────────────────────────────────────────────
-  if (type !== 'video') {
-    const imageEndpoints = [
-      'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
-      'https://platform.higgsfield.ai/nano_banana/text-to-image',
-      'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
-    ];
+  if (type !== 'video' && type !== 'video-step2') {
+    // 참고 소재가 있으면 flux-kontext(스타일 참조) 우선, 없으면 nano_banana_2 우선
+    const hasRefs = Array.isArray(referenceUrls) && referenceUrls.length > 0;
+    const medias = hasRefs
+      ? referenceUrls.slice(0, 3).map(u => ({ url: u, role: 'image' }))
+      : undefined;
 
-    // input wrapper 형식 먼저, flat 형식 나중에
-    const bodyVariants = [
-      { input: { prompt, aspect_ratio, safety_tolerance: 2 } },
-      { prompt, aspect_ratio, safety_tolerance: 2 },
-    ];
+    const imageEndpoints = hasRefs
+      ? [
+          'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
+          'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
+        ]
+      : [
+          'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
+          'https://platform.higgsfield.ai/nano_banana/text-to-image',
+          'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
+        ];
+
+    // flat body (medias 포함 시 참고 이미지 스타일 반영)
+    const bodyVariants = medias
+      ? [{ prompt, aspect_ratio, safety_tolerance: 2, medias }]
+      : [{ prompt, aspect_ratio, safety_tolerance: 2 }];
 
     for (const url of imageEndpoints) {
       for (const body of bodyVariants) {

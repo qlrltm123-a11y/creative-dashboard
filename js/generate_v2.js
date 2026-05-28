@@ -272,17 +272,44 @@ function _fakeResponse(status, text) {
     };
 }
 
+// Google Drive / 다양한 링크 → 직접 이미지 URL 변환
+function _toDirectImageUrl(url) {
+    if (!url) return null;
+    url = url.trim();
+    // Drive: /file/d/ID/view 또는 /open?id=ID
+    const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (driveMatch) return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+    // 이미 직접 URL이면 그대로
+    if (url.startsWith('http')) return url;
+    return null;
+}
+
+// 저장된 참고 소재 URL 목록 가져오기 (최대 3개)
+function _getReferenceUrls() {
+    const raw = localStorage.getItem('hf_reference_urls') || '';
+    return raw.split('\n')
+        .map(l => _toDirectImageUrl(l.trim()))
+        .filter(Boolean)
+        .slice(0, 3);
+}
+
 async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const apiKey = _getHfKey();
     if (!apiKey) throw new Error('API 키를 먼저 입력해주세요.');
 
     const vercelBase = _getVercelBase();
+    const referenceUrls = type === 'image' ? _getReferenceUrls() : [];
     let res;
 
     if (vercelBase) {
         // ✅ Vercel 서버리스 함수 사용 (IP 차단 없음)
         const url = `${vercelBase}/api/hf`;
-        const body = { prompt, aspect_ratio: aspectRatio || (type === 'video' ? '16:9' : '1:1'), type };
+        const body = {
+            prompt,
+            aspect_ratio: aspectRatio || (type === 'video' ? '16:9' : '1:1'),
+            type,
+            referenceUrls: referenceUrls.length ? referenceUrls : undefined,
+        };
         console.log('[HF→Vercel] POST', url, JSON.stringify(body));
         res = await fetch(url, {
             method: 'POST',
@@ -475,6 +502,29 @@ function _buildGeneratePanelHTML(p) {
         </div>
     </div>
 
+    <!-- 참고 소재 -->
+    <div class="gen-section">
+        <div class="gen-section-header">
+            <i class="fas fa-images text-emerald-500"></i>
+            <span>참고 소재</span>
+            <span class="gen-section-sub">과거 우수 광고 이미지 → AI가 스타일 학습</span>
+        </div>
+        <div class="mt-2">
+            <label class="gen-input-label mb-1">
+                Google Drive / 이미지 URL
+                <span class="font-normal text-slate-400 ml-1">(최대 3개, 줄바꿈으로 구분)</span>
+            </label>
+            <textarea id="gen-reference-urls" rows="3" class="gen-input font-mono text-xs"
+                placeholder="https://drive.google.com/file/d/xxxxxx/view&#10;https://drive.google.com/file/d/yyyyyy/view&#10;https://i.imgur.com/example.jpg"
+                style="resize:vertical">${localStorage.getItem('hf_reference_urls') || ''}</textarea>
+            <div class="flex items-center justify-between mt-1.5">
+                <p class="text-xs text-slate-400">Drive 링크는 자동으로 직접 URL로 변환됩니다</p>
+                <button id="gen-save-refs" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">저장</button>
+            </div>
+            <div id="gen-ref-preview" class="flex gap-2 mt-2 flex-wrap"></div>
+        </div>
+    </div>
+
     <!-- 연결 설정 -->
     <div class="gen-section">
         <div class="gen-section-header">
@@ -598,9 +648,33 @@ function _bindGeneratePanelEvents() {
         document.getElementById(id)?.addEventListener('input', _refreshPrompts);
     });
 
+    // 참고 소재 저장
+    document.getElementById('gen-save-refs')?.addEventListener('click', () => {
+        const val = document.getElementById('gen-reference-urls')?.value || '';
+        localStorage.setItem('hf_reference_urls', val);
+        _updateRefPreview();
+        genToast('✅ 참고 소재가 저장됐어요!');
+    });
+
     // 복사 / 생성 버튼
     document.getElementById('gen-copy-image')?.addEventListener('click', () => _copyPrompt('image'));
     document.getElementById('gen-generate-image')?.addEventListener('click', () => _triggerGenerate('image'));
+
+    // 초기 미리보기
+    _updateRefPreview();
+}
+
+function _updateRefPreview() {
+    const previewEl = document.getElementById('gen-ref-preview');
+    if (!previewEl) return;
+    const urls = _getReferenceUrls();
+    if (!urls.length) { previewEl.innerHTML = ''; return; }
+    previewEl.innerHTML = urls.map(u =>
+        `<div class="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+            <img src="${u}" class="w-full h-full object-cover" loading="lazy"
+                 onerror="this.parentElement.innerHTML='<span class=\\'text-xs text-slate-400 p-1\\'>로드 실패</span>'">
+        </div>`
+    ).join('') + `<p class="text-xs text-emerald-600 self-center font-semibold ml-1">✅ ${urls.length}개 참고 소재 적용</p>`;
 }
 
 function _switchGenTab(type) {
