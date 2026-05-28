@@ -179,7 +179,8 @@ async function _tryImageEndpoint(base, apiKey, params) {
         }
 
         const text = await res.text();
-        console.log('[HF] Status:', res.status, '| Body:', text.slice(0, 300));
+        const usedBase = res.headers?.get?.('X-Target-Base') || '?';
+        console.log('[HF] Status:', res.status, '| Base:', usedBase, '| Body:', text.slice(0, 400));
 
         // 401/403은 인증/권한 오류 → 즉시 중단 (재시도 의미없음)
         if (res.status === 401 || res.status === 403) {
