@@ -161,13 +161,13 @@ function _buildImageBody({ prompt, aspect_ratio, resolution, workspace_id, model
 //   주의: 브라우저 직접 호출 차단 → Cloudflare Worker(서버) 통해야 함
 // ============================================================
 
+// SDK 소스 확인: body는 input 필드를 직접 top-level로 보냄 (input:{} 래퍼 없음)
+// POST body = { ...input } = { prompt, aspect_ratio, safety_tolerance }
 function _buildV2Body({ prompt, aspect_ratio }) {
     return {
-        input: {
-            prompt,
-            aspect_ratio: aspect_ratio || '1:1',
-            safety_tolerance: 2,
-        },
+        prompt,
+        aspect_ratio: aspect_ratio || '1:1',
+        safety_tolerance: 2,
     };
 }
 
