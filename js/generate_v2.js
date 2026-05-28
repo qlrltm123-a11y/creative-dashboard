@@ -700,18 +700,46 @@ async function _triggerGenerate(type) {
     _showResultLoading(resultEl, type);
 
     try {
-        const result = await _callHiggsfieldGenerate(prompt, type, aspect);
+        if (type === 'video') {
+            // 영상: 브라우저가 직접 2단계 조율
+            // Step1: 이미지 생성
+            genToast('⏳ [1/2] 이미지 생성 중...', 0);
+            const imgResult = await _callHiggsfieldGenerate(prompt, 'image', aspect);
+            let imageUrl = typeof imgResult === 'string' ? imgResult : null;
 
-        if (result && typeof result === 'string') {
-            // 즉시 완료
-            _showResultSuccess(resultEl, result, type);
-        } else if (result?.requestId || result?.statusUrl) {
-            // 비동기 폴링
-            const msg = type === 'video'
-                ? '⏳ 이미지 생성 후 영상 변환 중... (1~2분 소요)'
-                : '⏳ 이미지 생성 중... 잠시 기다려주세요.';
-            genToast(msg, 0);
-            await _pollUntilDone(result.requestId, result.statusUrl, type, resultEl);
+            if (!imageUrl && (imgResult?.requestId || imgResult?.statusUrl)) {
+                imageUrl = await _pollUntilUrl(imgResult.requestId, imgResult.statusUrl, 'image', resultEl);
+            }
+            if (!imageUrl) throw new Error('소스 이미지 생성 실패');
+
+            // Step2: 이미지→영상 변환
+            genToast('⏳ [2/2] 영상 변환 중... (1분 소요)', 0);
+            const vercelBase = _getVercelBase();
+            const vidRes = await fetch(`${vercelBase}/api/hf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, aspect_ratio: aspect, type: 'video-step2', imageUrl }),
+            });
+            const vidData = await vidRes.json();
+            if (!vidRes.ok) throw new Error(`영상 변환 실패: ${vidData.error || vidRes.status}`);
+
+            const videoUrl = vidData.url || null;
+            if (videoUrl) {
+                _showResultSuccess(resultEl, videoUrl, 'video');
+            } else if (vidData.requestId) {
+                const finalUrl = await _pollUntilUrl(vidData.requestId, vidData.statusUrl, 'video', resultEl);
+                if (finalUrl) _showResultSuccess(resultEl, finalUrl, 'video');
+                else _showResultError(resultEl, '영상 URL을 받지 못했어요.');
+            }
+        } else {
+            // 이미지: 기존 흐름
+            const result = await _callHiggsfieldGenerate(prompt, type, aspect);
+            if (result && typeof result === 'string') {
+                _showResultSuccess(resultEl, result, type);
+            } else if (result?.requestId || result?.statusUrl) {
+                genToast('⏳ 이미지 생성 중... 잠시 기다려주세요.', 0);
+                await _pollUntilDone(result.requestId, result.statusUrl, type, resultEl);
+            }
         }
     } catch (e) {
         _showResultError(resultEl, e.message);
@@ -720,6 +748,21 @@ async function _triggerGenerate(type) {
     } finally {
         _setGenerating(type, false);
     }
+}
+
+// 폴링하면서 URL 반환 (영상 2단계용)
+async function _pollUntilUrl(requestId, statusUrl, type, resultEl) {
+    const start = Date.now();
+    while (Date.now() - start < HF_MAX_WAIT) {
+        await new Promise(r => setTimeout(r, HF_POLL_MS));
+        try {
+            const data = await _pollHiggsfieldStatus(requestId, statusUrl);
+            if (data.status === 'completed') return _extractResultUrl(data, type);
+            if (data.status === 'failed' || data.status === 'nsfw') return null;
+            _updateResultProgress(resultEl, Math.round((Date.now() - start) / 1000));
+        } catch (_) {}
+    }
+    return null;
 }
 
 async function _pollUntilDone(requestId, statusUrl, type, resultEl) {
