@@ -122,38 +122,68 @@ Product prominently featured, lifestyle context, eye-catching text overlay with 
 // 워크스페이스 ID (Higgsfield 계정 고유값)
 const HF_WORKSPACE_ID = 'b3a6bab3-3047-49bf-9dd8-0fd38e8fda8f';
 
-// 이미지 엔드포인트 우선순위 목록 — workspace_id 포함/미포함 패턴
-// [ urlFn, bodyFn ]
+// aspect_ratio → width/height 변환 (MCP가 실제로 사용하는 값)
+function _aspectToSize(ar) {
+    const map = {
+        '1:1':  { width: 1024, height: 1024 },
+        '9:16': { width: 576,  height: 1024 },
+        '16:9': { width: 1024, height: 576  },
+        '4:5':  { width: 819,  height: 1024 },
+        '3:2':  { width: 1024, height: 683  },
+        '2:3':  { width: 683,  height: 1024 },
+    };
+    return map[ar] || { width: 1024, height: 1024 };
+}
+
+// MCP 분석 결과: nano_banana_2 요청 시 실제 사용 모델 = nano_banana_flash
+// body에 MCP가 실제로 보내는 필드 포함 (width, height, batch_size, reference_elements)
+function _buildImageBody({ prompt, aspect_ratio, resolution, workspace_id, model }) {
+    const { width, height } = _aspectToSize(aspect_ratio);
+    return {
+        model: model || 'nano_banana_flash',
+        prompt,
+        aspect_ratio,
+        width,
+        height,
+        resolution: resolution || '1k',
+        batch_size: 1,
+        reference_elements: [],
+        medias: [],
+        workspace_id,
+    };
+}
+
+// 이미지 엔드포인트 우선순위 목록
 const HF_IMAGE_ENDPOINTS = [
-    // 패턴 1: workspace URL 포함 — body에 workspace_id도 포함
+    // 패턴 1: /v1/text2image/nano_banana_flash (실제 모델명)
     [
-        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_2`,
-        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
+        (base) => `${base}/v1/text2image/nano_banana_flash`,
+        (p) => _buildImageBody({ ...p, model: 'nano_banana_flash' }),
     ],
-    // 패턴 2: workspace URL 포함 — body엔 없음
-    [
-        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_2`,
-        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution }),
-    ],
-    // 패턴 3: /v1/text2image/{model} + workspace_id in body
+    // 패턴 2: /v1/text2image/nano_banana_2 (원래 모델명)
     [
         (base) => `${base}/v1/text2image/nano_banana_2`,
-        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
+        (p) => _buildImageBody({ ...p, model: 'nano_banana_2' }),
     ],
-    // 패턴 4: /v1/text2image/{model} — body 없음
+    // 패턴 3: workspace URL 포함
     [
-        (base) => `${base}/v1/text2image/nano_banana_2`,
-        ({ prompt, aspect_ratio, resolution }) => ({ prompt, aspect_ratio, resolution }),
+        (base) => `${base}/v1/workspaces/${HF_WORKSPACE_ID}/text2image/nano_banana_flash`,
+        (p) => _buildImageBody({ ...p, model: 'nano_banana_flash' }),
     ],
-    // 패턴 5: 통합 generate + workspace_id
-    [
-        (base) => `${base}/v1/generate`,
-        ({ prompt, aspect_ratio, resolution }) => ({ type: 'image', model: 'nano_banana_2', prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
-    ],
-    // 패턴 6: /v1/image/generate
+    // 패턴 4: /v1/image/generate — 통합 엔드포인트
     [
         (base) => `${base}/v1/image/generate`,
-        ({ prompt, aspect_ratio, resolution }) => ({ model: 'nano_banana_2', prompt, aspect_ratio, resolution, workspace_id: HF_WORKSPACE_ID }),
+        (p) => _buildImageBody(p),
+    ],
+    // 패턴 5: /v1/generate
+    [
+        (base) => `${base}/v1/generate`,
+        (p) => ({ type: 'image', ..._buildImageBody(p) }),
+    ],
+    // 패턴 6: /v1/jobs (일부 플랫폼 스타일)
+    [
+        (base) => `${base}/v1/jobs`,
+        (p) => ({ type: 'text2image', ..._buildImageBody(p) }),
     ],
 ];
 
@@ -247,6 +277,7 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
             prompt,
             aspect_ratio: aspectRatio || '1:1',
             resolution: '1k',
+            workspace_id: HF_WORKSPACE_ID,
         });
     }
 
@@ -306,6 +337,11 @@ async function _pollHiggsfieldStatus(requestId, statusUrl) {
 }
 
 function _extractResultUrl(data, type) {
+    // MCP 형식: data.results[0].rawUrl / minUrl
+    const firstResult = Array.isArray(data.results) ? data.results[0] : null;
+    if (firstResult?.rawUrl) return firstResult.rawUrl;
+    if (firstResult?.minUrl) return firstResult.minUrl;
+
     if (type === 'video') {
         return data.video?.url
             || data.videos?.[0]?.url
@@ -317,7 +353,6 @@ function _extractResultUrl(data, type) {
     return data.images?.[0]?.url
         || data.image?.url
         || data.output?.[0]
-        || data.results?.[0]?.url
         || data.result?.url
         || data.url
         || null;
