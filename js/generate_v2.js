@@ -333,11 +333,13 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const data = await res.json();
     console.log('[HF] Response:', JSON.stringify(data));
 
+    // Vercel SDK 응답: { url, type } — 이미 폴링 완료된 결과
+    if (data.url) return data.url;
+
     if (data.status === 'completed') return _extractResultUrl(data, type);
-    // 즉시 URL이 있으면 반환 (일부 모델은 동기 응답)
     const immediateUrl = _extractResultUrl(data, type);
     if (immediateUrl) return immediateUrl;
-    // 비동기: status_url 우선, 없으면 request_id로 구성
+    // 비동기 폴링 필요
     const requestId = data.request_id || data.id || data.job_id;
     const statusUrl = data.status_url || data.polling_url || null;
     if (!requestId && !statusUrl) throw new Error(`request_id를 받지 못했어요. 응답: ${JSON.stringify(data).slice(0,200)}`);
