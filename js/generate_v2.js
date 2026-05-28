@@ -707,8 +707,11 @@ async function _triggerGenerate(type) {
             _showResultSuccess(resultEl, result, type);
         } else if (result?.requestId || result?.statusUrl) {
             // 비동기 폴링
-            genToast('⏳ 생성 중... 잠시 기다려주세요.');
-            await _pollUntilDone(result.requestId, result.statusUrl, result.type, resultEl);
+            const msg = type === 'video'
+                ? '⏳ 이미지 생성 후 영상 변환 중... (1~2분 소요)'
+                : '⏳ 이미지 생성 중... 잠시 기다려주세요.';
+            genToast(msg, 0);
+            await _pollUntilDone(result.requestId, result.statusUrl, type, resultEl);
         }
     } catch (e) {
         _showResultError(resultEl, e.message);

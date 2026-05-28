@@ -148,49 +148,77 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ── 비디오 생성 ────────────────────────────────────────────────
+  // ── 비디오 생성: 2단계 (텍스트→이미지→영상) ──────────────────────
   if (type === 'video') {
-    // grok_video: text-to-video (이미지 불필요)
-    // 바디 형식: flat { prompt, aspect_ratio }
-    const videoEndpoints = [
-      { url: 'https://platform.higgsfield.ai/grok_video/text-to-video',   body: { prompt, aspect_ratio } },
-      { url: 'https://platform.higgsfield.ai/v1/grok_video/text-to-video', body: { prompt, aspect_ratio } },
-      { url: 'https://platform.higgsfield.ai/v1/image2video/dop',          body: { params: { prompt, aspect_ratio } } },
-    ];
-    for (const { url, body } of videoEndpoints) {
+    // Step 1: 텍스트로 이미지 생성
+    let sourceImageUrl = req.body?.imageUrl || null; // 이미 이미지 URL이 있으면 재사용
+
+    if (!sourceImageUrl) {
       try {
-        const r = await fetch(url, {
+        const imgR = await fetch('https://platform.higgsfield.ai/nano_banana_2/text-to-image', {
           method: 'POST',
-          headers: {
-            'Authorization': authKey,
-            'Content-Type': 'application/json',
-            'User-Agent': 'higgsfield-server-js/2.0',
-          },
-          body: JSON.stringify(body),
+          headers: { 'Authorization': authKey, 'Content-Type': 'application/json', 'User-Agent': 'higgsfield-server-js/2.0' },
+          body: JSON.stringify({ prompt, aspect_ratio, safety_tolerance: 2 }),
         });
-        const text = await r.text();
-        let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
-        logs.push({ url, status: r.status, body: text.slice(0,200) });
+        const imgText = await imgR.text();
+        const imgData = JSON.parse(imgText);
 
-        if (r.status === 404 || r.status === 422) continue; // 다음 엔드포인트 시도
-
-        if (r.status >= 200 && r.status < 300) {
-          if (data.request_id) {
-            return res.status(200).json({
-              requestId: data.request_id,
-              statusUrl: data.status_url || null,
-              _ep: url,
-            });
+        if (imgData.request_id) {
+          // 이미지 폴링
+          const pollUrl = imgData.status_url || `https://platform.higgsfield.ai/requests/${imgData.request_id}/status`;
+          for (let i = 0; i < 24; i++) {
+            await new Promise(r => setTimeout(r, 5000));
+            const pr = await fetch(pollUrl, { headers: { 'Authorization': authKey, 'User-Agent': 'higgsfield-server-js/2.0' } });
+            const pd = await pr.json();
+            if (pd.status === 'completed') {
+              sourceImageUrl = pd.images?.[0]?.url || pd.results?.[0]?.rawUrl || pd.url || null;
+              break;
+            }
+            if (pd.status === 'failed') break;
           }
-          const resultUrl = data.video?.url || data.url || data.results?.[0]?.rawUrl || null;
-          return res.status(200).json({ url: resultUrl, raw: data, _ep: url });
-        }
-        if (r.status === 401 || r.status === 403) {
-          return res.status(401).json({ error: '인증 실패', status: r.status });
+        } else {
+          sourceImageUrl = imgData.images?.[0]?.url || imgData.url || null;
         }
       } catch (e) {
-        logs.push({ url, error: e.message });
+        logs.push({ step: 'image-gen', error: e.message });
       }
+    }
+
+    if (!sourceImageUrl) {
+      return res.status(502).json({ error: '영상용 소스 이미지 생성 실패', logs });
+    }
+
+    // Step 2: 이미지→영상 변환
+    try {
+      const vidR = await fetch('https://platform.higgsfield.ai/v1/image2video/dop', {
+        method: 'POST',
+        headers: { 'Authorization': authKey, 'Content-Type': 'application/json', 'User-Agent': 'higgsfield-server-js/2.0' },
+        body: JSON.stringify({
+          params: {
+            input_images: [{ url: sourceImageUrl }],
+            prompt,
+            aspect_ratio,
+          },
+        }),
+      });
+      const vidText = await vidR.text();
+      let vidData; try { vidData = JSON.parse(vidText); } catch { vidData = { raw: vidText }; }
+      logs.push({ step: 'image2video', status: vidR.status, body: vidText.slice(0, 200) });
+
+      if (vidR.status >= 200 && vidR.status < 300) {
+        if (vidData.request_id) {
+          return res.status(200).json({
+            requestId: vidData.request_id,
+            statusUrl: vidData.status_url || null,
+            sourceImageUrl,
+            _ep: '/v1/image2video/dop',
+          });
+        }
+        const resultUrl = vidData.video?.url || vidData.url || vidData.results?.[0]?.rawUrl || null;
+        return res.status(200).json({ url: resultUrl, sourceImageUrl, raw: vidData });
+      }
+    } catch (e) {
+      logs.push({ step: 'image2video', error: e.message });
     }
   }
 
