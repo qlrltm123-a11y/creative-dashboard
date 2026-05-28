@@ -507,21 +507,39 @@ function _buildGeneratePanelHTML(p) {
         <div class="gen-section-header">
             <i class="fas fa-images text-emerald-500"></i>
             <span>참고 소재</span>
-            <span class="gen-section-sub">과거 우수 광고 이미지 → AI가 스타일 학습</span>
+            <span class="gen-section-sub">과거 광고 이미지 → AI가 스타일 학습</span>
         </div>
-        <div class="mt-2">
-            <label class="gen-input-label mb-1">
-                Google Drive / 이미지 URL
-                <span class="font-normal text-slate-400 ml-1">(최대 3개, 줄바꿈으로 구분)</span>
-            </label>
-            <textarea id="gen-reference-urls" rows="3" class="gen-input font-mono text-xs"
-                placeholder="https://drive.google.com/file/d/xxxxxx/view&#10;https://drive.google.com/file/d/yyyyyy/view&#10;https://i.imgur.com/example.jpg"
-                style="resize:vertical">${localStorage.getItem('hf_reference_urls') || ''}</textarea>
-            <div class="flex items-center justify-between mt-1.5">
-                <p class="text-xs text-slate-400">Drive 링크는 자동으로 직접 URL로 변환됩니다</p>
-                <button id="gen-save-refs" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">저장</button>
+        <div class="mt-2 space-y-3">
+            <!-- 폴더 URL 스캔 -->
+            <div>
+                <label class="gen-input-label mb-1">
+                    Google Drive 폴더 URL
+                    <span class="font-normal text-slate-400 ml-1">(폴더째로 스캔)</span>
+                </label>
+                <div class="flex gap-2">
+                    <input id="gen-drive-folder" type="url" class="gen-input flex-1"
+                        placeholder="https://drive.google.com/drive/folders/xxxxx"
+                        value="${localStorage.getItem('hf_drive_folder') || ''}">
+                    <button id="gen-scan-folder" class="gen-btn-copy whitespace-nowrap px-3">
+                        <i class="fas fa-magnifying-glass mr-1"></i>스캔
+                    </button>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">폴더를 "링크 있는 모든 사용자 - 뷰어" 로 공유해주세요</p>
             </div>
-            <div id="gen-ref-preview" class="flex gap-2 mt-2 flex-wrap"></div>
+            <!-- 스캔 결과 -->
+            <div id="gen-folder-result" class="hidden"></div>
+            <!-- 개별 URL 직접 입력 -->
+            <details class="text-xs text-slate-500 cursor-pointer">
+                <summary class="hover:text-slate-700 select-none">개별 URL 직접 입력 (선택)</summary>
+                <div class="mt-2">
+                    <textarea id="gen-reference-urls" rows="3" class="gen-input font-mono text-xs mt-1"
+                        placeholder="https://drive.google.com/file/d/xxxxxx/view&#10;https://i.imgur.com/example.jpg"
+                        style="resize:vertical">${localStorage.getItem('hf_reference_urls') || ''}</textarea>
+                    <button id="gen-save-refs" class="text-xs text-indigo-600 font-semibold mt-1">저장</button>
+                </div>
+            </details>
+            <!-- 최종 참고 이미지 미리보기 -->
+            <div id="gen-ref-preview" class="flex gap-2 flex-wrap"></div>
         </div>
     </div>
 
@@ -648,6 +666,58 @@ function _bindGeneratePanelEvents() {
         document.getElementById(id)?.addEventListener('input', _refreshPrompts);
     });
 
+    // 폴더 스캔
+    document.getElementById('gen-scan-folder')?.addEventListener('click', async () => {
+        const folderUrl = document.getElementById('gen-drive-folder')?.value?.trim();
+        if (!folderUrl) return genToast('폴더 URL을 입력해주세요.', 2500);
+        localStorage.setItem('hf_drive_folder', folderUrl);
+
+        const resultEl = document.getElementById('gen-folder-result');
+        resultEl.classList.remove('hidden');
+        resultEl.innerHTML = `<div class="flex items-center gap-2 text-sm text-slate-500"><i class="fas fa-spinner fa-spin"></i> 폴더 스캔 중...</div>`;
+
+        try {
+            const vercelBase = _getVercelBase();
+            const r = await fetch(`${vercelBase}/api/drive?folder=${encodeURIComponent(folderUrl)}`);
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || r.status);
+
+            if (!data.files?.length) {
+                resultEl.innerHTML = `<p class="text-sm text-amber-600">이미지 파일을 찾지 못했어요. 폴더 공유 설정을 확인해주세요.</p>`;
+                return;
+            }
+
+            // 최대 10개 선택 UI
+            resultEl.innerHTML = `
+                <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-sm font-semibold text-slate-700">
+                            <i class="fas fa-folder-open text-amber-500 mr-1"></i>
+                            ${data.count}개 이미지 발견
+                        </p>
+                        <div class="flex gap-2">
+                            <button onclick="_selectAllRefs()" class="text-xs text-indigo-600 font-semibold hover:underline">전체선택</button>
+                            <button onclick="_applySelectedRefs()" class="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 font-semibold">적용</button>
+                        </div>
+                    </div>
+                    <div id="gen-folder-files" class="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                        ${data.files.slice(0, 20).map((f, i) => `
+                        <label class="relative cursor-pointer group">
+                            <input type="checkbox" class="gen-ref-check absolute top-1 left-1 z-10" value="${f.url}" ${i < 5 ? 'checked' : ''}>
+                            <div class="w-full aspect-square rounded-lg overflow-hidden border-2 border-transparent group-has-[:checked]:border-indigo-500 bg-slate-200">
+                                <img src="${f.thumb || f.url}" class="w-full h-full object-cover" loading="lazy" title="${f.name}">
+                            </div>
+                        </label>`).join('')}
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2">체크된 이미지가 참고 소재로 사용됩니다 (최대 3개 반영)</p>
+                </div>`;
+
+            _applySelectedRefs(); // 초기 적용
+        } catch (e) {
+            resultEl.innerHTML = `<p class="text-sm text-red-500"><i class="fas fa-triangle-exclamation mr-1"></i>${e.message}</p>`;
+        }
+    });
+
     // 참고 소재 저장
     document.getElementById('gen-save-refs')?.addEventListener('click', () => {
         const val = document.getElementById('gen-reference-urls')?.value || '';
@@ -663,6 +733,24 @@ function _bindGeneratePanelEvents() {
     // 초기 미리보기
     _updateRefPreview();
 }
+
+function _selectAllRefs() {
+    document.querySelectorAll('.gen-ref-check').forEach(cb => cb.checked = true);
+    _applySelectedRefs();
+}
+window._selectAllRefs = _selectAllRefs;
+
+function _applySelectedRefs() {
+    const checked = [...document.querySelectorAll('.gen-ref-check:checked')].map(cb => cb.value);
+    // 기존 개별 URL에서도 추가 (중복 제거)
+    const manual = (document.getElementById('gen-reference-urls')?.value || '')
+        .split('\n').map(l => _toDirectImageUrl(l.trim())).filter(Boolean);
+    const all = [...new Set([...checked, ...manual])].slice(0, 10);
+    localStorage.setItem('hf_reference_urls', all.join('\n'));
+    _updateRefPreview();
+    genToast(`✅ 참고 소재 ${all.length}개 적용!`);
+}
+window._applySelectedRefs = _applySelectedRefs;
 
 function _updateRefPreview() {
     const previewEl = document.getElementById('gen-ref-preview');
