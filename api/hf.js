@@ -34,35 +34,18 @@ module.exports = async function handler(req, res) {
     const testResults = [];
     const authHeader = `Key ${apiKey}`;
 
-    // platform.higgsfield.ai - input wrapper 형식
+    // 영상 엔드포인트 경로 탐색
+    const videoBody = { prompt: 'test video', aspect_ratio: '16:9' };
     const tests = [
-      {
-        label: 'platform / nano_banana_2 / input wrapper',
-        url: 'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
-        body: { input: { prompt: 'test image', aspect_ratio: '1:1', safety_tolerance: 2 } },
-      },
-      {
-        label: 'platform / nano_banana_2 / flat body',
-        url: 'https://platform.higgsfield.ai/nano_banana_2/text-to-image',
-        body: { prompt: 'test image', aspect_ratio: '1:1', safety_tolerance: 2 },
-      },
-      {
-        label: 'platform / flux-pro / input wrapper',
-        url: 'https://platform.higgsfield.ai/flux-pro/kontext/max/text-to-image',
-        body: { input: { prompt: 'test image', aspect_ratio: '1:1', safety_tolerance: 2 } },
-      },
-      {
-        label: 'api.higgsfield.ai / v1/generations / Bearer',
-        url: 'https://api.higgsfield.ai/v1/generations',
-        body: { task: 'text-to-image', model: 'nano_banana_2', prompt: 'test image', aspect_ratio: '1:1' },
-        auth: `Bearer ${apiKey}`,
-      },
-      {
-        label: 'api.higgsfield.ai / v1/generations / Key',
-        url: 'https://api.higgsfield.ai/v1/generations',
-        body: { task: 'text-to-image', model: 'nano_banana_2', prompt: 'test image', aspect_ratio: '1:1' },
-        auth: `Key ${apiKey}`,
-      },
+      { label: 'video / grok_video/text-to-video',           url: 'https://platform.higgsfield.ai/grok_video/text-to-video',           body: videoBody },
+      { label: 'video / grok-video/text-to-video',           url: 'https://platform.higgsfield.ai/grok-video/text-to-video',           body: videoBody },
+      { label: 'video / grok-imagine/text-to-video',         url: 'https://platform.higgsfield.ai/grok-imagine/text-to-video',         body: videoBody },
+      { label: 'video / xai-grok/text-to-video',             url: 'https://platform.higgsfield.ai/xai-grok/text-to-video',             body: videoBody },
+      { label: 'video / seedance_2_0/text-to-video',         url: 'https://platform.higgsfield.ai/seedance_2_0/text-to-video',         body: videoBody },
+      { label: 'video / seedance-2-0/text-to-video',         url: 'https://platform.higgsfield.ai/seedance-2-0/text-to-video',         body: videoBody },
+      { label: 'video / minimax_hailuo/text-to-video',       url: 'https://platform.higgsfield.ai/minimax_hailuo/text-to-video',       body: videoBody },
+      { label: 'video / v1/generate-video model:grok_video', url: 'https://platform.higgsfield.ai/v1/generate/video',                  body: { model: 'grok_video', ...videoBody } },
+      { label: 'video / v1/text-to-video model:grok_video',  url: 'https://platform.higgsfield.ai/v1/text-to-video',                   body: { model: 'grok_video', ...videoBody } },
     ];
 
     for (const t of tests) {
