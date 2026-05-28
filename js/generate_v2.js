@@ -540,10 +540,11 @@ function _buildGeneratePanelHTML(p) {
     const thumbsHtml = p.top5.filter(c => c.thumbnail_url || c.media_url)
         .map((c, i) => {
             const raw = c.thumbnail_url || c.media_url || '';
-            const src = _toDirectImageUrl(raw) || raw;
+            const imgHtml = (typeof buildDriveImgHtml === 'function' && typeof isDriveUrl === 'function' && isDriveUrl(raw))
+                ? buildDriveImgHtml(raw, { loading: 'lazy', extraAttrs: 'style="width:100%;height:100%;object-fit:cover;display:block"' })
+                : `<img src="${_toDirectImageUrl(raw) || raw}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.opacity='0.12'">`;
             return `<div class="gen-thumb" title="${c.ad_name || ''}">
-                <img src="${src}" alt="" loading="lazy"
-                     onerror="this.style.opacity='0.15'">
+                ${imgHtml}
                 <span class="gen-thumb-rank">${i+1}</span>
             </div>`;
         }).join('');
@@ -601,10 +602,12 @@ function _buildGeneratePanelHTML(p) {
     const refThumbsHtml = (p.top5 || []).filter(c => c.thumbnail_url || c.media_url).slice(0, 8).map((c, i) => {
         const rawThumb = c.thumbnail_url || c.media_url || '';
         const rawRef   = c.media_url || c.thumbnail_url || '';
-        const thumb    = _toDirectImageUrl(rawThumb) || rawThumb;
-        const refUrl   = _toDirectImageUrl(rawRef)   || rawRef;
+        const refUrl   = _toDirectImageUrl(rawRef) || rawRef;
+        const imgHtml  = (typeof buildDriveImgHtml === 'function' && typeof isDriveUrl === 'function' && isDriveUrl(rawThumb))
+            ? buildDriveImgHtml(rawThumb, { className: 'gen-ref-thumb', loading: 'lazy' })
+            : `<img src="${_toDirectImageUrl(rawThumb) || rawThumb}" class="gen-ref-thumb" loading="lazy" onerror="this.style.opacity='0.12'">`;
         return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
-            <img src="${thumb}" class="gen-ref-thumb" loading="lazy" onerror="this.style.opacity='0.15'">
+            ${imgHtml}
             <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
             <button class="gen-ref-insert-btn" onclick="event.stopPropagation();_insertRefToPrompt('${refUrl}')">📎 삽입</button>
         </div>`;
@@ -914,19 +917,19 @@ function _updateRefPreview() {
     const autoCount  = autoUrls.length;
     const extraCount = extraUrls.length;
 
+    function _previewImgHtml(u, badge, borderColor) {
+        const inner = (typeof buildDriveImgHtml === 'function' && typeof isDriveUrl === 'function' && isDriveUrl(u))
+            ? buildDriveImgHtml(u, { loading: 'lazy', extraAttrs: 'style="width:100%;height:100%;object-fit:cover"' })
+            : `<img src="${u}" style="width:100%;height:100%;object-fit:cover" loading="lazy" onerror="this.style.opacity='0.2'">`;
+        return `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 ${borderColor} bg-slate-100 flex-shrink-0">
+            ${inner}
+            <span style="position:absolute;bottom:2px;right:2px;background:${badge==='AUTO'?'#4f46e5':'#059669'};color:#fff;font-size:7px;padding:1px 3px;border-radius:3px;font-weight:700;line-height:1.4">${badge}</span>
+        </div>`;
+    }
+
     previewEl.innerHTML =
-        autoUrls.map(u =>
-            `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-indigo-300 bg-slate-100 flex-shrink-0" title="자동 참조 (ROAS 상위)">
-                <img src="${u}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.opacity='0.2'">
-                <span style="position:absolute;bottom:2px;right:2px;background:#4f46e5;color:#fff;font-size:7px;padding:1px 3px;border-radius:3px;font-weight:700;line-height:1.4">AUTO</span>
-            </div>`
-        ).join('')
-        + extraUrls.map(u =>
-            `<div class="relative w-14 h-14 rounded-lg overflow-hidden border-2 border-emerald-400 bg-slate-100 flex-shrink-0" title="수동 추가">
-                <img src="${u}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.opacity='0.2'">
-                <span style="position:absolute;bottom:2px;right:2px;background:#059669;color:#fff;font-size:7px;padding:1px 3px;border-radius:3px;font-weight:700;line-height:1.4">+</span>
-            </div>`
-        ).join('')
+        autoUrls.map(u => _previewImgHtml(u, 'AUTO', 'border-indigo-300')).join('')
+        + extraUrls.map(u => _previewImgHtml(u, '+', 'border-emerald-400')).join('')
         + `<div class="self-center ml-1 text-xs leading-5">
             <p class="text-indigo-600 font-semibold">⚡ ${autoCount}개 자동 (${_genPatterns?.selectedProduct || _genPatterns?.brand || '현재 컨텍스트'})</p>
             ${extraCount > 0 ? `<p class="text-emerald-600 font-semibold">✅ ${extraCount}개 수동 추가</p>` : ''}
