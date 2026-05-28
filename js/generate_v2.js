@@ -340,8 +340,8 @@ async function _callHiggsfieldGenerate(prompt, type, aspectRatio) {
     const immediateUrl = _extractResultUrl(data, type);
     if (immediateUrl) return immediateUrl;
     // 비동기 폴링 필요
-    const requestId = data.request_id || data.id || data.job_id;
-    const statusUrl = data.status_url || data.polling_url || null;
+    const requestId = data.requestId || data.request_id || data.id || data.job_id;
+    const statusUrl = data.statusUrl || data.status_url || data.polling_url || null;
     if (!requestId && !statusUrl) throw new Error(`request_id를 받지 못했어요. 응답: ${JSON.stringify(data).slice(0,200)}`);
     return { requestId, statusUrl, type };
 }
