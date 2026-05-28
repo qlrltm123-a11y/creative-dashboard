@@ -17,9 +17,10 @@ function _getVercelBase() {
     return null;
 }
 
-let _genPatterns   = null;
-let _genCurrentTab = 'image';
-let _genPollingTimer = null;
+let _genPatterns      = null;
+let _genCurrentTab    = 'image';
+let _genPollingTimer  = null;
+let _genProductFilter = '';   // 패널 내 제품 필터 ('' = 전체)
 
 // ---- 토스트 ----
 function genToast(msg, duration) {
@@ -46,22 +47,39 @@ function getWinningPatterns() {
              : (typeof allCreatives !== 'undefined' && Array.isArray(allCreatives)) ? [...allCreatives] : [];
     if (!data.length) return null;
 
-    if (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL')
-        data = data.filter(c => c.brand === currentBrand);
-    if (typeof currentPlatform !== 'undefined' && currentPlatform)
-        data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
-    if (typeof currentEvent !== 'undefined' && currentEvent)
-        data = data.filter(c => (c.event || '').toString().trim() === currentEvent);
+    // 전역 필터 (브랜드 / 매체 / 이벤트)
+    const brand    = (typeof currentBrand    !== 'undefined') ? currentBrand    : '';
+    const platform = (typeof currentPlatform !== 'undefined') ? currentPlatform : '';
+    const event_   = (typeof currentEvent    !== 'undefined') ? currentEvent    : '';
+
+    if (brand && brand !== 'ALL')
+        data = data.filter(c => c.brand === brand);
+    if (platform)
+        data = data.filter(c => (c.platform || '').toString().trim() === platform);
+    if (event_)
+        data = data.filter(c => (c.event || '').toString().trim() === event_);
+
+    // 제품 목록 추출 (전역 필터 적용 후, 제품 필터 적용 전)
+    const productList = Array.from(new Set(
+        data.map(c => (c.product || '').trim()).filter(Boolean)
+    )).sort();
+
+    // 패널 내 제품 필터 (현재 브랜드에 없는 제품이면 자동 초기화)
+    if (_genProductFilter && !productList.includes(_genProductFilter)) {
+        _genProductFilter = '';
+    }
+    if (_genProductFilter)
+        data = data.filter(c => (c.product || '').trim() === _genProductFilter);
 
     if (typeof aggregateByAdName === 'function') data = aggregateByAdName(data);
 
     let top5 = [...data].filter(c => (c.roas || 0) > 0)
-        .sort((a, b) => (b.roas || 0) - (a.roas || 0)).slice(0, 5);
+        .sort((a, b) => (b.roas || 0) - (a.roas || 0)).slice(0, 8);
     if (!top5.length) {
         top5 = [...data].filter(c => (c.ctr || 0) > 0)
-            .sort((a, b) => (b.ctr || 0) - (a.ctr || 0)).slice(0, 5);
+            .sort((a, b) => (b.ctr || 0) - (a.ctr || 0)).slice(0, 8);
     }
-    if (!top5.length) return null;
+    if (!top5.length) return { top5: [], productList, noData: true, brand, platform };
 
     function extractTopTags(items, field, topN) {
         const counter = new Map();
@@ -83,8 +101,10 @@ function getWinningPatterns() {
         topEmotion: extractTopTags(top5, 'target_emotion', 4),
         avgRoas: top5.reduce((s, c) => s + (c.roas || 0), 0) / top5.length,
         avgCtr:  top5.reduce((s, c) => s + (c.ctr  || 0), 0) / top5.length,
-        brand:    (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? currentBrand : (top5[0]?.brand || ''),
-        platform: (typeof currentPlatform !== 'undefined' && currentPlatform) || '',
+        brand:    (brand && brand !== 'ALL') ? brand : (top5[0]?.brand || ''),
+        platform,
+        selectedProduct: _genProductFilter,
+        productList,
         sampleThumb: top5[0]?.thumbnail_url || top5[0]?.media_url || '',
         sampleName:  top5[0]?.ad_name || top5[0]?.creative_name || '',
     };
@@ -443,42 +463,40 @@ function _buildGeneratePanelHTML(p) {
     const savedKey = _getHfKey();
     const maskedKey = savedKey ? savedKey.slice(0, 6) + '••••••••••' : '';
 
-    return `
-    <!-- 워킹 패턴 분석 -->
-    <div class="gen-section">
-        <div class="gen-section-header">
-            <i class="fas fa-trophy text-amber-500"></i>
-            <span>워킹 패턴 분석</span>
-            <span class="gen-section-sub">ROAS 기준 BEST TOP5 · ${p.top5.length}개 소재</span>
-        </div>
+    // 제품 선택 드롭다운 옵션
+    const productOptions = (p.productList || []).map(prod =>
+        `<option value="${prod.replace(/"/g,'&quot;')}" ${p.selectedProduct === prod ? 'selected' : ''}>${prod}</option>`
+    ).join('');
+
+    // 패턴 분석 내용 (데이터 없으면 안내 메시지)
+    const patternInner = p.noData ? `
+        <div class="py-6 text-center">
+            <i class="fas fa-magnifying-glass text-3xl mb-2 block opacity-30 text-slate-400"></i>
+            <p class="text-sm font-semibold text-slate-500">해당 제품의 소재 데이터가 없어요</p>
+            <p class="text-xs mt-1 text-slate-400">다른 제품을 선택하거나 필터를 조정해주세요</p>
+        </div>` : `
         <div class="gen-pattern-grid">
             <div class="gen-pattern-card">
                 <div class="gen-pattern-title"><i class="fas fa-bullseye text-violet-500 mr-1.5"></i>소구포인트</div>
-                <div class="gen-tag-list">
-                    ${p.topAppeal.length ? p.topAppeal.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}
-                </div>
+                <div class="gen-tag-list">${p.topAppeal?.length ? p.topAppeal.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}</div>
             </div>
             <div class="gen-pattern-card">
                 <div class="gen-pattern-title"><i class="fas fa-fish text-cyan-500 mr-1.5"></i>후킹 전략</div>
-                <div class="gen-tag-list">
-                    ${p.topHook.length ? p.topHook.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}
-                </div>
+                <div class="gen-tag-list">${p.topHook?.length ? p.topHook.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}</div>
             </div>
             <div class="gen-pattern-card">
                 <div class="gen-pattern-title"><i class="fas fa-heart text-rose-500 mr-1.5"></i>타겟 감정</div>
-                <div class="gen-tag-list">
-                    ${p.topEmotion.length ? p.topEmotion.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}
-                </div>
+                <div class="gen-tag-list">${p.topEmotion?.length ? p.topEmotion.map((t,i) => rankBadge(t,i)).join('') : '<span class="text-slate-400 text-xs">데이터 없음</span>'}</div>
             </div>
         </div>
         <div class="gen-benchmark-bar">
             <div class="gen-benchmark-item">
                 <span class="gen-benchmark-label">ROAS 평균</span>
-                <span class="gen-benchmark-value" style="color:#7c3aed">${Math.round(p.avgRoas*100)}%</span>
+                <span class="gen-benchmark-value" style="color:#7c3aed">${Math.round((p.avgRoas||0)*100)}%</span>
             </div>
             <div class="gen-benchmark-item">
                 <span class="gen-benchmark-label">CTR 평균</span>
-                <span class="gen-benchmark-value" style="color:#2563eb">${(p.avgCtr*100).toFixed(2)}%</span>
+                <span class="gen-benchmark-value" style="color:#2563eb">${((p.avgCtr||0)*100).toFixed(2)}%</span>
             </div>
             <div class="gen-benchmark-item">
                 <span class="gen-benchmark-label">브랜드</span>
@@ -489,20 +507,58 @@ function _buildGeneratePanelHTML(p) {
                 <span class="gen-benchmark-value">${p.platform || '전체'}</span>
             </div>
         </div>
-        ${thumbsHtml ? `<div class="gen-top5-thumbs">${thumbsHtml}</div>` : ''}
+        ${thumbsHtml ? `<div class="gen-top5-thumbs">${thumbsHtml}</div>` : ''}`;
+
+    // 참고 소재 썸네일 (top5 중 이미지 있는 것)
+    const refThumbsHtml = (p.top5 || []).filter(c => c.thumbnail_url || c.media_url).slice(0, 8).map((c, i) => {
+        const rawThumb = c.thumbnail_url || c.media_url || '';
+        const rawRef   = c.media_url || c.thumbnail_url || '';
+        const thumb    = _toDirectImageUrl(rawThumb) || rawThumb;
+        const refUrl   = _toDirectImageUrl(rawRef)   || rawRef;
+        return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
+            <img src="${thumb}" class="gen-ref-thumb" loading="lazy" onerror="this.style.opacity='0.15'">
+            <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
+        </div>`;
+    }).join('') || '<p class="text-xs text-slate-400 py-2">소재 없음</p>';
+
+    return `
+    <!-- ① 제품 필터 바 -->
+    <div class="gen-product-filter-bar">
+        <i class="fas fa-cube text-indigo-500 flex-shrink-0"></i>
+        <span class="gen-product-filter-label">제품 선택</span>
+        <select id="gen-product-filter-sel" class="gen-product-filter-sel">
+            <option value="">전체 제품</option>
+            ${productOptions}
+        </select>
+        ${p.selectedProduct ? `<span class="gen-product-filter-badge">${p.selectedProduct}</span>` : `<span class="text-xs text-slate-400">제품 선택 시 해당 소재만 분석</span>`}
     </div>
 
-    <!-- 제품 정보 -->
+    <!-- ② 워킹 패턴 분석 -->
+    <div class="gen-section">
+        <div class="gen-section-header">
+            <i class="fas fa-trophy text-amber-500"></i>
+            <span>워킹 패턴 분석</span>
+            <span class="gen-section-sub">
+                ${p.selectedProduct ? `<b>${p.selectedProduct}</b> ·` : 'ROAS 기준 BEST ·'}
+                ${p.top5?.length || 0}개 소재
+            </span>
+        </div>
+        ${patternInner}
+    </div>
+
+    <!-- ③ 제품 정보 -->
     <div class="gen-section">
         <div class="gen-section-header">
             <i class="fas fa-box-open text-indigo-500"></i>
             <span>제품 정보</span>
-            <span class="gen-section-sub">입력하면 더 정밀한 브리프 생성</span>
+            <span class="gen-section-sub">소재 생성 타겟 제품</span>
         </div>
         <div class="gen-product-inputs">
             <div class="gen-input-group">
-                <label class="gen-input-label">제품명</label>
-                <input id="gen-product-name" type="text" class="gen-input" placeholder="예: ShinchanSET 립글로스 세트">
+                <label class="gen-input-label">제품명 <span class="font-normal text-slate-400">(생성에 반영)</span></label>
+                <input id="gen-product-name" type="text" class="gen-input"
+                    placeholder="예: 립글로스 세트"
+                    value="${(p.selectedProduct || '').replace(/"/g,'&quot;')}">
             </div>
             <div class="gen-input-group">
                 <label class="gen-input-label">제품 이미지 URL <span class="font-normal text-slate-400">(선택)</span></label>
@@ -511,7 +567,7 @@ function _buildGeneratePanelHTML(p) {
         </div>
     </div>
 
-    <!-- 참고 소재 -->
+    <!-- ④ 참고 소재 -->
     <div class="gen-section">
         <div class="gen-section-header">
             <i class="fas fa-images text-emerald-500"></i>
@@ -519,57 +575,37 @@ function _buildGeneratePanelHTML(p) {
             <span class="gen-section-sub">클릭해서 선택 → AI가 스타일 학습</span>
         </div>
         <div class="mt-2 space-y-3">
-
-            <!-- ① 자동: 스프레드시트 ROAS 상위 소재 -->
             <div>
                 <p class="gen-input-label mb-2">
                     <i class="fas fa-trophy text-amber-500 mr-1"></i>
-                    ROAS 상위 소재 <span class="font-normal text-slate-400">(클릭해서 참고 소재로 선택)</span>
+                    ROAS 상위 소재 <span class="font-normal text-slate-400">(클릭해서 선택)</span>
                 </p>
-                <div class="flex gap-2 flex-wrap" id="gen-top-refs">
-                    ${p.top5.filter(c => c.thumbnail_url || c.media_url).slice(0, 8).map((c, i) => {
-                        const rawThumb = c.thumbnail_url || c.media_url || '';
-                        const rawRef   = c.media_url || c.thumbnail_url || '';
-                        const thumb    = _toDirectImageUrl(rawThumb) || rawThumb;
-                        const refUrl   = _toDirectImageUrl(rawRef)   || rawRef;
-                        return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
-                            <img src="${thumb}" class="gen-ref-thumb" loading="lazy"
-                                 onerror="this.style.opacity='0.15'">
-                            <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
-                        </div>`;
-                    }).join('')}
-                </div>
+                <div class="flex gap-2 flex-wrap" id="gen-top-refs">${refThumbsHtml}</div>
                 <p class="text-xs text-slate-400 mt-1.5">선택한 소재의 스타일·구도를 참고해서 생성합니다</p>
             </div>
-
-            <!-- ② 수동: 직접 URL 입력 (Drive 개별 파일 등) -->
             <div>
                 <p class="gen-input-label mb-1">
                     <i class="fas fa-link text-indigo-400 mr-1"></i>
-                    직접 URL 추가 <span class="font-normal text-slate-400">(Drive 파일 링크, 이미지 URL — 줄바꿈 구분)</span>
+                    직접 URL 추가 <span class="font-normal text-slate-400">(Drive 파일 링크 — 줄바꿈 구분)</span>
                 </p>
-                <textarea id="gen-reference-urls" rows="3" class="gen-input font-mono text-xs"
-                    placeholder="https://drive.google.com/file/d/xxxxxx/view&#10;https://drive.google.com/file/d/yyyyyy/view"
+                <textarea id="gen-reference-urls" rows="2" class="gen-input font-mono text-xs"
+                    placeholder="https://drive.google.com/file/d/xxxxxx/view"
                     style="resize:vertical">${localStorage.getItem('hf_reference_urls') || ''}</textarea>
                 <div class="flex items-center justify-between mt-1">
                     <p class="text-xs text-slate-400">Drive 링크 → 자동 변환됨</p>
                     <button id="gen-save-refs" class="text-xs text-indigo-600 font-semibold hover:underline">저장</button>
                 </div>
             </div>
-
-            <!-- 최종 선택 미리보기 -->
             <div id="gen-ref-preview" class="flex gap-2 flex-wrap items-center"></div>
         </div>
     </div>
 
-    <!-- 연결 설정 -->
+    <!-- ⑤ 연결 설정 -->
     <div class="gen-section">
         <div class="gen-section-header">
             <i class="fas fa-plug text-amber-500"></i>
             <span>연결 설정</span>
         </div>
-
-        <!-- API 키 -->
         <div class="mt-3">
             <div class="flex items-center justify-between mb-1">
                 <label class="gen-input-label">Higgsfield API 키 (KEY_ID:KEY_SECRET)</label>
@@ -580,21 +616,16 @@ function _buildGeneratePanelHTML(p) {
             </div>
             <div class="flex gap-2">
                 <input id="gen-api-key" type="password" class="gen-input flex-1"
-                    placeholder="abc123:xxxxxxxxxxxxxxxx"
-                    value="${savedKey}">
+                    placeholder="abc123:xxxxxxxxxxxxxxxx" value="${savedKey}">
                 <button id="gen-save-key" class="gen-btn-copy whitespace-nowrap">
                     <i class="fas fa-save mr-1.5"></i>저장
                 </button>
             </div>
             ${savedKey ? `<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="fas fa-circle-check"></i> 저장됨: ${maskedKey}</p>` : ''}
         </div>
-
-        <!-- Vercel URL -->
         <div class="mt-4">
             <div class="flex items-center justify-between mb-1">
-                <label class="gen-input-label">Vercel 배포 URL
-                    <span class="text-slate-400 font-normal ml-1">(필수 — 아래 안내 참고)</span>
-                </label>
+                <label class="gen-input-label">Vercel 배포 URL <span class="text-slate-400 font-normal">(필수)</span></label>
                 <a href="https://vercel.com/new" target="_blank"
                    class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold flex items-center gap-1">
                     <i class="fas fa-external-link-alt text-[10px]"></i> Vercel 배포
@@ -614,13 +645,13 @@ function _buildGeneratePanelHTML(p) {
                     <p class="font-semibold">⚡ Vercel 설정 방법 (2분)</p>
                     <p>1. <a href="https://vercel.com" target="_blank" class="underline">vercel.com</a> → GitHub 로그인</p>
                     <p>2. "Add New Project" → 이 저장소(creative-dashboard) 선택</p>
-                    <p>3. Settings → Environment Variables → <code class="bg-amber-100 px-1 rounded">HF_CREDENTIALS</code> = <code class="bg-amber-100 px-1 rounded">API키(KEY_ID:KEY_SECRET)</code> 추가</p>
+                    <p>3. Settings → Environment Variables → <code class="bg-amber-100 px-1 rounded">HF_CREDENTIALS</code> 추가</p>
                     <p>4. Deploy → 완료 후 URL 복붙</p>
                    </div>`}
         </div>
     </div>
 
-    <!-- 생성 브리프 -->
+    <!-- ⑥ 생성 브리프 & 결과 -->
     <div class="gen-section">
         <div class="gen-section-header">
             <i class="fas fa-wand-magic-sparkles text-pink-500"></i>
@@ -629,8 +660,6 @@ function _buildGeneratePanelHTML(p) {
                 <i class="fas fa-rotate-right"></i> 분석 새로고침
             </button>
         </div>
-
-        <!-- 이미지 생성 -->
         <div id="gen-brief-image">
             <textarea id="gen-prompt-image" class="gen-prompt-textarea" rows="8" spellcheck="false"
                 placeholder="프롬프트 자동 생성 중..."></textarea>
@@ -651,7 +680,6 @@ function _buildGeneratePanelHTML(p) {
                     <i class="fas fa-sparkles mr-1.5"></i>이미지 생성
                 </button>
             </div>
-            <!-- 결과 표시 -->
             <div id="gen-result-image" class="gen-result-area hidden"></div>
         </div>
     </div>`;
@@ -661,7 +689,16 @@ function _buildGeneratePanelHTML(p) {
 // 이벤트 바인딩
 // ============================
 function _bindGeneratePanelEvents() {
-    document.getElementById('gen-refresh-btn')?.addEventListener('click', renderGeneratePanel);
+    document.getElementById('gen-refresh-btn')?.addEventListener('click', () => {
+        _genProductFilter = '';  // 새로고침 시 제품 필터 초기화
+        renderGeneratePanel();
+    });
+
+    // 제품 필터 변경 → 즉시 재렌더
+    document.getElementById('gen-product-filter-sel')?.addEventListener('change', (e) => {
+        _genProductFilter = e.target.value;
+        renderGeneratePanel();
+    });
 
     // API 키 저장
     document.getElementById('gen-save-key')?.addEventListener('click', () => {

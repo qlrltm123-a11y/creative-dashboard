@@ -793,8 +793,8 @@ function updateDashboard() {
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
     }
-    // 생성 패널: 현재 활성 탭일 때만 갱신 (필터 변경 시 워킹 패턴 즉시 반영)
-    if (_currentSection === 'generate' && typeof window.renderGeneratePanel === 'function') {
+    // 생성 패널: 패널이 한 번이라도 열렸고 현재 활성 탭이면 갱신
+    if (_renderedSections.generate && _currentSection === 'generate' && typeof window.renderGeneratePanel === 'function') {
         window.renderGeneratePanel();
     }
 }
