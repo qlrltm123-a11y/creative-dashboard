@@ -20,21 +20,25 @@ module.exports = async function handler(req, res) {
   // app_key: env 우선, 없으면 OAuth state 파라미터에서 꺼냄
   let stateData = {};
   try { stateData = JSON.parse(decodeURIComponent(req.query.state || '{}')); } catch {}
-  const appKey = process.env.KAKAO_APP_KEY || stateData.appKey || '';
+  const appKey       = process.env.KAKAO_APP_KEY       || stateData.appKey       || '';
+  const clientSecret = process.env.KAKAO_CLIENT_SECRET || stateData.clientSecret || '';
   if (!appKey) {
     return res.status(500).send(htmlPage('❌ 설정 오류', 'KAKAO_APP_KEY 환경변수가 없어요.<br>Vercel → Settings → Environment Variables에서 추가하세요.', null));
   }
 
   try {
+    const tokenParams = {
+      grant_type:   'authorization_code',
+      client_id:    appKey,
+      redirect_uri: redirectUri,
+      code,
+    };
+    if (clientSecret) tokenParams.client_secret = clientSecret;
+
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
-      body: new URLSearchParams({
-        grant_type:   'authorization_code',
-        client_id:    appKey,
-        redirect_uri: redirectUri,
-        code,
-      }).toString(),
+      body: new URLSearchParams(tokenParams).toString(),
     });
     const data = await tokenRes.json();
     if (!tokenRes.ok || !data.refresh_token) {
