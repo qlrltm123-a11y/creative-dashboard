@@ -389,14 +389,7 @@ function renderMegawariPanel() {
         .filter(c => useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0)
         .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
 
-    // ── 고효율: 제품별 최고 소재 ──────────────────────────
-    const topByProd = {};
-    sortedC.forEach(c => {
-        const prod = (c.product||'기타').trim();
-        if (!topByProd[prod]) topByProd[prod] = c;
-    });
-    const topCreativeIds = new Set(Object.values(topByProd).map(c => c.ad_name||c.creative_name||''));
-
+    // ── 썸네일 헬퍼 ───────────────────────────────────────
     const _mwThumb = (c) => {
         const raw = c.thumbnail_url || c.media_url || '';
         const fallback = `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
@@ -407,7 +400,10 @@ function renderMegawariPanel() {
         return `<img class="mw-cr-thumb" src="${raw}" alt="" onerror="this.outerHTML='${fallback.replace(/'/g,"&#39;")}'">`;
     };
 
-    const topRows = Object.entries(topByProd).map(([prod, c]) => {
+    // ── 고효율: 개별 소재 TOP5 ───────────────────────────
+    const topCreativeIds = new Set(sortedC.slice(0,5).map(c => c.ad_name||c.creative_name||''));
+
+    const topRows = sortedC.slice(0, 5).map(c => {
         const cnt  = c.add_to_cart||0;
         const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
         const metricHtml = useAtc
@@ -417,7 +413,7 @@ function renderMegawariPanel() {
         <div class="mw-creative-item top">
             ${_mwThumb(c)}
             <div class="mw-cr-info">
-                <span class="mw-cr-prod-badge">${prod}</span>
+                <span class="mw-cr-prod-badge">${(c.product||'기타').slice(0,10)}</span>
                 <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
             </div>
             ${metricHtml}
@@ -509,7 +505,7 @@ function renderMegawariPanel() {
     <div class="mw-two-col">
         <div>
             <div class="mw-section-hd">
-                🏆 고효율 소재 (제품별)
+                🏆 고효율 소재 TOP5
                 <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'장바구니 담기 기준':'ROAS 기준'}</span>
             </div>
             <div class="mw-creative-list">${topRows||'<p class="mw-no-data">데이터 없음</p>'}</div>
