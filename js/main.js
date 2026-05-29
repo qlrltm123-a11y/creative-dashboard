@@ -908,6 +908,16 @@ function isNoConvPlatform(platform) {
     return NO_CONV_PLATFORMS.some(p => lc === p || lc.includes(p));
 }
 
+// BEST/WORST 선정용: 트래킹 안 되는 브로드 매체 행 제외 필터
+// "Meta(broad)", "TikTok(broad)" 등 isNoConvPlatform=true 행은 제외
+// "Single One Meta", "Single One TikTok" 등 tracked 계열은 유지
+// 매체 필터가 이미 특정 플랫폼으로 걸린 경우엔 적용 안 함
+function filterTrackedOnly(rows) {
+    const tracked = rows.filter(c => !isNoConvPlatform(c.platform));
+    // tracked 행이 하나도 없으면 원본 유지 (데이터 구조상 트래킹 구분 없는 경우 대비)
+    return tracked.length > 0 ? tracked : rows;
+}
+
 // ★ 장바구니 최적화 모드 감지
 // 현재 필터 기준 데이터에 add_to_cart 값이 있으면 장바구니 캠페인으로 판단
 function isCartMode(dataPool) {
@@ -992,7 +1002,7 @@ function buildPerformanceCriteriaBadge() {
             </div>
             <div class="perf-criteria-sub">
                 <i class="fas fa-info-circle"></i>
-                <span>아래 모든 컨텐츠는 동일한 기준으로 선정됩니다 · ad_name 합산 · 광고비 중앙값/₩10,000 이상 · X·Meta·TikTok 포함</span>
+                <span>아래 모든 컨텐츠는 동일한 기준으로 선정됩니다 · ad_name 단위 매체 종합 합산 · 광고비 중앙값/₩10,000 이상 · 브로드 Meta·TikTok 제외(전환 미측정) · Single One 계열 포함</span>
             </div>
         </div>
     `;
@@ -3540,8 +3550,15 @@ function renderProductPerformance() {
     if (performanceProduct) {
         data = data.filter(c => (c.product || '').trim() === performanceProduct);
     }
-    // ad_name 단위 합산
-    if (typeof aggregateByAdName === 'function') data = aggregateByAdName(data);
+    // ★ BEST/WORST 선정 기준 개선:
+    // 매체 필터가 없는 경우(전체 보기) — 트래킹 안 되는 브로드 매체(Meta, TikTok)는 제외하고
+    // Single One Meta / Single One TikTok 등 전환 추적 되는 행만으로 합산
+    // → 같은 이름 소재가 여러 매체에 집행된 경우, 전환 추적 매체 수치만으로 ROAS/CTR 계산
+    const isAllPlatform = !currentPlatform;
+    const dataForRanking = isAllPlatform ? filterTrackedOnly(data) : data;
+
+    // ad_name 단위 합산 (tracked 행만으로 집계)
+    if (typeof aggregateByAdName === 'function') data = aggregateByAdName(dataForRanking);
 
     console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
 
@@ -3583,7 +3600,10 @@ function renderProductPerformance() {
 
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const cartLabel = cartMode ? '🛒 ' : '';
-    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준</span>`;
+    const trackingNote = isAllPlatform
+        ? `<span class="text-[10px] text-indigo-400 ml-1">· 전환 추적 매체 종합 합산</span>`
+        : `<span class="text-[10px] text-slate-400 ml-1">· ${currentPlatform} 단독</span>`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${trackingNote}</span>`;
 
     // 정렬: cost_per_atc는 낮을수록 좋음 → 오름차순
     const sortAsc = metric === 'cost_per_atc';
@@ -3656,7 +3676,7 @@ function renderProductPerformance() {
         const worstFinal = worstFiltered.length ? worstFiltered : worst;
 
         if (worstSummaryEl) {
-            worstSummaryEl.innerHTML = `<span class="text-xs text-slate-400">WORST TOP 5 · ${worstPool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준</span>`;
+            worstSummaryEl.innerHTML = `<span class="text-xs text-slate-400">WORST TOP 5 · ${worstPool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${isAllPlatform ? '<span class="text-[10px] text-indigo-400 ml-1">· 전환 추적 매체 종합 합산</span>' : ''}</span>`;
         }
 
         worstEl.innerHTML = worstFinal.map((c, i) => createRankRow(c, i + 1, metric, 'worst', benchmark)).join('');
