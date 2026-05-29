@@ -993,23 +993,28 @@ window.buildPerformanceCriteriaBadge = buildPerformanceCriteriaBadge;
 // ============================
 function calcKpiTrend(rawList) {
     // start_date 필드가 있는 소재만 추출
-    const dated = rawList.filter(c => c.start_date);
+    const dated = rawList.filter(c => {
+        if (!c.start_date) return false;
+        const d = new Date(c.start_date);
+        return !isNaN(d.getTime());
+    });
     if (dated.length < 2) return null; // 날짜 데이터 부족 → fallback
 
-    const dates = dated.map(c => new Date(c.start_date)).filter(d => !isNaN(d));
-    if (!dates.length) return null;
+    // 날짜 정렬
+    dated.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
 
-    const maxDate = new Date(Math.max(...dates));
-    // 최근 7일 / 직전 7일 구간
-    const recent7End   = maxDate;
-    const recent7Start = new Date(maxDate); recent7Start.setDate(maxDate.getDate() - 6);
-    const prev7End     = new Date(recent7Start); prev7End.setDate(recent7Start.getDate() - 1);
-    const prev7Start   = new Date(prev7End); prev7Start.setDate(prev7End.getDate() - 6);
+    const allDates = dated.map(c => new Date(c.start_date));
+    const minDate = allDates[0];
+    const maxDate = allDates[allDates.length - 1];
+    const spanMs = maxDate - minDate;
+
+    // 전체 기간이 너무 짧으면 반반 나눔, 충분하면 후반부 vs 전반부
+    const midDate = new Date(minDate.getTime() + spanMs / 2);
 
     function sumPeriod(list, from, to) {
         const inRange = list.filter(c => {
             const d = new Date(c.start_date);
-            return !isNaN(d) && d >= from && d <= to;
+            return d >= from && d <= to;
         });
         if (!inRange.length) return null;
         return {
@@ -1021,17 +1026,19 @@ function calcKpiTrend(rawList) {
         };
     }
 
-    const cur  = sumPeriod(dated, recent7Start, recent7End);
-    const prev = sumPeriod(dated, prev7Start, prev7End);
+    const cur  = sumPeriod(dated, midDate, maxDate);
+    const prev = sumPeriod(dated, minDate, new Date(midDate.getTime() - 1));
     if (!cur || !prev) return null;
+
+    const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
 
     function pctDiff(a, b) {
         if (!b || b === 0) return null;
         return ((a - b) / b) * 100;
     }
 
-    const curCtr  = cur.impressions   > 0 ? cur.clicks / cur.impressions : 0;
-    const prevCtr = prev.impressions  > 0 ? prev.clicks / prev.impressions : 0;
+    const curCtr  = cur.impressions  > 0 ? cur.clicks / cur.impressions : 0;
+    const prevCtr = prev.impressions > 0 ? prev.clicks / prev.impressions : 0;
     const curRoas  = cur.spend  > 0 ? cur.revenue / cur.spend : 0;
     const prevRoas = prev.spend > 0 ? prev.revenue / prev.spend : 0;
 
@@ -1042,7 +1049,7 @@ function calcKpiTrend(rawList) {
         conversions: pctDiff(cur.conversions, prev.conversions),
         ctr:         prevCtr > 0 ? ((curCtr - prevCtr) / prevCtr * 100) : null,
         roas:        prevRoas > 0 ? ((curRoas - prevRoas) / prevRoas * 100) : null,
-        periodLabel: `${recent7Start.getMonth()+1}/${recent7Start.getDate()}~${recent7End.getMonth()+1}/${recent7End.getDate()}`,
+        periodLabel: `${fmt(midDate)}~${fmt(maxDate)} vs ${fmt(minDate)}~${fmt(new Date(midDate.getTime()-1))}`,
     };
 }
 
