@@ -398,15 +398,22 @@ function renderMegawariPanel() {
     const topCreativeIds = new Set(Object.values(topByProd).map(c => c.ad_name||c.creative_name||''));
 
     const topRows = Object.entries(topByProd).map(([prod, c]) => {
-        const cnt  = c.add_to_cart||0;
-        const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
+        const cnt      = c.add_to_cart||0;
+        const rate     = (c.clicks||0)>0 ? cnt/c.clicks : 0;
+        const thumbUrl = _toPublicThumb(c.thumbnail_url || c.media_url || '');
+        const thumbHtml = thumbUrl
+            ? `<img class="mw-cr-thumb" src="${thumbUrl}" alt="" onerror="this.style.display='none'">`
+            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
         const metricHtml = useAtc
             ? `<span class="mw-cr-roas ${_atcClass(cnt)}">${_fmtAtc(cnt, rate)}</span>`
             : `<span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>`;
         return `
         <div class="mw-creative-item top">
-            <span class="mw-cr-prod-badge">${prod}</span>
-            <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            ${thumbHtml}
+            <div class="mw-cr-info">
+                <span class="mw-cr-prod-badge">${prod}</span>
+                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            </div>
             ${metricHtml}
         </div>`;
     }).join('');
@@ -423,13 +430,20 @@ function renderMegawariPanel() {
         : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
 
     const botRows = worstC.map(c => {
+        const thumbUrl = _toPublicThumb(c.thumbnail_url || c.media_url || '');
+        const thumbHtml = thumbUrl
+            ? `<img class="mw-cr-thumb" src="${thumbUrl}" alt="" onerror="this.style.display='none'">`
+            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
         const metricHtml = useAtc
             ? `<span class="mw-cr-roas roas-bad">담기 0건</span>`
             : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
         return `
         <div class="mw-creative-item bot">
-            <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'').slice(0,8)||'기타'}</span>
-            <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            ${thumbHtml}
+            <div class="mw-cr-info">
+                <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'').slice(0,8)||'기타'}</span>
+                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            </div>
             ${metricHtml}
         </div>`;
     }).join('');
@@ -651,7 +665,7 @@ function _mwCopyReport() {
 window._mwCopyReport = _mwCopyReport;
 
 // ── 카카오 API로 전송 ─────────────────────────────────────────
-async function _mwSendViaKakao(text, creatives = []) {
+async function _mwSendViaKakao(text) {
     const vercelBase   = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
     const refreshToken = localStorage.getItem('mw_kakao_refresh_token') || '';
     const appKey       = localStorage.getItem('mw_kakao_app_key') || '';
@@ -664,18 +678,14 @@ async function _mwSendViaKakao(text, creatives = []) {
     }
 
     const clientSecret = localStorage.getItem('mw_kakao_client_secret') || '';
-    const payload = { text, refresh_token: refreshToken, app_key: appKey, client_secret: clientSecret };
-    if (creatives.length) payload.creatives = creatives;
-
     const res  = await fetch(`${vercelBase}/api/kakao-send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ text, refresh_token: refreshToken, app_key: appKey, client_secret: clientSecret }),
     });
     const data = await res.json();
     if (res.ok) {
-        const imgMsg = data.images_sent ? `\n🖼 소재 이미지 ${data.images_sent}개도 전송됐어요!` : '';
-        alert(`✅ 카카오톡으로 전송됐어요!${imgMsg}`);
+        alert('✅ 카카오톡으로 전송됐어요!');
     } else {
         const detail = data.detail ? `\n카카오 오류: ${JSON.stringify(data.detail)}` : '';
         alert(`❌ 전송 실패 (${res.status}): ${data.error || ''}${detail}\n\n클립보드에 복사합니다.`);
@@ -683,16 +693,9 @@ async function _mwSendViaKakao(text, creatives = []) {
     }
 }
 
-function _mwSendNow() {
-    const creatives = _mwGetTopCreativesForKakao();
-    _mwSendViaKakao(_mwGetReportText(), creatives);
-}
+function _mwSendNow()  { _mwSendViaKakao(_mwGetReportText()); }
 window._mwSendNow = _mwSendNow;
-
-function _mwTestSend() {
-    const creatives = _mwGetTopCreativesForKakao();
-    _mwSendViaKakao(_mwGetReportText(), creatives);
-}
+function _mwTestSend() { _mwSendViaKakao(_mwGetReportText()); }
 window._mwTestSend = _mwTestSend;
 
 // ── 카카오 설정 저장 ──────────────────────────────────────────
