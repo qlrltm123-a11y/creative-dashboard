@@ -17,8 +17,10 @@ module.exports = async function handler(req, res) {
   const proto    = req.headers['x-forwarded-proto'] || 'https';
   const redirectUri = `${proto}://${host}/api/kakao-callback`;
 
-  // app_key는 env 또는 state param으로 전달받음
-  const appKey = process.env.KAKAO_APP_KEY || req.query.client_id || '';
+  // app_key: env 우선, 없으면 OAuth state 파라미터에서 꺼냄
+  let stateData = {};
+  try { stateData = JSON.parse(decodeURIComponent(req.query.state || '{}')); } catch {}
+  const appKey = process.env.KAKAO_APP_KEY || stateData.appKey || '';
   if (!appKey) {
     return res.status(500).send(htmlPage('❌ 설정 오류', 'KAKAO_APP_KEY 환경변수가 없어요.<br>Vercel → Settings → Environment Variables에서 추가하세요.', null));
   }

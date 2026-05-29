@@ -561,7 +561,9 @@ function _mwKakaoLogin() {
     if (!vercelBase) return alert('Vercel URL을 먼저 설정해주세요 (광고 생성 탭)');
     const redirectUri = encodeURIComponent(`${vercelBase}/api/kakao-callback`);
     const scope = encodeURIComponent('talk_message');
-    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${appKey}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    // state에 appKey를 담아서 콜백에서 꺼낼 수 있게 함
+    const state = encodeURIComponent(JSON.stringify({ appKey }));
+    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${appKey}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}`;
     const popup = window.open(url, 'kakao_login', 'width=500,height=600');
     // 팝업에서 token 받기
     window._kakaoLoginCallback = (refreshToken) => {
