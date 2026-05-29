@@ -198,8 +198,12 @@ function renderMegawariPanel() {
     }
 
     const byDate = _aggregateMw(mwData);
-    const sortedDates = Object.keys(byDate).sort();
-    window._mwSelectedDate = window._mwSelectedDate && byDate[window._mwSelectedDate]
+    // 메가와리 기간(티저+본기간) 안에 있는 날짜만 탭에 표시
+    const periodStart = MW_PERIODS[0].start;
+    const periodEnd   = MW_PERIODS[MW_PERIODS.length - 1].end;
+    const sortedDates = Object.keys(byDate).sort()
+        .filter(iso => iso >= periodStart && iso <= periodEnd);
+    window._mwSelectedDate = window._mwSelectedDate && sortedDates.includes(window._mwSelectedDate)
         ? window._mwSelectedDate : sortedDates[sortedDates.length - 1];
 
     const sel = window._mwSelectedDate;
