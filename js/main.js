@@ -16,6 +16,15 @@ let winningProduct = '';       // ★ 위닝 요소 인사이트 - 제품 필터
 let appealRightMetric = 'ctr'; // 소구포인트 우측 컬럼 지표: 'ctr' | 'atc_rate'
 let charts = {};
 
+function debounce(fn, delay = 250) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+const debouncedUpdateDashboard = debounce(() => updateDashboard(), 250);
+
 const BRAND_COLORS = {
     BOH: '#f43f5e',
     WM: '#10b981',
@@ -142,7 +151,7 @@ function bindEvents() {
             aiCampaign = '';
 
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
     const platformResetBtn = document.getElementById('platform-filter-reset');
@@ -171,7 +180,7 @@ function bindEvents() {
             aiProduct = '';
             aiCampaign = '';
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
     const retailResetBtn = document.getElementById('retail-filter-reset');
@@ -196,7 +205,7 @@ function bindEvents() {
             aiProduct = '';
             aiCampaign = '';
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
     const eventResetBtn = document.getElementById('event-filter-reset');
@@ -377,19 +386,24 @@ function switchSection(sectionName) {
     // ★ Lazy render: 첫 진입 시에만 렌더 (이후엔 필터 변경 시에만 갱신)
     if (!_renderedSections[sectionName]) {
         _renderedSections[sectionName] = true;
-        if (sectionName === 'performance') {
-            renderPerformanceCriteriaBadge();
-            renderScatterChart();
-            renderAppealInsight();
-            renderProductPerformance();
-            renderPlatformCreativeMatrix();
-        } else if (sectionName === 'ai') {
-            if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
-        } else if (sectionName === 'generate') {
-            if (typeof window.renderGeneratePanel === 'function') window.renderGeneratePanel();
-        } else if (sectionName === 'megawari') {
-            if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
-        }
+        const panel = document.querySelector(`.section-panel[data-panel="${sectionName}"]`);
+        if (panel) panel.classList.add('section-loading');
+        requestAnimationFrame(() => {
+            if (sectionName === 'performance') {
+                renderPerformanceCriteriaBadge();
+                renderScatterChart();
+                renderAppealInsight();
+                renderProductPerformance();
+                renderPlatformCreativeMatrix();
+            } else if (sectionName === 'ai') {
+                if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
+            } else if (sectionName === 'generate') {
+                if (typeof window.renderGeneratePanel === 'function') window.renderGeneratePanel();
+            } else if (sectionName === 'megawari') {
+                if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
+            }
+            if (panel) panel.classList.remove('section-loading');
+        });
     }
 
     // 차트 리사이즈 (display:none → block 전환 시 Chart.js가 캔버스 크기를 못 잡는 문제 방지)
@@ -403,14 +417,6 @@ function switchSection(sectionName) {
 }
 window.switchSection = switchSection;
 
-// ★ 디바운스 유틸 — 빠른 연속 호출 시 마지막 호출만 실행
-function debounce(fn, ms) {
-    let t = null;
-    return function(...args) {
-        clearTimeout(t);
-        t = setTimeout(() => fn.apply(this, args), ms);
-    };
-}
 
 // ============================
 // Filtering
