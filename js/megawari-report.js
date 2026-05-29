@@ -225,6 +225,11 @@ function renderMegawariPanel() {
         </button>`;
     });
 
+    // ── 기간 판단 (전체에서 공유) ────────────────────────────
+    const isTeaser = dayInfo.period?.key === 'teaser';
+    const hasAtc   = today.creatives.some(c => (c.add_to_cart||0) > 0);
+    const useAtc   = isTeaser && hasAtc;
+
     // ── 제품 × 매체 테이블 ────────────────────────────────────
     const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
     // 전체 매체 목록
@@ -278,9 +283,6 @@ function renderMegawariPanel() {
     }).join('');
 
     // ── 소재 리스트 (티저: ATC율 기준 / 본기간: ROAS 기준) ─
-    const isTeaser = dayInfo.period?.key === 'teaser';
-    const hasAtc   = today.creatives.some(c => (c.add_to_cart||0) > 0);
-    const useAtc   = isTeaser && hasAtc;
 
     // 유효 소재 정렬
     const sortedC = today.creatives
