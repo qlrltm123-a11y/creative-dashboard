@@ -15,16 +15,8 @@ function _getMwPeriod(isoDate) {
 function _getMwDayLabel(isoDate) {
     const period = _getMwPeriod(isoDate);
     if (!period) return { label: isoDate.slice(5).replace('-','/'), sub: '', badge: '', color: '#64748b', period: null };
-    const start = new Date(period.start);
-    const curr  = new Date(isoDate);
-    const diffDays = Math.round((curr - start) / 86400000) + 1;
-    return {
-        label: `D+${diffDays}`,
-        sub: isoDate.slice(5).replace('-','/'),
-        badge: period.badge,
-        color: period.color,
-        period,
-    };
+    const diffDays = Math.round((new Date(isoDate) - new Date(period.start)) / 86400000) + 1;
+    return { label: `D+${diffDays}`, sub: isoDate.slice(5).replace('-','/'), badge: period.badge, color: period.color, period };
 }
 
 // ── 유틸 ──────────────────────────────────────────────────────
@@ -36,19 +28,24 @@ function _fmtMoney(v, unit) {
     if (Math.abs(v) >= 10_000)    return `${Math.round(v / 1_000)}K${unit||''}`;
     return `${Math.round(v).toLocaleString()}${unit||''}`;
 }
-function _arrow(curr, prev) {
-    if (!prev || !curr) return '';
-    const diff = ((curr - prev) / Math.abs(prev)) * 100;
-    if (diff > 3)  return `📈+${Math.round(diff)}%`;
-    if (diff < -3) return `📉${Math.round(diff)}%`;
-    return '➡️';
+function _roasClass(roas) {
+    if (roas >= 3)   return 'roas-high';
+    if (roas >= 1.5) return 'roas-mid';
+    if (roas >= 1)   return 'roas-low';
+    return 'roas-bad';
+}
+function _diffBadge(curr, prev) {
+    if (!prev || !curr || prev === 0) return '';
+    const p = ((curr - prev) / Math.abs(prev)) * 100;
+    if (p > 3)  return `<span class="mw-diff up">▲${Math.abs(Math.round(p))}%</span>`;
+    if (p < -3) return `<span class="mw-diff dn">▼${Math.abs(Math.round(p))}%</span>`;
+    return `<span class="mw-diff flat">→</span>`;
 }
 
 // ── 메가와리 데이터 필터 ──────────────────────────────────────
 function _getMwData() {
     const raw = Array.isArray(window.allCreatives) ? window.allCreatives : [];
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : null;
-
     let data = raw.filter(c => {
         const ev = (c.event || '').toLowerCase().replace(/\s/g, '');
         return ev.includes('megawari') || ev.includes('メガワリ') || ev.includes('mega');
@@ -60,189 +57,116 @@ function _getMwData() {
 // ── 날짜별 집계 ───────────────────────────────────────────────
 function _aggregateMw(data) {
     const byDate = {};
-
     data.forEach(c => {
         const raw = c.start_date || c.date || '';
         const iso = raw ? new Date(raw).toISOString().split('T')[0] : '0000-00-00';
-
-        if (!byDate[iso]) {
-            byDate[iso] = {
-                iso,
-                spend: 0, revenue: 0, impressions: 0, clicks: 0,
-                byProduct: {}, byPlatform: {},
-                creatives: [],
-            };
-        }
+        if (!byDate[iso]) byDate[iso] = { iso, spend:0, revenue:0, impressions:0, clicks:0, byProduct:{}, byPlatform:{}, creatives:[] };
         const d = byDate[iso];
-        d.spend       += c.spend       || 0;
-        d.revenue     += c.revenue     || 0;
-        d.impressions += c.impressions || 0;
-        d.clicks      += c.clicks      || 0;
+        d.spend += c.spend||0; d.revenue += c.revenue||0;
+        d.impressions += c.impressions||0; d.clicks += c.clicks||0;
         d.creatives.push(c);
 
-        const prod = (c.product || '기타').trim();
-        const plat = (c.platform || '기타').trim();
+        const prod = (c.product||'기타').trim();
+        const plat = (c.platform||'기타').trim();
 
-        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0, revenue:0, impressions:0, clicks:0, creatives:[], byPlatform:{} };
+        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0,revenue:0,impressions:0,clicks:0,creatives:[],byPlatform:{} };
         const dp = d.byProduct[prod];
-        dp.spend += c.spend || 0; dp.revenue += c.revenue || 0;
-        dp.impressions += c.impressions || 0; dp.clicks += c.clicks || 0;
+        dp.spend+=c.spend||0; dp.revenue+=c.revenue||0; dp.impressions+=c.impressions||0; dp.clicks+=c.clicks||0;
         dp.creatives.push(c);
+        if (!dp.byPlatform[plat]) dp.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0};
+        dp.byPlatform[plat].spend+=c.spend||0; dp.byPlatform[plat].revenue+=c.revenue||0;
+        dp.byPlatform[plat].impressions+=c.impressions||0; dp.byPlatform[plat].clicks+=c.clicks||0;
 
-        if (!dp.byPlatform[plat]) dp.byPlatform[plat] = { spend:0, revenue:0, impressions:0, clicks:0 };
-        dp.byPlatform[plat].spend += c.spend || 0;
-        dp.byPlatform[plat].revenue += c.revenue || 0;
-        dp.byPlatform[plat].impressions += c.impressions || 0;
-        dp.byPlatform[plat].clicks += c.clicks || 0;
-
-        if (!d.byPlatform[plat]) d.byPlatform[plat] = { spend:0, revenue:0, impressions:0, clicks:0 };
-        d.byPlatform[plat].spend += c.spend || 0;
-        d.byPlatform[plat].revenue += c.revenue || 0;
-        d.byPlatform[plat].impressions += c.impressions || 0;
-        d.byPlatform[plat].clicks += c.clicks || 0;
+        if (!d.byPlatform[plat]) d.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0};
+        d.byPlatform[plat].spend+=c.spend||0; d.byPlatform[plat].revenue+=c.revenue||0;
+        d.byPlatform[plat].impressions+=c.impressions||0; d.byPlatform[plat].clicks+=c.clicks||0;
     });
 
-    // ROAS / CTR 파생
-    const calc = obj => {
-        obj.roas = obj.spend > 0 ? obj.revenue / obj.spend : 0;
-        obj.ctr  = obj.impressions > 0 ? obj.clicks / obj.impressions : 0;
-    };
+    const calc = o => { o.roas = o.spend>0 ? o.revenue/o.spend : 0; o.ctr = o.impressions>0 ? o.clicks/o.impressions : 0; };
     Object.values(byDate).forEach(d => {
         calc(d);
         Object.values(d.byProduct).forEach(p => { calc(p); Object.values(p.byPlatform).forEach(calc); });
         Object.values(d.byPlatform).forEach(calc);
     });
-
     return byDate;
 }
 
-// ── AI 코멘트 (rule-based) ────────────────────────────────────
+// ── AI 코멘트 ─────────────────────────────────────────────────
 function _genAiComment(today, yesterday, dayInfo, isoDate) {
     const lines = [];
     const period = _getMwPeriod(isoDate);
-    const periodLabel = period ? period.label : '';
-
-    // 기간별 맥락 코멘트
     if (period?.key === 'teaser') {
-        lines.push(`🎬 티저 기간 중. 본기간(5/29) 대비 소재·예산 준비 상황 점검.`);
+        lines.push(`🎬 티저 기간 중. 본기간(5/29) 대비 소재·예산 준비 점검.`);
     } else if (period?.key === 'main') {
-        const mainStart = new Date('2026-05-29');
-        const curr = new Date(isoDate);
-        const mainDay = Math.round((curr - mainStart) / 86400000) + 1;
-        const totalDays = 13; // 5/29~6/10
+        const mainDay = Math.round((new Date(isoDate) - new Date('2026-05-29')) / 86400000) + 1;
         if (mainDay <= 2)  lines.push(`🚀 본기간 시작! 초반 모멘텀이 전체 성과를 결정합니다.`);
-        if (mainDay >= 10) lines.push(`📅 본기간 후반 (${mainDay}/${totalDays}일차). 소재 피로도 점검 필요.`);
+        if (mainDay >= 10) lines.push(`📅 본기간 후반 (${mainDay}/13일차). 소재 피로도 점검 필요.`);
     }
-
-    // ROAS 추세
     if (yesterday) {
-        const roasDiff = (today.roas - yesterday.roas) / (yesterday.roas || 1) * 100;
-        if (roasDiff >= 15)      lines.push(`✅ ROAS 전일 대비 ${Math.round(roasDiff)}% 상승. 이벤트 모멘텀 강함.`);
-        else if (roasDiff >= 3)  lines.push(`📈 ROAS 소폭 상승 (+${Math.round(roasDiff)}%).`);
-        else if (roasDiff >= -5) lines.push(`➡️ ROAS 전일 대비 유사 수준 (${roasDiff >= 0 ? '+' : ''}${Math.round(roasDiff)}%).`);
-        else if (roasDiff >= -15)lines.push(`⚠️ ROAS 전일 대비 ${Math.abs(Math.round(roasDiff))}% 하락. 소재 피로도 확인 권장.`);
-        else                      lines.push(`🔴 ROAS 급락 (${Math.round(roasDiff)}%). 소재·예산 즉시 점검 필요.`);
+        const d = (today.roas - yesterday.roas) / (yesterday.roas||1) * 100;
+        if (d >= 15)      lines.push(`✅ ROAS ${Math.round(d)}% 상승. 이벤트 모멘텀 강함.`);
+        else if (d >= 3)  lines.push(`📈 ROAS 소폭 상승 (+${Math.round(d)}%).`);
+        else if (d >= -5) lines.push(`➡️ ROAS 전일 대비 유사 수준.`);
+        else if (d >= -15)lines.push(`⚠️ ROAS ${Math.abs(Math.round(d))}% 하락. 소재 피로도 확인.`);
+        else              lines.push(`🔴 ROAS 급락 (${Math.round(d)}%). 즉시 점검 필요.`);
     }
-
-    // 최고/최저 제품
-    const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
-    if (prods.length > 0) {
-        const best = prods[0];
-        lines.push(`🏆 주력 제품: ${best[0]} (ROAS ${_fmtRoas(best[1].roas)})`);
-        if (prods.length > 1) {
-            const worst = prods[prods.length - 1];
-            if (worst[1].roas < 1) lines.push(`⚠️ ${worst[0]} ROAS ${_fmtRoas(worst[1].roas)} — 예산 조정 검토.`);
-        }
+    const prods = Object.entries(today.byProduct).sort((a,b)=>b[1].roas-a[1].roas);
+    if (prods.length) {
+        lines.push(`🏆 주력: ${prods[0][0]} (ROAS ${_fmtRoas(prods[0][1].roas)})`);
+        const worst = prods[prods.length-1];
+        if (prods.length > 1 && worst[1].roas < 1) lines.push(`⚠️ ${worst[0]} 저효율 (${_fmtRoas(worst[1].roas)}) — 예산 조정 검토.`);
     }
-
-    // 매체 추천
-    const plats = Object.entries(today.byPlatform).sort((a,b) => b[1].roas - a[1].roas);
-    if (plats.length > 0) {
-        const best = plats[0];
-        if (best[1].roas > 2) lines.push(`📱 ${best[0]} 효율 최고 (ROAS ${_fmtRoas(best[1].roas)}) — 예산 집중 권장.`);
-        const worst = plats[plats.length-1];
-        if (plats.length > 1 && worst[1].ctr < 0.01) {
-            lines.push(`📉 ${worst[0]} CTR ${_fmtCtr(worst[1].ctr)} — 크리에이티브 교체 검토.`);
-        }
-    }
-
+    const plats = Object.entries(today.byPlatform).sort((a,b)=>b[1].roas-a[1].roas);
+    if (plats.length && plats[0][1].roas > 2) lines.push(`📱 ${plats[0][0]} 최고효율 (${_fmtRoas(plats[0][1].roas)}) — 집중 권장.`);
     return lines.join('\n');
 }
 
 // ── 리포트 텍스트 포맷 ───────────────────────────────────────
-function buildReportText(dateIso, byDate, startIso) {
+function buildReportText(dateIso, byDate) {
     const today = byDate[dateIso];
     if (!today) return '해당 날짜 데이터 없음';
-
     const sortedDates = Object.keys(byDate).sort();
     const prevIso = sortedDates[sortedDates.indexOf(dateIso) - 1];
     const yesterday = prevIso ? byDate[prevIso] : null;
-
     const dayInfo = _getMwDayLabel(dateIso);
-    const dateLabel = dateIso.replace(/-/g, '.');
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
     const periodLabel = dayInfo.period ? `${dayInfo.badge}${dayInfo.period.label}` : 'Megawari';
 
-    // 헤더
-    let txt = `📊 [${brand}] メガワリ ${periodLabel} ${dayInfo.label} 성과 리포트\n`;
-    txt    += `📅 ${dateLabel}\n`;
-    txt    += `${'─'.repeat(24)}\n`;
+    let txt = `📊 [${brand}] メガワリ ${periodLabel} ${dayInfo.label}\n`;
+    txt += `📅 ${dateIso.replace(/-/g,'.')}\n${'─'.repeat(22)}\n`;
+    txt += `🏆 전체\n`;
+    txt += `• ROAS: ${_fmtRoas(today.roas)}${yesterday ? ` (전일比 ${today.roas>yesterday.roas?'+':''}${Math.round((today.roas-yesterday.roas)/(yesterday.roas||1)*100)}%)` : ''}\n`;
+    txt += `• CTR:  ${_fmtCtr(today.ctr)}\n`;
+    txt += `• 매출: ${_fmtMoney(today.revenue,'원')} / 지출: ${_fmtMoney(today.spend,'원')}\n\n`;
 
-    // 전체 KPI
-    txt += `🏆 전체 성과\n`;
-    txt += `• ROAS: ${_fmtRoas(today.roas)} ${yesterday ? _arrow(today.roas, yesterday.roas) : ''}\n`;
-    txt += `• CTR: ${_fmtCtr(today.ctr)} ${yesterday ? _arrow(today.ctr, yesterday.ctr) : ''}\n`;
-    txt += `• 매출: ${_fmtMoney(today.revenue, '원')}\n`;
-    txt += `• 지출: ${_fmtMoney(today.spend, '원')}\n`;
-    txt += `\n`;
-
-    // 제품별
-    const products = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
-    if (products.length > 0) {
-        txt += `📦 제품별 성과\n`;
-        products.forEach(([name, p]) => {
-            txt += `[${name}] ROAS ${_fmtRoas(p.roas)} / CTR ${_fmtCtr(p.ctr)}\n`;
-            const plats = Object.entries(p.byPlatform).sort((a,b) => b[1].roas - a[1].roas);
-            plats.forEach(([pl, v]) => {
-                txt += `  • ${pl}: ROAS ${_fmtRoas(v.roas)} / CTR ${_fmtCtr(v.ctr)}\n`;
+    const prods = Object.entries(today.byProduct).sort((a,b)=>b[1].roas-a[1].roas);
+    if (prods.length) {
+        txt += `📦 제품별\n`;
+        prods.forEach(([name, p]) => {
+            txt += `[${name}] ROAS ${_fmtRoas(p.roas)} / CTR ${_fmtCtr(p.ctr)} / 매출 ${_fmtMoney(p.revenue,'원')}\n`;
+            Object.entries(p.byPlatform).sort((a,b)=>b[1].roas-a[1].roas).forEach(([pl,v]) => {
+                txt += `  • ${pl}: ${_fmtRoas(v.roas)} / ${_fmtCtr(v.ctr)}\n`;
             });
         });
-        txt += `\n`;
+        txt += '\n';
     }
 
-    // 고효율 소재 TOP3
-    const allCreatives = today.creatives
-        .filter(c => (c.roas || 0) > 0)
-        .sort((a,b) => (b.roas||0) - (a.roas||0));
-    if (allCreatives.length > 0) {
-        txt += `🎯 고효율 소재 TOP3\n`;
-        allCreatives.slice(0, 3).forEach((c, i) => {
-            const name = c.ad_name || c.creative_name || '소재명없음';
-            txt += `${i+1}위. ${name} (ROAS ${_fmtRoas(c.roas || 0)})\n`;
-        });
-        txt += `\n`;
+    const all = today.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
+    if (all.length) {
+        txt += `🎯 고효율 TOP3\n`;
+        all.slice(0,3).forEach((c,i) => txt += `${i+1}. ${c.ad_name||c.creative_name||'-'} (${_fmtRoas(c.roas||0)})\n`);
+        txt += '\n';
+    }
+    const worst = all.filter(c=>(c.roas||0)<1).slice(-2).reverse();
+    if (worst.length) {
+        txt += `⚠️ 저효율 소재\n`;
+        worst.forEach(c => txt += `• ${c.ad_name||c.creative_name||'-'} (${_fmtRoas(c.roas||0)})\n`);
+        txt += '\n';
     }
 
-    // 저효율 소재
-    const bottom = allCreatives.filter(c => (c.roas || 0) < 1).slice(-3).reverse();
-    if (bottom.length > 0) {
-        txt += `⚠️ 저효율 소재 (ROAS 100% 미만)\n`;
-        bottom.forEach(c => {
-            const name = c.ad_name || c.creative_name || '소재명없음';
-            txt += `• ${name} (ROAS ${_fmtRoas(c.roas || 0)})\n`;
-        });
-        txt += `\n`;
-    }
-
-    // AI 코멘트
     const comment = _genAiComment(today, yesterday, dayInfo, dateIso);
-    if (comment) {
-        txt += `💡 AI 코멘트\n${comment}\n`;
-    }
-
-    txt += `\n${'-'.repeat(20)}\n`;
+    if (comment) txt += `💡 AI 코멘트\n${comment}\n\n`;
     txt += `📲 Creative Dashboard`;
-
     return txt;
 }
 
@@ -253,194 +177,326 @@ function renderMegawariPanel() {
 
     const mwData = _getMwData();
     if (!mwData.length) {
-        container.innerHTML = `
-        <div class="mw-empty">
-            <i class="fas fa-calendar-xmark text-3xl text-slate-300 mb-2"></i>
-            <p class="font-semibold text-slate-500">Megawari 이벤트 데이터가 없어요</p>
-            <p class="text-xs text-slate-400 mt-1">이벤트 필터에 "megawari" 항목이 있는 데이터를 불러와주세요</p>
-        </div>`;
+        container.innerHTML = `<div class="mw-empty"><i class="fas fa-fire text-3xl text-slate-200 mb-3"></i><p class="font-semibold text-slate-500">Megawari 이벤트 데이터가 없어요</p><p class="text-xs text-slate-400 mt-1">이벤트 필터에 "megawari" 항목이 있는 데이터를 불러와주세요</p></div>`;
         return;
     }
 
     const byDate = _aggregateMw(mwData);
     const sortedDates = Object.keys(byDate).sort();
-    const startIso = sortedDates[0];
-    const latestIso = sortedDates[sortedDates.length - 1];
+    window._mwSelectedDate = window._mwSelectedDate && byDate[window._mwSelectedDate]
+        ? window._mwSelectedDate : sortedDates[sortedDates.length - 1];
 
-    // 선택된 날짜 (state)
-    window._mwSelectedDate = window._mwSelectedDate || latestIso;
-    if (!byDate[window._mwSelectedDate]) window._mwSelectedDate = latestIso;
+    const sel = window._mwSelectedDate;
+    const today = byDate[sel];
+    const dayInfo = _getMwDayLabel(sel);
+    const prevIso = sortedDates[sortedDates.indexOf(sel) - 1];
+    const prev = prevIso ? byDate[prevIso] : null;
 
-    const selected = window._mwSelectedDate;
-    const today = byDate[selected];
-    const dayInfo = _getMwDayLabel(selected);
-    const dayN = dayInfo.label;  // "D+3" 형태
-    const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
-
-    // 날짜 탭 (기간별 구분)
+    // ── 날짜 탭 ───────────────────────────────────────────────
     let dateTabs = '';
-    let lastPeriodKey = null;
+    let lastKey = null;
     sortedDates.forEach(iso => {
         const info = _getMwDayLabel(iso);
-        const isActive = iso === selected;
-
-        // 기간 구분선
-        if (info.period && info.period.key !== lastPeriodKey) {
-            lastPeriodKey = info.period.key;
-            dateTabs += `<span class="mw-period-divider" style="color:${info.period.color}">${info.badge} ${info.period.label}</span>`;
+        if (info.period?.key !== lastKey) {
+            lastKey = info.period?.key || null;
+            if (info.period) dateTabs += `<span class="mw-period-chip" style="color:${info.period.color};border-color:${info.period.color}20;background:${info.period.color}0d">${info.badge} ${info.period.label}</span>`;
         }
-
-        dateTabs += `<button class="mw-date-tab ${isActive ? 'active' : ''}" data-iso="${iso}"
-            style="${isActive ? `border-color:${info.color};background:${info.color}18;` : ''}"
-            onclick="_mwSelectDate('${iso}')">
-            <span class="mw-date-tab-day" style="color:${info.color}">${info.label}</span>
-            <span class="mw-date-tab-date">${info.sub}</span>
+        const isActive = iso === sel;
+        dateTabs += `<button class="mw-date-tab${isActive?' active':''}" onclick="_mwSelectDate('${iso}')"
+            style="${isActive?`border-color:${info.color};box-shadow:0 0 0 3px ${info.color}22`:''}" >
+            <span class="mw-dtab-d" style="color:${info.color}">${info.label}</span>
+            <span class="mw-dtab-date">${info.sub}</span>
         </button>`;
     });
 
-    // 제품별 카드
-    const products = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
-    const productCards = products.map(([name, p]) => {
-        const platRows = Object.entries(p.byPlatform).sort((a,b) => b[1].roas - a[1].roas).map(([pl, v]) =>
-            `<div class="mw-plat-row">
-                <span class="mw-plat-name">${pl}</span>
-                <span class="mw-plat-roas">${_fmtRoas(v.roas)}</span>
-                <span class="mw-plat-ctr">${_fmtCtr(v.ctr)}</span>
-            </div>`
-        ).join('');
+    // ── 제품 × 매체 테이블 ────────────────────────────────────
+    const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
+    // 전체 매체 목록
+    const allPlats = [...new Set(prods.flatMap(([,p]) => Object.keys(p.byPlatform)))].sort();
 
-        // 해당 제품 TOP/WORST 소재
-        const sorted = p.creatives.filter(c => (c.roas || 0) > 0).sort((a,b) => (b.roas||0) - (a.roas||0));
-        const topCreative  = sorted[0];
-        const worstCreative = sorted[sorted.length - 1];
+    const tableHead = `<thead><tr>
+        <th class="mw-th mw-th-prod">제품</th>
+        <th class="mw-th">ROAS</th>
+        <th class="mw-th">CTR</th>
+        <th class="mw-th">매출</th>
+        ${allPlats.map(pl=>`<th class="mw-th mw-th-plat">${pl}</th>`).join('')}
+    </tr></thead>`;
 
-        return `<div class="mw-product-card">
-            <div class="mw-product-header">
-                <span class="mw-product-name">📦 ${name}</span>
-                <span class="mw-product-roas">${_fmtRoas(p.roas)}</span>
-            </div>
-            <div class="mw-product-ctr">CTR ${_fmtCtr(p.ctr)} · 매출 ${_fmtMoney(p.revenue,'원')}</div>
-            ${platRows ? `<div class="mw-plat-table">${platRows}</div>` : ''}
-            ${topCreative ? `<div class="mw-creative-row top">🏆 <b>${topCreative.ad_name || topCreative.creative_name || '-'}</b> ROAS ${_fmtRoas(topCreative.roas)}</div>` : ''}
-            ${worstCreative && worstCreative !== topCreative && (worstCreative.roas||0) < 1 ? `<div class="mw-creative-row worst">⚠️ <b>${worstCreative.ad_name || worstCreative.creative_name || '-'}</b> ROAS ${_fmtRoas(worstCreative.roas)}</div>` : ''}
-        </div>`;
+    const tableBody = prods.map(([name, p]) => {
+        const platCells = allPlats.map(pl => {
+            const v = p.byPlatform[pl];
+            if (!v || v.roas === 0) return `<td class="mw-td mw-td-plat"><span class="text-slate-300">-</span></td>`;
+            return `<td class="mw-td mw-td-plat">
+                <span class="mw-cell-roas ${_roasClass(v.roas)}">${_fmtRoas(v.roas)}</span>
+                <span class="mw-cell-ctr">${_fmtCtr(v.ctr)}</span>
+            </td>`;
+        }).join('');
+
+        // 해당 제품 TOP 소재
+        const sorted = p.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
+        const top = sorted[0];
+        const bot = sorted.length > 1 && (sorted[sorted.length-1].roas||0) < 1 ? sorted[sorted.length-1] : null;
+
+        return `<tr class="mw-tr">
+            <td class="mw-td mw-td-prod">
+                <div class="mw-prod-name">${name}</div>
+                ${top ? `<div class="mw-prod-top">🏆 ${(top.ad_name||top.creative_name||'').slice(0,20)}</div>` : ''}
+                ${bot ? `<div class="mw-prod-bot">⚠️ ${(bot.ad_name||bot.creative_name||'').slice(0,20)}</div>` : ''}
+            </td>
+            <td class="mw-td"><span class="mw-roas-badge ${_roasClass(p.roas)}">${_fmtRoas(p.roas)}</span>${_diffBadge(p.roas, prev?.byProduct?.[name]?.roas)}</td>
+            <td class="mw-td mw-td-num">${_fmtCtr(p.ctr)}</td>
+            <td class="mw-td mw-td-num">${_fmtMoney(p.revenue)}</td>
+            ${platCells}
+        </tr>`;
     }).join('');
 
-    // 전체 KPI 바
-    const prevIso = sortedDates[sortedDates.indexOf(selected) - 1];
-    const prev = prevIso ? byDate[prevIso] : null;
+    // ── 소재 리스트 ───────────────────────────────────────────
+    const allC = today.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
+    const topRows = allC.slice(0,5).map((c,i)=>`
+        <div class="mw-creative-item top">
+            <span class="mw-cr-rank">${['🥇','🥈','🥉','4','5'][i]}</span>
+            <span class="mw-cr-name">${c.ad_name||c.creative_name||'-'}</span>
+            <span class="mw-cr-prod">${c.product||''}</span>
+            <span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>
+        </div>`).join('');
+    const botC = allC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
+    const botRows = botC.map(c=>`
+        <div class="mw-creative-item bot">
+            <span class="mw-cr-rank">⚠️</span>
+            <span class="mw-cr-name">${c.ad_name||c.creative_name||'-'}</span>
+            <span class="mw-cr-prod">${c.product||''}</span>
+            <span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>
+        </div>`).join('');
 
-    function kpiDiff(curr, pr, field) {
-        if (!pr) return '';
-        const diff = ((curr[field] - pr[field]) / (Math.abs(pr[field]) || 1)) * 100;
-        if (diff > 3)  return `<span class="mw-kpi-up">▲${Math.abs(Math.round(diff))}%</span>`;
-        if (diff < -3) return `<span class="mw-kpi-down">▼${Math.abs(Math.round(diff))}%</span>`;
-        return `<span class="mw-kpi-flat">→</span>`;
-    }
+    // ── 카카오 설정 상태 ──────────────────────────────────────
+    const kakaoKey = localStorage.getItem('mw_kakao_app_key') || '';
+    const kakaoToken = localStorage.getItem('mw_kakao_refresh_token') || '';
+    const kakaoTime = localStorage.getItem('mw_kakao_send_time') || '09:00';
+    const kakaoEnabled = localStorage.getItem('mw_kakao_enabled') === '1';
+    const vercelUrl = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
+
+    const kakaoStatus = kakaoKey && kakaoToken
+        ? `<span class="mw-kakao-ok">✅ 연결됨 — 매일 ${kakaoTime} 자동발송${kakaoEnabled?' 켜짐':' 꺼짐'}</span>`
+        : `<span class="mw-kakao-warn">⚙️ 카카오 설정 필요</span>`;
 
     // AI 코멘트
-    const aiComment = _genAiComment(today, prev, dayInfo, selected);
+    const aiComment = _genAiComment(today, prev, dayInfo, sel);
 
     container.innerHTML = `
     <!-- 날짜 탭 -->
-    <div class="mw-date-tabs" id="mw-date-tabs">${dateTabs}</div>
+    <div class="mw-date-tabs">${dateTabs}</div>
 
-    <!-- 전체 KPI -->
+    <!-- KPI 바 -->
     <div class="mw-kpi-bar">
         <div class="mw-kpi-item">
-            <div class="mw-kpi-label">ROAS</div>
-            <div class="mw-kpi-value">${_fmtRoas(today.roas)}</div>
-            <div>${kpiDiff(today, prev, 'roas')}</div>
+            <div class="mw-kpi-lbl">전체 ROAS</div>
+            <div class="mw-kpi-val ${_roasClass(today.roas)}">${_fmtRoas(today.roas)}</div>
+            <div>${_diffBadge(today.roas, prev?.roas)}</div>
         </div>
         <div class="mw-kpi-item">
-            <div class="mw-kpi-label">CTR</div>
-            <div class="mw-kpi-value">${_fmtCtr(today.ctr)}</div>
-            <div>${kpiDiff(today, prev, 'ctr')}</div>
+            <div class="mw-kpi-lbl">CTR</div>
+            <div class="mw-kpi-val">${_fmtCtr(today.ctr)}</div>
+            <div>${_diffBadge(today.ctr, prev?.ctr)}</div>
         </div>
         <div class="mw-kpi-item">
-            <div class="mw-kpi-label">매출</div>
-            <div class="mw-kpi-value">${_fmtMoney(today.revenue)}</div>
-            <div class="mw-kpi-sub">원</div>
+            <div class="mw-kpi-lbl">매출</div>
+            <div class="mw-kpi-val">${_fmtMoney(today.revenue)}</div>
+            <div class="mw-kpi-unit">원</div>
         </div>
         <div class="mw-kpi-item">
-            <div class="mw-kpi-label">지출</div>
-            <div class="mw-kpi-value">${_fmtMoney(today.spend)}</div>
-            <div class="mw-kpi-sub">원</div>
+            <div class="mw-kpi-lbl">지출</div>
+            <div class="mw-kpi-val">${_fmtMoney(today.spend)}</div>
+            <div class="mw-kpi-unit">원</div>
         </div>
     </div>
 
     <!-- AI 코멘트 -->
-    <div class="mw-ai-comment">
-        <div class="mw-ai-label"><i class="fas fa-robot mr-1.5"></i>AI 코멘트</div>
-        <div class="mw-ai-text">${aiComment.replace(/\n/g, '<br>')}</div>
+    <div class="mw-ai-box">
+        <div class="mw-ai-hd"><i class="fas fa-robot"></i> AI 코멘트</div>
+        <div class="mw-ai-body">${aiComment.replace(/\n/g,'<br>')}</div>
     </div>
 
-    <!-- 제품별 -->
-    <div class="mw-section-title">📦 제품별 성과</div>
-    <div class="mw-product-grid">${productCards || '<p class="text-sm text-slate-400 p-3">제품 데이터 없음</p>'}</div>
+    <!-- 제품 × 매체 테이블 -->
+    <div class="mw-section-hd">📦 제품별 성과 (매체 교차)</div>
+    <div class="mw-table-wrap">
+        <table class="mw-table"><${tableHead}<tbody>${tableBody}</tbody></table>
+    </div>
 
-    <!-- 공유 버튼 -->
+    <!-- 소재 리스트 -->
+    <div class="mw-two-col">
+        <div>
+            <div class="mw-section-hd">🏆 고효율 TOP5</div>
+            <div class="mw-creative-list">${topRows||'<p class="mw-no-data">데이터 없음</p>'}</div>
+        </div>
+        <div>
+            <div class="mw-section-hd">⚠️ 저효율 소재</div>
+            <div class="mw-creative-list">${botRows||'<p class="mw-no-data">없음 👍</p>'}</div>
+        </div>
+    </div>
+
+    <!-- 카카오 자동발송 설정 -->
+    <details class="mw-kakao-wrap" ${!kakaoKey&&!kakaoToken?'open':''}>
+        <summary class="mw-kakao-summary">
+            <i class="fas fa-comment" style="color:#3b1f1f"></i>
+            카카오톡 자동발송 설정 &nbsp; ${kakaoStatus}
+        </summary>
+        <div class="mw-kakao-body">
+            <div class="mw-kakao-step">
+                <div class="mw-kakao-step-num">1</div>
+                <div class="mw-kakao-step-content">
+                    <p class="font-semibold text-sm mb-1">카카오 REST API 키 입력</p>
+                    <p class="text-xs text-slate-500 mb-2"><a href="https://developers.kakao.com/console/app" target="_blank" class="text-indigo-500 underline">developers.kakao.com</a> → 내 애플리케이션 → REST API 키</p>
+                    <div class="flex gap-2">
+                        <input id="mw-kakao-key-input" type="text" class="mw-kakao-input flex-1" placeholder="REST API 키" value="${kakaoKey}">
+                        <button class="mw-kakao-btn" onclick="_mwSaveKakaoKey()">저장</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mw-kakao-step">
+                <div class="mw-kakao-step-num">2</div>
+                <div class="mw-kakao-step-content">
+                    <p class="font-semibold text-sm mb-1">카카오 로그인 → Refresh Token 발급</p>
+                    <p class="text-xs text-slate-500 mb-2">로그인 후 나에게 보내기 권한(talk_message)을 허용해주세요</p>
+                    <div class="flex gap-2 mb-2">
+                        <button class="mw-kakao-btn kakao-yellow" onclick="_mwKakaoLogin()">
+                            카카오 로그인
+                        </button>
+                        ${kakaoToken ? `<span class="text-xs text-emerald-600 self-center">✅ 토큰 저장됨</span>` : ''}
+                    </div>
+                    ${kakaoToken ? `<p class="text-xs text-slate-500">Refresh Token (Vercel 환경변수 <code>KAKAO_REFRESH_TOKEN</code>에도 등록):</p>
+                    <input type="text" class="mw-kakao-input w-full mt-1" value="${kakaoToken}" readonly onclick="this.select()">` : ''}
+                </div>
+            </div>
+            <div class="mw-kakao-step">
+                <div class="mw-kakao-step-num">3</div>
+                <div class="mw-kakao-step-content">
+                    <p class="font-semibold text-sm mb-2">발송 시간 설정 (JST)</p>
+                    <div class="flex gap-2 items-center">
+                        <input id="mw-kakao-time-input" type="time" class="mw-kakao-input w-28" value="${kakaoTime}">
+                        <span class="text-xs text-slate-500">매일 이 시간에 자동발송</span>
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <button class="mw-kakao-btn" onclick="_mwSaveAutoSend()" style="background:#f97316">
+                            <i class="fas fa-clock mr-1"></i>${kakaoEnabled ? '설정 업데이트' : '자동발송 활성화'}
+                        </button>
+                        <button class="mw-kakao-btn" onclick="_mwTestSend()" style="background:#6366f1">
+                            <i class="fas fa-paper-plane mr-1"></i>지금 바로 전송
+                        </button>
+                    </div>
+                    ${vercelUrl ? `<p class="text-xs text-slate-400 mt-2">Vercel Cron 엔드포인트: <code>${vercelUrl}/api/megawari-cron</code></p>` : '<p class="text-xs text-amber-600 mt-2">⚠️ Vercel URL이 설정되어야 자동발송이 작동합니다 (광고 생성 탭에서 설정)</p>'}
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <!-- 하단 버튼 -->
     <div class="mw-share-bar">
         <button class="mw-btn-copy" onclick="_mwCopyReport()">
             <i class="fas fa-copy mr-1.5"></i>리포트 복사
         </button>
-        <button class="mw-btn-kakao" onclick="_mwShareKakao()">
-            <img src="https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png"
-                 style="width:20px;height:20px;object-fit:contain;vertical-align:middle;margin-right:6px" alt=""> 카카오톡 공유
+        <button class="mw-btn-kakao" onclick="_mwSendNow()">
+            <i class="fas fa-comment mr-1.5"></i>카카오 전송
         </button>
-    </div>
-    `;
+    </div>`;
 }
 
-// ── 날짜 선택 ──────────────────────────────────────────────────
+// ── 날짜 선택 ─────────────────────────────────────────────────
 function _mwSelectDate(iso) {
     window._mwSelectedDate = iso;
     renderMegawariPanel();
-    // 탭 스크롤
-    setTimeout(() => {
-        const active = document.querySelector('.mw-date-tab.active');
-        active?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }, 50);
+    setTimeout(() => document.querySelector('.mw-date-tab.active')?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}), 50);
 }
 window._mwSelectDate = _mwSelectDate;
 
-// ── 리포트 복사 ───────────────────────────────────────────────
-function _mwCopyReport() {
-    const mwData = _getMwData();
-    const byDate = _aggregateMw(mwData);
-    const text = buildReportText(window._mwSelectedDate, byDate, Object.keys(byDate).sort()[0]);
+// ── 리포트 텍스트 가져오기 ────────────────────────────────────
+function _mwGetReportText() {
+    const byDate = _aggregateMw(_getMwData());
+    return buildReportText(window._mwSelectedDate || Object.keys(byDate).sort().pop(), byDate);
+}
 
-    navigator.clipboard.writeText(text).then(() => {
+// ── 복사 ──────────────────────────────────────────────────────
+function _mwCopyReport() {
+    navigator.clipboard.writeText(_mwGetReportText()).then(() => {
         const btn = document.querySelector('.mw-btn-copy');
-        if (btn) {
-            const orig = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check mr-1.5"></i>복사됨!';
-            btn.style.background = '#059669';
-            setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
-        }
+        if (!btn) return;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check mr-1.5"></i>복사됨!';
+        btn.style.background = '#059669';
+        setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
     });
 }
 window._mwCopyReport = _mwCopyReport;
 
-// ── 카카오톡 공유 (Web Share API → 카카오 앱 선택 가능) ────────
-function _mwShareKakao() {
-    const mwData = _getMwData();
-    const byDate = _aggregateMw(mwData);
-    const text = buildReportText(window._mwSelectedDate, byDate, Object.keys(byDate).sort()[0]);
+// ── 카카오 API로 전송 ─────────────────────────────────────────
+async function _mwSendViaKakao(text) {
+    const vercelBase = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
+    const refreshToken = localStorage.getItem('mw_kakao_refresh_token') || '';
+    const appKey = localStorage.getItem('mw_kakao_app_key') || '';
 
-    // Web Share API (모바일 브라우저에서 카카오톡 선택 가능)
-    if (navigator.share) {
-        navigator.share({ text })
-            .catch(e => { if (e.name !== 'AbortError') _mwCopyReport(); });
+    if (!vercelBase || !refreshToken || !appKey) {
+        // fallback: Web Share API
+        if (navigator.share) { await navigator.share({ text }); return; }
+        await navigator.clipboard.writeText(text);
+        alert('리포트가 클립보드에 복사됐어요!\n카카오톡에 붙여넣기 해주세요.');
         return;
     }
 
-    // 데스크탑 fallback: 클립보드 복사 후 안내
-    navigator.clipboard.writeText(text).then(() => {
-        alert('리포트가 클립보드에 복사됐어요!\n카카오톡 채팅창에 붙여넣기(Ctrl+V)해주세요.');
+    const res = await fetch(`${vercelBase}/api/kakao-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, refresh_token: refreshToken, app_key: appKey }),
     });
+    const data = await res.json();
+    if (res.ok) {
+        alert('✅ 카카오톡으로 전송됐어요!');
+    } else {
+        alert(`❌ 전송 실패: ${data.error || res.status}\n클립보드에 복사합니다.`);
+        await navigator.clipboard.writeText(text);
+    }
 }
-window._mwShareKakao = _mwShareKakao;
 
-// 전역 노출
+function _mwSendNow() { _mwSendViaKakao(_mwGetReportText()); }
+window._mwSendNow = _mwSendNow;
+
+function _mwTestSend() { _mwSendViaKakao(_mwGetReportText()); }
+window._mwTestSend = _mwTestSend;
+
+// ── 카카오 설정 저장 ──────────────────────────────────────────
+function _mwSaveKakaoKey() {
+    const key = document.getElementById('mw-kakao-key-input')?.value?.trim();
+    if (!key) return alert('REST API 키를 입력해주세요');
+    localStorage.setItem('mw_kakao_app_key', key);
+    alert('✅ 저장됐어요!');
+}
+window._mwSaveKakaoKey = _mwSaveKakaoKey;
+
+function _mwSaveAutoSend() {
+    const time = document.getElementById('mw-kakao-time-input')?.value || '09:00';
+    localStorage.setItem('mw_kakao_send_time', time);
+    localStorage.setItem('mw_kakao_enabled', '1');
+    renderMegawariPanel();
+    alert(`✅ 매일 ${time} 자동발송이 설정됐어요!\nVercel 환경변수에 KAKAO_REFRESH_TOKEN과 KAKAO_APP_KEY를 추가해주세요.`);
+}
+window._mwSaveAutoSend = _mwSaveAutoSend;
+
+// ── 카카오 OAuth 로그인 ───────────────────────────────────────
+function _mwKakaoLogin() {
+    const appKey = document.getElementById('mw-kakao-key-input')?.value?.trim()
+                || localStorage.getItem('mw_kakao_app_key') || '';
+    if (!appKey) return alert('먼저 REST API 키를 입력하고 저장해주세요');
+    const vercelBase = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
+    if (!vercelBase) return alert('Vercel URL을 먼저 설정해주세요 (광고 생성 탭)');
+    const redirectUri = encodeURIComponent(`${vercelBase}/api/kakao-callback`);
+    const scope = encodeURIComponent('talk_message');
+    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${appKey}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    const popup = window.open(url, 'kakao_login', 'width=500,height=600');
+    // 팝업에서 token 받기
+    window._kakaoLoginCallback = (refreshToken) => {
+        localStorage.setItem('mw_kakao_refresh_token', refreshToken);
+        renderMegawariPanel();
+        alert('✅ 카카오 로그인 완료! Refresh Token이 저장됐어요.');
+    };
+}
+window._mwKakaoLogin = _mwKakaoLogin;
+
 window.renderMegawariPanel = renderMegawariPanel;
