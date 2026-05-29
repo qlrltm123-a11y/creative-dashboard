@@ -2,6 +2,31 @@
 // Megawari 일일 성과 리포트
 // ============================
 
+// ── 기간 정의 ─────────────────────────────────────────────────
+const MW_PERIODS = [
+    { key: 'teaser', label: '티저',   start: '2026-05-25', end: '2026-05-28', color: '#8b5cf6', badge: '🎬' },
+    { key: 'main',   label: '본기간', start: '2026-05-29', end: '2026-06-10', color: '#f97316', badge: '🔥' },
+];
+
+function _getMwPeriod(isoDate) {
+    return MW_PERIODS.find(p => isoDate >= p.start && isoDate <= p.end) || null;
+}
+
+function _getMwDayLabel(isoDate) {
+    const period = _getMwPeriod(isoDate);
+    if (!period) return { label: isoDate.slice(5).replace('-','/'), sub: '', badge: '', color: '#64748b', period: null };
+    const start = new Date(period.start);
+    const curr  = new Date(isoDate);
+    const diffDays = Math.round((curr - start) / 86400000) + 1;
+    return {
+        label: `D+${diffDays}`,
+        sub: isoDate.slice(5).replace('-','/'),
+        badge: period.badge,
+        color: period.color,
+        period,
+    };
+}
+
 // ── 유틸 ──────────────────────────────────────────────────────
 function _fmtRoas(v) { return v > 0 ? `${Math.round(v * 100)}%` : '-'; }
 function _fmtCtr(v)  { return v > 0 ? `${(v * 100).toFixed(2)}%` : '-'; }
@@ -92,15 +117,30 @@ function _aggregateMw(data) {
 }
 
 // ── AI 코멘트 (rule-based) ────────────────────────────────────
-function _genAiComment(today, yesterday, dayN) {
+function _genAiComment(today, yesterday, dayInfo, isoDate) {
     const lines = [];
+    const period = _getMwPeriod(isoDate);
+    const periodLabel = period ? period.label : '';
+
+    // 기간별 맥락 코멘트
+    if (period?.key === 'teaser') {
+        lines.push(`🎬 티저 기간 중. 본기간(5/29) 대비 소재·예산 준비 상황 점검.`);
+    } else if (period?.key === 'main') {
+        const mainStart = new Date('2026-05-29');
+        const curr = new Date(isoDate);
+        const mainDay = Math.round((curr - mainStart) / 86400000) + 1;
+        const totalDays = 13; // 5/29~6/10
+        if (mainDay <= 2)  lines.push(`🚀 본기간 시작! 초반 모멘텀이 전체 성과를 결정합니다.`);
+        if (mainDay >= 10) lines.push(`📅 본기간 후반 (${mainDay}/${totalDays}일차). 소재 피로도 점검 필요.`);
+    }
 
     // ROAS 추세
     if (yesterday) {
         const roasDiff = (today.roas - yesterday.roas) / (yesterday.roas || 1) * 100;
-        if (roasDiff >= 10)       lines.push(`✅ ${dayN}일차 ROAS ${Math.round(roasDiff)}% 상승. 이벤트 모멘텀 살아있음.`);
-        else if (roasDiff >= 0)   lines.push(`➡️ ROAS 전일 대비 소폭 유지 (${Math.round(roasDiff)}%)`);
-        else if (roasDiff >= -10) lines.push(`⚠️ ROAS 전일 대비 ${Math.abs(Math.round(roasDiff))}% 하락. 소재 피로도 확인 권장.`);
+        if (roasDiff >= 15)      lines.push(`✅ ROAS 전일 대비 ${Math.round(roasDiff)}% 상승. 이벤트 모멘텀 강함.`);
+        else if (roasDiff >= 3)  lines.push(`📈 ROAS 소폭 상승 (+${Math.round(roasDiff)}%).`);
+        else if (roasDiff >= -5) lines.push(`➡️ ROAS 전일 대비 유사 수준 (${roasDiff >= 0 ? '+' : ''}${Math.round(roasDiff)}%).`);
+        else if (roasDiff >= -15)lines.push(`⚠️ ROAS 전일 대비 ${Math.abs(Math.round(roasDiff))}% 하락. 소재 피로도 확인 권장.`);
         else                      lines.push(`🔴 ROAS 급락 (${Math.round(roasDiff)}%). 소재·예산 즉시 점검 필요.`);
     }
 
@@ -108,7 +148,7 @@ function _genAiComment(today, yesterday, dayN) {
     const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
     if (prods.length > 0) {
         const best = prods[0];
-        lines.push(`🏆 오늘의 주력 제품: ${best[0]} (ROAS ${_fmtRoas(best[1].roas)})`);
+        lines.push(`🏆 주력 제품: ${best[0]} (ROAS ${_fmtRoas(best[1].roas)})`);
         if (prods.length > 1) {
             const worst = prods[prods.length - 1];
             if (worst[1].roas < 1) lines.push(`⚠️ ${worst[0]} ROAS ${_fmtRoas(worst[1].roas)} — 예산 조정 검토.`);
@@ -118,21 +158,13 @@ function _genAiComment(today, yesterday, dayN) {
     // 매체 추천
     const plats = Object.entries(today.byPlatform).sort((a,b) => b[1].roas - a[1].roas);
     if (plats.length > 0) {
-        const bestPlat = plats[0];
-        if (bestPlat[1].roas > 2) {
-            lines.push(`📱 ${bestPlat[0]} 효율 최고 (ROAS ${_fmtRoas(bestPlat[1].roas)}) — 예산 집중 권장.`);
-        }
-        if (plats.length > 1) {
-            const worstPlat = plats[plats.length-1];
-            if (worstPlat[1].ctr < 0.01) {
-                lines.push(`📉 ${worstPlat[0]} CTR ${_fmtCtr(worstPlat[1].ctr)} — 크리에이티브 교체 검토.`);
-            }
+        const best = plats[0];
+        if (best[1].roas > 2) lines.push(`📱 ${best[0]} 효율 최고 (ROAS ${_fmtRoas(best[1].roas)}) — 예산 집중 권장.`);
+        const worst = plats[plats.length-1];
+        if (plats.length > 1 && worst[1].ctr < 0.01) {
+            lines.push(`📉 ${worst[0]} CTR ${_fmtCtr(worst[1].ctr)} — 크리에이티브 교체 검토.`);
         }
     }
-
-    // 이벤트 후반부 코멘트
-    if (dayN >= 7) lines.push(`📅 이벤트 ${dayN}일차. 후반 피로도 대비 소재 리프레시 권장.`);
-    if (dayN <= 2) lines.push(`🚀 이벤트 초반. 성과 데이터 축적 중.`);
 
     return lines.join('\n');
 }
@@ -146,13 +178,13 @@ function buildReportText(dateIso, byDate, startIso) {
     const prevIso = sortedDates[sortedDates.indexOf(dateIso) - 1];
     const yesterday = prevIso ? byDate[prevIso] : null;
 
-    const dayN = sortedDates.indexOf(dateIso) + 1;
+    const dayInfo = _getMwDayLabel(dateIso);
     const dateLabel = dateIso.replace(/-/g, '.');
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
-    const eventLabel = _getMwData()[0]?.event || 'Megawari';
+    const periodLabel = dayInfo.period ? `${dayInfo.badge}${dayInfo.period.label}` : 'Megawari';
 
     // 헤더
-    let txt = `📊 [${brand}] ${eventLabel} D+${dayN} 성과 리포트\n`;
+    let txt = `📊 [${brand}] メガワリ ${periodLabel} ${dayInfo.label} 성과 리포트\n`;
     txt    += `📅 ${dateLabel}\n`;
     txt    += `${'─'.repeat(24)}\n`;
 
@@ -203,7 +235,7 @@ function buildReportText(dateIso, byDate, startIso) {
     }
 
     // AI 코멘트
-    const comment = _genAiComment(today, yesterday, dayN);
+    const comment = _genAiComment(today, yesterday, dayInfo, dateIso);
     if (comment) {
         txt += `💡 AI 코멘트\n${comment}\n`;
     }
@@ -241,18 +273,30 @@ function renderMegawariPanel() {
 
     const selected = window._mwSelectedDate;
     const today = byDate[selected];
-    const dayN = sortedDates.indexOf(selected) + 1;
+    const dayInfo = _getMwDayLabel(selected);
+    const dayN = dayInfo.label;  // "D+3" 형태
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
 
-    // 날짜 탭
-    const dateTabs = sortedDates.map((iso, i) => {
+    // 날짜 탭 (기간별 구분)
+    let dateTabs = '';
+    let lastPeriodKey = null;
+    sortedDates.forEach(iso => {
+        const info = _getMwDayLabel(iso);
         const isActive = iso === selected;
-        const label = iso.slice(5).replace('-', '/');
-        return `<button class="mw-date-tab ${isActive ? 'active' : ''}" data-iso="${iso}" onclick="_mwSelectDate('${iso}')">
-            <span class="mw-date-tab-day">D+${i+1}</span>
-            <span class="mw-date-tab-date">${label}</span>
+
+        // 기간 구분선
+        if (info.period && info.period.key !== lastPeriodKey) {
+            lastPeriodKey = info.period.key;
+            dateTabs += `<span class="mw-period-divider" style="color:${info.period.color}">${info.badge} ${info.period.label}</span>`;
+        }
+
+        dateTabs += `<button class="mw-date-tab ${isActive ? 'active' : ''}" data-iso="${iso}"
+            style="${isActive ? `border-color:${info.color};background:${info.color}18;` : ''}"
+            onclick="_mwSelectDate('${iso}')">
+            <span class="mw-date-tab-day" style="color:${info.color}">${info.label}</span>
+            <span class="mw-date-tab-date">${info.sub}</span>
         </button>`;
-    }).join('');
+    });
 
     // 제품별 카드
     const products = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
@@ -295,7 +339,7 @@ function renderMegawariPanel() {
     }
 
     // AI 코멘트
-    const aiComment = _genAiComment(today, prev, dayN);
+    const aiComment = _genAiComment(today, prev, dayInfo, selected);
 
     container.innerHTML = `
     <!-- 날짜 탭 -->
