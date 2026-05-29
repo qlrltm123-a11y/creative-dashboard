@@ -75,6 +75,11 @@ function renderGridView(items) {
   grid.innerHTML = items.map(cr => {
     const p = cr.perf;
     const roasCls = roasClass(p.roas);
+    const fatigueKey = (cr.brand || '') + '||' + (cr.ad_name || '');
+    const isFatigued = window._creativeFatigue && window._creativeFatigue.has(fatigueKey);
+    const fatigueBadge = isFatigued
+      ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-300" title="전반부 대비 후반부 CTR 20% 이상 하락 감지"><i class="fas fa-fire-flame-curved"></i> 피로도</span>`
+      : '';
     return `
     <article class="creative-card" onclick="openModal('${cr.id}')">
       <div class="card-media">
@@ -91,6 +96,7 @@ function renderGridView(items) {
           ${brandBadge(cr.brand)}
           ${statusBadge(cr.status)}
           <span class="card-format">${cr.format}</span>
+          ${fatigueBadge}
         </div>
         <div class="card-kpis">
           <div class="card-kpi">
@@ -128,6 +134,11 @@ function renderListView(items) {
   list.innerHTML = items.map(cr => {
     const p = cr.perf;
     const roasCls = roasClass(p.roas);
+    const fatigueKey = (cr.brand || '') + '||' + (cr.ad_name || '');
+    const isFatigued = window._creativeFatigue && window._creativeFatigue.has(fatigueKey);
+    const fatigueBadge = isFatigued
+      ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-300" title="전반부 대비 후반부 CTR 20% 이상 하락 감지"><i class="fas fa-fire-flame-curved"></i> 피로도</span>`
+      : '';
     return `
     <article class="creative-list-item" onclick="openModal('${cr.id}')">
       <img class="list-thumb" src="${cr.media_url}" alt="${cr.title}" loading="lazy" />
@@ -141,6 +152,7 @@ function renderListView(items) {
             <i class="fa-solid fa-${cr.type === 'video' ? 'circle-play' : 'image'}"></i>
             ${cr.type === 'video' ? '영상' : '이미지'}
           </span>
+          ${fatigueBadge}
         </div>
       </div>
       <div class="list-kpis">

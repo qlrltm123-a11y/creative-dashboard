@@ -679,6 +679,11 @@ function renderAIInsights() {
     // ★ 키워드 → 소재 매핑 빌드 (hover preview용) — 중앙값 기준 대표 소재 선정
     buildKeywordCreativeMap(list);
 
+    // 브랜드 ALL 상태일 때만 교차 인사이트 표시
+    const crossEl = document.getElementById('brandCrossInsight');
+    if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
+    renderBrandCrossInsight(window.allCreatives || list);
+
     renderSuccessPatterns(list);
     renderAppealRoasChart(list);
     renderAppealWordCloud(list);
@@ -837,6 +842,84 @@ function attachInsightHoverEvents() {
             });
         }
     });
+}
+
+// ============================
+// 브랜드 교차 인사이트 — 브랜드별 소구포인트 ROAS 비교 테이블
+// ============================
+function renderBrandCrossInsight(list) {
+    const container = document.getElementById('brandCrossInsight');
+    if (!container) return;
+
+    // BRAND_COLORS는 main.js 전역에 있으므로 직접 정의
+    const BRANDS = ['BOH', 'WM', 'CG'];
+    const COLORS = { BOH: '#f43f5e', WM: '#10b981', CG: '#f59e0b' };
+    const threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+
+    // 브랜드별 소구포인트 TOP5 집계
+    const brandData = {};
+    BRANDS.forEach(brand => {
+        const sub = list.filter(c => c.brand === brand);
+        if (!sub.length) return;
+        const agg = aggregateByKeyword(sub, 'appeal_points', { threshold });
+        brandData[brand] = agg.slice(0, 5); // ROAS 상위 5개
+    });
+
+    const activeBrands = BRANDS.filter(b => brandData[b] && brandData[b].length);
+    if (activeBrands.length < 2) {
+        container.innerHTML = '<p class="text-slate-400 text-sm text-center py-4">브랜드 2개 이상 데이터 필요</p>';
+        return;
+    }
+
+    // 공통 소구포인트 키워드 수집 (각 브랜드 TOP5 합집합)
+    const allKeywords = [...new Set(activeBrands.flatMap(b => brandData[b].map(d => d.keyword)))];
+    // 전체 평균 ROAS 기준 정렬
+    allKeywords.sort((a, b) => {
+        const avgA = activeBrands.reduce((s, brand) => {
+            const d = brandData[brand]?.find(x => x.keyword === a);
+            return s + (d ? d.roas * 100 : 0);
+        }, 0) / activeBrands.length;
+        const avgB = activeBrands.reduce((s, brand) => {
+            const d = brandData[brand]?.find(x => x.keyword === b);
+            return s + (d ? d.roas * 100 : 0);
+        }, 0) / activeBrands.length;
+        return avgB - avgA;
+    });
+    const keywords = allKeywords.slice(0, 8);
+
+    // HTML 테이블로 렌더 (Chart.js 없이, 간단하게)
+    const rows = keywords.map(kw => {
+        const cells = activeBrands.map(brand => {
+            const d = brandData[brand]?.find(x => x.keyword === kw);
+            if (!d) return `<td class="text-center text-slate-300 text-xs py-2 px-3">-</td>`;
+            const roas = Math.round(d.roas * 100);
+            const intensity = Math.min(1, roas / 500);
+            const color = COLORS[brand];
+            const bg = color + Math.round(intensity * 40 + 15).toString(16).padStart(2,'0');
+            return `<td class="text-center py-2 px-3 rounded" style="background:${bg}">
+                <span class="text-xs font-bold" style="color:${color}">${roas}%</span>
+                <span class="text-[9px] text-slate-400 block">n=${d.count}</span>
+            </td>`;
+        }).join('');
+        return `<tr class="border-b border-slate-100">
+            <td class="text-xs text-slate-600 py-2 px-3 font-medium whitespace-nowrap">${kw.length > 10 ? kw.slice(0,10)+'…' : kw}</td>
+            ${cells}
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-200">
+                        <th class="text-left text-xs text-slate-400 font-medium py-2 px-3">소구포인트</th>
+                        ${activeBrands.map(b => `<th class="text-center text-xs font-bold py-2 px-3" style="color:${COLORS[b]}">${b} ROAS</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <p class="text-[10px] text-slate-400 mt-2 px-1">각 브랜드 소재 중 spend 중앙값 이상 소재 기준 · 최대 8개 소구포인트 표시</p>
+        </div>`;
 }
 
 // 성공 패턴 카드 (3개)

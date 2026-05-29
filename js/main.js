@@ -75,6 +75,7 @@ async function loadData() {
 // 시트 연동 후 전역 갱신을 위해 노출
 window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
+    window._creativeFatigue = detectCreativeFatigue(allCreatives); // ★ 소재 피로도 감지
     invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
     populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
     populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
@@ -1062,6 +1063,41 @@ function calcKpiTrend(rawList) {
         roas:        prevRoas > 0 ? ((curRoas - prevRoas) / prevRoas * 100) : null,
         periodLabel: `${fmt(midDate)}~${fmt(maxDate)} vs ${fmt(minDate)}~${fmt(new Date(midDate.getTime()-1))}`,
     };
+}
+
+// ============================
+// 소재 피로도 감지 (allCreatives 기반)
+// 동일 ad_name의 날짜별 다중 행이 있을 경우 전반부/후반부 CTR 비교
+// ============================
+function detectCreativeFatigue(allList) {
+    // ad_name별로 날짜 행 그룹핑
+    const byName = new Map();
+    allList.forEach(c => {
+        if (!c.start_date || !c.ad_name) return;
+        const key = (c.brand || '') + '||' + (c.ad_name || '');
+        if (!byName.has(key)) byName.set(key, []);
+        byName.get(key).push(c);
+    });
+
+    const fatigued = new Set(); // 피로도 경고 소재의 ad_name 키
+    byName.forEach((rows, key) => {
+        if (rows.length < 3) return; // 최소 3개 행(날짜)이 있어야 의미 있음
+        rows.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+        const half = Math.floor(rows.length / 2);
+        const early = rows.slice(0, half);
+        const late  = rows.slice(half);
+        const avgCtr = arr => {
+            const valid = arr.filter(c => Number(c.impressions) > 0);
+            if (!valid.length) return 0;
+            return valid.reduce((s, c) => s + (Number(c.clicks) / Number(c.impressions)), 0) / valid.length;
+        };
+        const earlyCtr = avgCtr(early);
+        const lateCtr  = avgCtr(late);
+        if (earlyCtr > 0 && lateCtr < earlyCtr * 0.8) { // 20% 이상 하락
+            fatigued.add(key);
+        }
+    });
+    return fatigued;
 }
 
 function renderKpiTrendBadge(elId, pct, opts = {}) {
@@ -3773,6 +3809,13 @@ function createRankRow(c, rank, metric, type, benchmark) {
         ? `<span class="rank-agg-badge" title="일별 데이터 ${c._row_count}건 합산"><i class="fas fa-layer-group"></i> ${c._row_count}일</span>`
         : '';
 
+    // 피로도 경고 배지
+    const fatigueKey = (c.brand || '') + '||' + (c.ad_name || '');
+    const isFatigued = window._creativeFatigue && window._creativeFatigue.has(fatigueKey);
+    const fatigueBadge = isFatigued
+        ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-300" title="전반부 대비 후반부 CTR 20% 이상 하락 감지"><i class="fas fa-fire-flame-curved"></i> 피로도</span>`
+        : '';
+
     // ★ AI 추론 코멘트 (왜 좋았나/나빴나)
     let commentHtml = '';
     if (benchmark && typeof buildPerformanceComment === 'function') {
@@ -3818,6 +3861,7 @@ function createRankRow(c, rank, metric, type, benchmark) {
                         <span><i class="fas fa-broadcast-tower"></i> ${c.platform || '-'}</span>
                         ${c.product ? `<span class="rank-dot">·</span><span>${c.product}</span>` : ''}
                         ${aggBadge}
+                        ${fatigueBadge}
                     </div>
                 </div>
                 <div class="rank-value-wrap">
