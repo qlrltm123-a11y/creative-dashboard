@@ -987,6 +987,85 @@ function buildPerformanceCriteriaBadge() {
 }
 window.buildPerformanceCriteriaBadge = buildPerformanceCriteriaBadge;
 
+// ============================
+// KPI 증감 배지 헬퍼 — 최근 7일 vs 직전 7일 비교
+// start_date 없거나 날짜 범위 미충족 시 fallback 처리
+// ============================
+function calcKpiTrend(rawList) {
+    // start_date 필드가 있는 소재만 추출
+    const dated = rawList.filter(c => c.start_date);
+    if (dated.length < 2) return null; // 날짜 데이터 부족 → fallback
+
+    const dates = dated.map(c => new Date(c.start_date)).filter(d => !isNaN(d));
+    if (!dates.length) return null;
+
+    const maxDate = new Date(Math.max(...dates));
+    // 최근 7일 / 직전 7일 구간
+    const recent7End   = maxDate;
+    const recent7Start = new Date(maxDate); recent7Start.setDate(maxDate.getDate() - 6);
+    const prev7End     = new Date(recent7Start); prev7End.setDate(recent7Start.getDate() - 1);
+    const prev7Start   = new Date(prev7End); prev7Start.setDate(prev7End.getDate() - 6);
+
+    function sumPeriod(list, from, to) {
+        const inRange = list.filter(c => {
+            const d = new Date(c.start_date);
+            return !isNaN(d) && d >= from && d <= to;
+        });
+        if (!inRange.length) return null;
+        return {
+            impressions: inRange.reduce((s, c) => s + (Number(c.impressions) || 0), 0),
+            clicks:      inRange.reduce((s, c) => s + (Number(c.clicks)      || 0), 0),
+            spend:       inRange.reduce((s, c) => s + (Number(c.spend)       || 0), 0),
+            conversions: inRange.reduce((s, c) => s + (Number(c.conversions) || 0), 0),
+            revenue:     inRange.reduce((s, c) => s + (Number(c.revenue)     || 0), 0),
+        };
+    }
+
+    const cur  = sumPeriod(dated, recent7Start, recent7End);
+    const prev = sumPeriod(dated, prev7Start, prev7End);
+    if (!cur || !prev) return null;
+
+    function pctDiff(a, b) {
+        if (!b || b === 0) return null;
+        return ((a - b) / b) * 100;
+    }
+
+    const curCtr  = cur.impressions   > 0 ? cur.clicks / cur.impressions : 0;
+    const prevCtr = prev.impressions  > 0 ? prev.clicks / prev.impressions : 0;
+    const curRoas  = cur.spend  > 0 ? cur.revenue / cur.spend : 0;
+    const prevRoas = prev.spend > 0 ? prev.revenue / prev.spend : 0;
+
+    return {
+        impressions: pctDiff(cur.impressions, prev.impressions),
+        clicks:      pctDiff(cur.clicks, prev.clicks),
+        spend:       pctDiff(cur.spend, prev.spend),
+        conversions: pctDiff(cur.conversions, prev.conversions),
+        ctr:         prevCtr > 0 ? ((curCtr - prevCtr) / prevCtr * 100) : null,
+        roas:        prevRoas > 0 ? ((curRoas - prevRoas) / prevRoas * 100) : null,
+        periodLabel: `${recent7Start.getMonth()+1}/${recent7Start.getDate()}~${recent7End.getMonth()+1}/${recent7End.getDate()}`,
+    };
+}
+
+function renderKpiTrendBadge(elId, pct, opts = {}) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    // pct === null → fallback 텍스트
+    if (pct === null || pct === undefined) {
+        el.innerHTML = opts.fallback || '';
+        el.className = 'kpi-trend text-slate-400';
+        return;
+    }
+    const abs   = Math.abs(pct).toFixed(1);
+    const up    = pct >= 0;
+    const icon  = up ? 'fa-arrow-up' : 'fa-arrow-down';
+    const color = up ? (opts.invertGood ? 'text-rose-500' : 'text-emerald-600')
+                     : (opts.invertGood ? 'text-emerald-600' : 'text-rose-500');
+    const sign  = up ? '+' : '-';
+    el.innerHTML = `<i class="fas ${icon}"></i> ${sign}${abs}%`;
+    el.className = `kpi-trend ${color}`;
+    el.title     = opts.title || `직전 7일 대비 ${sign}${abs}%`;
+}
+
 function updateKPIs() {
     // ★ aggregateByAdName 적용 — 성과 분석 섹션과 동일한 소재 단위 집계
     //   raw 일별 데이터를 직접 합산하면 숫자가 맞지만
@@ -1028,6 +1107,31 @@ function updateKPIs() {
     spendEl.innerHTML = formatKpiCurrency(spend);
     if (spendJpy > 0) {
         spendEl.title = `원본: ¥${formatNumber(spendJpy)} (환율 ¥1 = ₩${(typeof window.getFxRate === 'function' ? window.getFxRate() : 9.5)})`;
+    }
+
+    // ★ KPI 증감 배지 — 최근 7일 vs 직전 7일 (start_date 없으면 정적 텍스트 fallback)
+    const trend = calcKpiTrend(rawList);
+    const fallbackStatic = (label) => `<span class="kpi-trend text-slate-400" style="font-size:10px">${label}</span>`;
+    if (trend) {
+        const label = `최근 7일 (${trend.periodLabel}) 직전 7일 대비`;
+        renderKpiTrendBadge('kpi-trend-impressions', trend.impressions, { title: label });
+        renderKpiTrendBadge('kpi-trend-clicks',      trend.clicks,      { title: label });
+        renderKpiTrendBadge('kpi-trend-ctr',         trend.ctr,         { title: label });
+        renderKpiTrendBadge('kpi-trend-spend',       trend.spend,       { title: label, invertGood: true });
+        renderKpiTrendBadge('kpi-trend-conversions', trend.conversions, { title: label });
+        renderKpiTrendBadge('kpi-trend-roas',        trend.roas,        { title: label });
+    } else {
+        // start_date 없거나 기간 데이터 부족 → 기존 정적 텍스트 유지
+        const setFallback = (id, html, cls) => {
+            const el = document.getElementById(id);
+            if (el) { el.innerHTML = html; el.className = `kpi-trend ${cls}`; }
+        };
+        setFallback('kpi-trend-impressions', '<i class="fas fa-arrow-up"></i> 실시간', 'text-emerald-600');
+        setFallback('kpi-trend-clicks',      '<i class="fas fa-arrow-up"></i> 실시간', 'text-emerald-600');
+        setFallback('kpi-trend-ctr',         '소재 평균', 'text-slate-500');
+        setFallback('kpi-trend-spend',       '누적 집행', 'text-slate-500');
+        setFallback('kpi-trend-conversions', '<i class="fas fa-arrow-up"></i> 실시간', 'text-emerald-600');
+        setFallback('kpi-trend-roas',        '매출 효율', 'text-white/80');
     }
 }
 
@@ -1201,9 +1305,10 @@ function renderScatterChart() {
             data: brandList.map((c, idx) => ({
                 x: (c.ctr || 0) * 100,
                 y: noConv ? (c.impressions || 0) : (c.roas || 0) * 100,
+                // ★ 버블 크기 로그 스케일 — 광고비 차이가 클 때 작은 버블이 뭉치는 현상 해소
                 r: noConv
-                    ? Math.max(5, Math.min(28, Math.sqrt((c.impressions || 0) / maxImpr) * 28))
-                    : Math.max(5, Math.min(28, Math.sqrt((c.spend || 0) / 100000))),
+                    ? Math.max(5, Math.min(28, (Math.log10(Math.max((c.impressions || 1), 1)) / Math.log10(Math.max(maxImpr, 10))) * 28))
+                    : Math.max(5, Math.min(28, Math.log10(Math.max((c.spend || 1), 1)) * 2.2)),
                 name: c.creative_name || c.ad_name || '-',
                 _idx: idx, _brand: brand, _id: c.id,
                 spend: c.spend, revenue: c.revenue,
@@ -1226,9 +1331,52 @@ function renderScatterChart() {
 
     const ctx = document.getElementById('scatterChart');
     if (!ctx) return;
+    // ★ 4사분면 가이드라인 플러그인 — 평균 CTR 수직선 + 평균 ROAS(또는 노출수) 수평선
+    const quadrantPlugin = {
+        id: 'scatterQuadrant',
+        afterDraw(chart) {
+            const { ctx: c, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+            if (!x || !y) return;
+
+            // 데이터 전체에서 평균값 계산
+            let allX = [], allY = [];
+            chart.data.datasets.forEach(ds => {
+                ds.data.forEach(pt => {
+                    if (pt.x != null) allX.push(pt.x);
+                    if (pt.y != null) allY.push(pt.y);
+                });
+            });
+            if (!allX.length || !allY.length) return;
+
+            const avgX = allX.reduce((s, v) => s + v, 0) / allX.length;
+            const avgY = allY.reduce((s, v) => s + v, 0) / allY.length;
+            const xPx = x.getPixelForValue(avgX);
+            const yPx = y.getPixelForValue(avgY);
+
+            c.save();
+            c.setLineDash([5, 4]);
+            c.strokeStyle = 'rgba(100, 116, 139, 0.45)';
+            c.lineWidth = 1.2;
+
+            // 수직선 (평균 CTR)
+            c.beginPath(); c.moveTo(xPx, top); c.lineTo(xPx, bottom); c.stroke();
+            // 수평선 (평균 ROAS / 노출수)
+            c.beginPath(); c.moveTo(left, yPx); c.lineTo(right, yPx); c.stroke();
+
+            c.setLineDash([]);
+            c.font = '9px sans-serif';
+            c.fillStyle = 'rgba(100,116,139,0.75)';
+            c.fillText(`평균 CTR ${avgX.toFixed(2)}%`, xPx + 4, top + 12);
+            const yLabel = noConv ? `평균 노출 ${Math.round(avgY).toLocaleString()}` : `평균 ROAS ${Math.round(avgY)}%`;
+            c.fillText(yLabel, left + 4, yPx - 4);
+            c.restore();
+        }
+    };
+
     charts.scatter = new Chart(ctx, {
         type: 'bubble',
         data: { datasets },
+        plugins: [quadrantPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -1993,12 +2141,19 @@ function renderPlatformMatrixHeatmap(enriched, platformTotals, appealTotals, met
             }
             const val = combo[metric] || 0;
             const { bg, color, border } = colorFor(val);
+            // ★ count < 2이면 신뢰 낮음 표시 — 반투명 + 경고 아이콘
+            const lowConf = combo.count < 2;
+            const lowConfAttr  = lowConf ? ' pm-cell-low-conf' : '';
+            const lowConfBadge = lowConf
+                ? `<div class="pm-cell-conf-badge" title="소재 1개 데이터 — 참고용"><i class="fas fa-circle-exclamation"></i> n=1</div>`
+                : '';
             return `
-                <td class="pm-cell" style="background:${bg}; color:${color}; border-color:${border}"
+                <td class="pm-cell${lowConfAttr}" style="background:${bg}; color:${color}; border-color:${border}; ${lowConf ? 'opacity:0.55;' : ''}"
                     data-creative-id="${combo.creatives[0]?.id || ''}"
-                    title="${platform} × ${appeal}: ${metricCfg.label} ${metricCfg.format(val)} · 소재 ${combo.count}개 · 광고비 ₩${formatNumber(combo.spend)}">
+                    title="${platform} × ${appeal}: ${metricCfg.label} ${metricCfg.format(val)} · 소재 ${combo.count}개 · 광고비 ₩${formatNumber(combo.spend)}${lowConf ? ' ⚠ 소재 1개 — 신뢰도 낮음' : ''}">
                     <div class="pm-cell-val">${metricCfg.short(val)}</div>
                     <div class="pm-cell-sub">${combo.count}개</div>
+                    ${lowConfBadge}
                 </td>
             `;
         }).join('');

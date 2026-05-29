@@ -3748,6 +3748,25 @@ body {
     font-weight: 600;
 }
 
+/* ★ 신뢰도 낮음 배지 (count < 2) */
+.pm-cell-low-conf {
+    position: relative;
+}
+.pm-cell-conf-badge {
+    font-size: 8px;
+    font-weight: 700;
+    margin-top: 2px;
+    color: #f59e0b;
+    letter-spacing: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+.pm-cell-conf-badge i {
+    font-size: 8px;
+}
+
 /* 범례 */
 .pm-legend {
     display: flex;
