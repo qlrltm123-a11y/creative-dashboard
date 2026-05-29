@@ -248,6 +248,16 @@ function bindEvents() {
         productSortMetric.addEventListener('change', renderProductPerformance);
     }
 
+    // 갤러리 소구포인트 / 성과구간 필터
+    const galleryAppealSel = document.getElementById('gallery-appeal-select');
+    const galleryPerfTierSel = document.getElementById('gallery-perf-tier-select');
+    if (galleryAppealSel) {
+        galleryAppealSel.addEventListener('change', renderProductPerformance);
+    }
+    if (galleryPerfTierSel) {
+        galleryPerfTierSel.addEventListener('change', renderProductPerformance);
+    }
+
     // (기존 개별 제품 셀렉트는 hidden으로 유지 — 섹션 통합 필터가 동기화)
 
     // 매체 × 소재 조합 - 지표 변경
@@ -791,6 +801,7 @@ function updateDashboard() {
     populatePerformanceFilterOptions(); // ★ 성과 분석 섹션 필터
     populateAiFilterOptions();           // ★ AI 인사이트 섹션 필터
     populateWinningProductOptions();     // ★ 위닝 요소 인사이트 제품 필터
+    populateGalleryAppealOptions();      // ★ 갤러리 소구포인트 필터
     updateKPIs();
     updateCharts();
     // renderProductKPIs(); // 제거됨 (제품별 성과 요약 섹션 제거)
@@ -1653,6 +1664,23 @@ function buildDesignLabel(c) {
     const topEmotion = emotions[0] || '';
     if (!mediaPart && !topEmotion) return null;
     return [mediaPart, topEmotion].filter(Boolean).join(' · ');
+}
+
+// 갤러리 소구포인트 필터 옵션 채우기
+function populateGalleryAppealOptions() {
+    const sel = document.getElementById('gallery-appeal-select');
+    if (!sel) return;
+    const appeals = new Set();
+    (window.allCreatives || []).forEach(c => {
+        const pts = Array.isArray(c.appeal_points)
+            ? c.appeal_points
+            : String(c.appeal_points || '').split(/[,、，·・]/).map(s => s.trim());
+        pts.forEach(p => { if (p) appeals.add(p); });
+    });
+    const current = sel.value;
+    sel.innerHTML = '<option value="ALL">소구포인트 전체</option>' +
+        [...appeals].sort().map(a => `<option value="${a}">${a}</option>`).join('');
+    if ([...appeals].includes(current)) sel.value = current;
 }
 
 // 위닝 요소 인사이트 - 제품 드롭다운

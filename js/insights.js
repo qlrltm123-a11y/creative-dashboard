@@ -538,6 +538,7 @@ function renderAIInsights() {
     renderHookCtrChart(list);
     renderEmotionChart(list);
     renderTopMessages(list);
+    renderAppealFunnelChart(list);
 
     // 선정 기준 안내 배지 갱신
     renderInsightThresholdBadge();
@@ -1246,6 +1247,89 @@ function renderTopMessages(list) {
             </div>
         `;
     }).join('');
+}
+
+function renderAppealFunnelChart(list) {
+    destroyInsightChart('appealFunnel');
+    const ctx = document.getElementById('appealFunnelChart');
+    if (!ctx) return;
+
+    const threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    let data = aggregateByKeyword(list, 'appeal_points', { threshold })
+        .filter(d => d.ctr > 0 && d.cvr > 0 && d.count >= 2)
+        .slice(0, 15);
+
+    if (!data.length) { ctx.parentElement.innerHTML = '<p class="text-slate-400 text-sm text-center py-8">데이터 부족 (소재 2개 이상 + CTR/CVR 필요)</p>'; return; }
+
+    const avgCtr = data.reduce((s,d) => s + d.ctr, 0) / data.length;
+    const avgCvr = data.reduce((s,d) => s + d.cvr, 0) / data.length;
+    const maxCount = Math.max(...data.map(d => d.count), 1);
+
+    const colors = data.map(d => {
+        const hc = d.ctr >= avgCtr, hv = d.cvr >= avgCvr;
+        if (hc && hv)  return 'rgba(16,185,129,0.75)';
+        if (!hc && hv) return 'rgba(99,102,241,0.70)';
+        if (hc && !hv) return 'rgba(251,191,36,0.75)';
+        return 'rgba(148,163,184,0.60)';
+    });
+
+    insightCharts['appealFunnel'] = new Chart(ctx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: '소구포인트',
+                data: data.map((d, i) => ({
+                    x: Number((d.ctr * 100).toFixed(2)),
+                    y: Number((d.cvr * 100).toFixed(2)),
+                    r: 6 + Math.round((d.count / maxCount) * 18),
+                    _d: d
+                })),
+                backgroundColor: colors,
+                borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: t => { const d = t.raw._d; return [`"${d.keyword}"`, `CTR ${(d.ctr*100).toFixed(2)}%  CVR ${(d.cvr*100).toFixed(2)}%`, `ROAS ${Math.round(d.roas*100)}%  소재 ${d.count}개`]; } } }
+            },
+            scales: {
+                x: { title: { display: true, text: 'CTR (%)' }, ticks: { callback: v => v + '%' } },
+                y: { title: { display: true, text: 'CVR (%)' }, ticks: { callback: v => v + '%' } }
+            }
+        },
+        plugins: [{
+            id: 'funnelQuadrant',
+            afterDraw(chart) {
+                const { ctx: c, chartArea: { top, bottom, left, right }, scales } = chart;
+                const xMid = scales.x.getPixelForValue(avgCtr * 100);
+                const yMid = scales.y.getPixelForValue(avgCvr * 100);
+                c.save(); c.strokeStyle = 'rgba(100,116,139,0.35)'; c.lineWidth = 1; c.setLineDash([5,4]);
+                c.beginPath(); c.moveTo(xMid, top); c.lineTo(xMid, bottom); c.stroke();
+                c.beginPath(); c.moveTo(left, yMid); c.lineTo(right, yMid); c.stroke();
+                c.setLineDash([]); c.font = '10px sans-serif'; c.fillStyle = 'rgba(100,116,139,0.7)';
+                c.fillText('CTR·CVR 모두 우수 ★', xMid + 6, top + 14);
+                c.fillText('클릭↑ 전환↓', xMid + 6, bottom - 8);
+                c.textAlign = 'right';
+                c.fillText('전환↑ 클릭↓', xMid - 6, top + 14);
+                c.restore();
+            }
+        }, {
+            id: 'bubbleLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx: c } = chart;
+                const meta = chart.getDatasetMeta(0);
+                c.save(); c.font = 'bold 9px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#1e293b';
+                meta.data.forEach((el, i) => {
+                    const kw = data[i].keyword;
+                    c.fillText(kw.length > 6 ? kw.slice(0,6)+'…' : kw, el.x, el.y);
+                });
+                c.restore();
+            }
+        }]
+    });
 }
 
 // formatNumber 폴백

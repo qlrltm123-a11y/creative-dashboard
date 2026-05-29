@@ -506,6 +506,12 @@ function renderMegawariPanel() {
         <table class="mw-table"><${tableHead}<tbody>${tableBody}</tbody></table>
     </div>
 
+    <!-- D+N 누적 ROAS 추이 라인 차트 -->
+    <div class="mw-section-hd">📈 D+N 누적 ROAS 추이</div>
+    <div class="chart-card mb-4" style="padding:16px">
+        <canvas id="mwRoasLineChart" style="height:220px;max-height:220px"></canvas>
+    </div>
+
     <!-- 소재 리스트 -->
     <div class="mw-two-col">
         <div>
@@ -595,6 +601,8 @@ function renderMegawariPanel() {
             <i class="fas fa-comment mr-1.5"></i>카카오 전송
         </button>
     </div>`;
+
+    _renderMwRoasChart(byDate, sortedDates);
 }
 
 // ── 날짜 선택 ─────────────────────────────────────────────────
@@ -757,3 +765,72 @@ function _mwKakaoLogin() {
 window._mwKakaoLogin = _mwKakaoLogin;
 
 window.renderMegawariPanel = renderMegawariPanel;
+
+// ── D+N 누적 ROAS 라인 차트 ─────────────────────────────────
+let _mwRoasChart = null;
+
+function _renderMwRoasChart(byDate, sortedDates) {
+    const ctx = document.getElementById('mwRoasLineChart');
+    if (!ctx) return;
+    if (_mwRoasChart) { _mwRoasChart.destroy(); _mwRoasChart = null; }
+
+    let cumSpend = 0, cumRevenue = 0;
+    const labels = [], cumRoasData = [], dailyRoasData = [];
+
+    sortedDates.forEach(iso => {
+        const d = byDate[iso];
+        if (!d) return;
+        cumSpend   += d.spend   || 0;
+        cumRevenue += d.revenue || 0;
+        const dateObj = new Date(iso);
+        labels.push(`${dateObj.getMonth()+1}/${dateObj.getDate()}`);
+        cumRoasData.push(cumSpend > 0 ? Math.round(cumRevenue / cumSpend * 100) : 0);
+        dailyRoasData.push(Math.round((d.roas || 0) * 100));
+    });
+
+    if (!labels.length) return;
+
+    _mwRoasChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: '누적 ROAS (%)',
+                    data: cumRoasData,
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249,115,22,0.10)',
+                    borderWidth: 2.5,
+                    tension: 0.35,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                },
+                {
+                    label: '일별 ROAS (%)',
+                    data: dailyRoasData,
+                    borderColor: '#a78bfa',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    tension: 0.3,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+                tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.raw}%` } }
+            },
+            scales: {
+                y: { ticks: { callback: v => v + '%', font: { size: 10 } }, grid: { color: 'rgba(226,232,240,0.6)' } },
+                x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+            }
+        }
+    });
+}

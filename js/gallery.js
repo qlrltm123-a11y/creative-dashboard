@@ -8,7 +8,7 @@ let compareSelected = [null, null, null]; // 최대 3개
 /* ────────────────────────────────────────
    갤러리 렌더링
 ──────────────────────────────────────── */
-function renderGallery(brand = 'ALL', type = 'ALL', status = 'ALL', search = '', sort = 'roas', perfData = PERFORMANCE) {
+function renderGallery(brand = 'ALL', type = 'ALL', status = 'ALL', search = '', sort = 'roas', perfData = PERFORMANCE, appeal = 'ALL', perfTier = 'ALL') {
   let creatives = [...CREATIVES];
 
   // 필터
@@ -19,12 +19,33 @@ function renderGallery(brand = 'ALL', type = 'ALL', status = 'ALL', search = '',
     c.title.includes(search) || c.concept.includes(search) || c.copy.includes(search)
   );
 
+  // 소구포인트 필터
+  if (appeal !== 'ALL') {
+    creatives = creatives.filter(c => {
+      const pts = Array.isArray(c.appeal_points)
+        ? c.appeal_points
+        : String(c.appeal_points || '').split(/[,、，·・]/).map(s => s.trim());
+      return pts.some(p => p === appeal);
+    });
+  }
+
   // 퍼포먼스 집계
-  const withPerf = creatives.map(cr => {
+  let withPerf = creatives.map(cr => {
     const rows = perfData.filter(p => p.creative_id === cr.id);
     const perf = rows.length ? aggregatePerf(rows) : { roas: 0, ctr: 0, cpa: 0, spend: 0, conversions: 0, clicks: 0, impressions: 0 };
     return { ...cr, perf };
   });
+
+  // 성과구간 필터
+  if (perfTier !== 'ALL') {
+    withPerf = withPerf.filter(cr => {
+      const roas = cr.perf.roas || 0;
+      if (perfTier === 'high') return roas >= 300;
+      if (perfTier === 'mid')  return roas >= 150 && roas < 300;
+      if (perfTier === 'low')  return roas > 0 && roas < 150;
+      return true;
+    });
+  }
 
   // 정렬
   const sortKey = { roas: 'roas', spend: 'spend', conversions: 'conversions', ctr: 'ctr' }[sort] || 'roas';
