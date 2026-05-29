@@ -911,11 +911,14 @@ function isNoConvPlatform(platform) {
 // BEST/WORST 선정용: 트래킹 안 되는 브로드 매체 행 제외 필터
 // "Meta(broad)", "TikTok(broad)" 등 isNoConvPlatform=true 행은 제외
 // "Single One Meta", "Single One TikTok" 등 tracked 계열은 유지
-// 매체 필터가 이미 특정 플랫폼으로 걸린 경우엔 적용 안 함
+// ★ 캐시: 동일 입력 배열 참조에 대해 재계산 방지 (WeakMap 활용)
+const _trackedOnlyCache = new WeakMap();
 function filterTrackedOnly(rows) {
+    if (_trackedOnlyCache.has(rows)) return _trackedOnlyCache.get(rows);
     const tracked = rows.filter(c => !isNoConvPlatform(c.platform));
-    // tracked 행이 하나도 없으면 원본 유지 (데이터 구조상 트래킹 구분 없는 경우 대비)
-    return tracked.length > 0 ? tracked : rows;
+    const result = tracked.length > 0 ? tracked : rows;
+    try { _trackedOnlyCache.set(rows, result); } catch (_) {}
+    return result;
 }
 
 // ★ 장바구니 최적화 모드 감지
@@ -3524,52 +3527,50 @@ function median(arr) {
         : sorted[mid];
 }
 
+// ★ renderProductPerformance 전용 집계 캐시
+// 동일 필터 상태 + 동일 allCreatives 참조면 재집계 생략
+let _perfPerfCache = null;
+function _getPerfData() {
+    const cacheKey = `${currentBrand}|${currentPlatform}|${currentEvent}|${performanceProduct}`;
+    const src = window.allCreatives || allCreatives || [];
+    if (_perfPerfCache && _perfPerfCache.key === cacheKey && _perfPerfCache.src === src) {
+        return _perfPerfCache;
+    }
+    let data = src;
+    if (currentBrand && currentBrand !== 'ALL') data = data.filter(c => c.brand === currentBrand);
+    if (currentPlatform) data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
+    if (currentEvent)   data = data.filter(c => (c.event    || '').toString().trim() === currentEvent);
+    if (performanceProduct) data = data.filter(c => (c.product || '').trim() === performanceProduct);
+
+    const isAllPlatform = !currentPlatform;
+    const dataForRanking = isAllPlatform ? filterTrackedOnly(data) : data;
+    const aggregated = (typeof aggregateByAdName === 'function') ? aggregateByAdName(dataForRanking) : dataForRanking;
+
+    _perfPerfCache = { key: cacheKey, src, data: aggregated, isAllPlatform };
+    return _perfPerfCache;
+}
+// 필터 변경 시 캐시 무효화 (invalidatePerformancePoolCache와 함께 호출)
+const _origInvalidate = window.invalidatePerformancePoolCache || (() => {});
+window.invalidatePerformancePoolCache = function() { _perfPerfCache = null; _origInvalidate(); };
+
 function renderProductPerformance() {
     const metricSel = document.getElementById('product-sort-metric');
     const bestEl = document.getElementById('best-creatives-list');
     const summaryEl = document.getElementById('product-summary');
-    // best-metric-label 제거됨
     if (!bestEl) return;
 
-    // ★ window.allCreatives 직접 사용 (getBrandCreatives 우회)
-    let data = Array.isArray(window.allCreatives) ? window.allCreatives
-             : Array.isArray(allCreatives) ? allCreatives : [];
-    // 브랜드 필터
-    if (currentBrand && currentBrand !== 'ALL') {
-        data = data.filter(c => c.brand === currentBrand);
-    }
-    // 매체 필터
-    if (currentPlatform) {
-        data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
-    }
-    // 이벤트 필터
-    if (currentEvent) {
-        data = data.filter(c => (c.event || '').toString().trim() === currentEvent);
-    }
-    // 제품 필터 (성과 분석 섹션 필터)
-    if (performanceProduct) {
-        data = data.filter(c => (c.product || '').trim() === performanceProduct);
-    }
-    // ★ BEST/WORST 선정 기준 개선:
-    // 매체 필터가 없는 경우(전체 보기) — 트래킹 안 되는 브로드 매체(Meta, TikTok)는 제외하고
-    // Single One Meta / Single One TikTok 등 전환 추적 되는 행만으로 합산
-    // → 같은 이름 소재가 여러 매체에 집행된 경우, 전환 추적 매체 수치만으로 ROAS/CTR 계산
-    const isAllPlatform = !currentPlatform;
-    const dataForRanking = isAllPlatform ? filterTrackedOnly(data) : data;
+    const { data: dataArr, isAllPlatform } = _getPerfData();
 
-    // ad_name 단위 합산 (tracked 행만으로 집계)
-    if (typeof aggregateByAdName === 'function') data = aggregateByAdName(dataForRanking);
+    console.log(`[BEST TOP5] 소재수=${dataArr.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
 
-    console.log(`[BEST TOP5] 소재수=${data.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
-
-    if (!data.length) {
-            if (summaryEl) summaryEl.innerHTML = '';
+    if (!dataArr.length) {
+        if (summaryEl) summaryEl.innerHTML = '';
         bestEl.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>데이터 없음</div>`;
         return;
     }
 
     // 장바구니 모드 감지
-    const cartMode = isCartMode(data);
+    const cartMode = isCartMode(dataArr);
 
     // 정렬 지표 결정 (사용자 선택 유지 — 자동 전환 없음)
     let metric = metricSel?.value || 'ctr';
@@ -3594,9 +3595,9 @@ function renderProductPerformance() {
     }
 
     // 지표값 > 0인 소재 우선, 없으면 impressions > 0, 그래도 없으면 전체
-    let pool = data.filter(c => (c[metric] || 0) > 0);
-    if (!pool.length) pool = data.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0);
-    if (!pool.length) pool = data;
+    let pool = dataArr.filter(c => (c[metric] || 0) > 0);
+    if (!pool.length) pool = dataArr.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0);
+    if (!pool.length) pool = dataArr;
 
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const cartLabel = cartMode ? '🛒 ' : '';
