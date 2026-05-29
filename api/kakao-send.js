@@ -12,14 +12,16 @@ module.exports = async function handler(req, res) {
 
   const {
     text,
-    refresh_token: bodyRefresh,
-    app_key:      bodyAppKey,
+    refresh_token:  bodyRefresh,
+    app_key:        bodyAppKey,
+    client_secret:  bodySecret,
   } = req.body || {};
 
   if (!text) return res.status(400).json({ error: 'text 필요' });
 
-  const refreshToken = bodyRefresh || process.env.KAKAO_REFRESH_TOKEN || '';
-  const appKey       = bodyAppKey  || process.env.KAKAO_APP_KEY       || '';
+  const refreshToken = bodyRefresh || process.env.KAKAO_REFRESH_TOKEN  || '';
+  const appKey       = bodyAppKey  || process.env.KAKAO_APP_KEY        || '';
+  const clientSecret = bodySecret  || process.env.KAKAO_CLIENT_SECRET  || '';
 
   if (!refreshToken || !appKey) {
     return res.status(401).json({
@@ -30,14 +32,17 @@ module.exports = async function handler(req, res) {
   // ── 1. Refresh Token → Access Token ────────────────────────
   let accessToken;
   try {
+    const tokenParams = {
+      grant_type:    'refresh_token',
+      client_id:     appKey,
+      refresh_token: refreshToken,
+    };
+    if (clientSecret) tokenParams.client_secret = clientSecret;
+
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
-      body: new URLSearchParams({
-        grant_type:    'refresh_token',
-        client_id:     appKey,
-        refresh_token: refreshToken,
-      }).toString(),
+      body: new URLSearchParams(tokenParams).toString(),
     });
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {

@@ -336,9 +336,10 @@ function renderMegawariPanel() {
     }).join('');
 
     // ── 카카오 설정 상태 ──────────────────────────────────────
-    const kakaoKey = localStorage.getItem('mw_kakao_app_key') || '';
-    const kakaoToken = localStorage.getItem('mw_kakao_refresh_token') || '';
-    const kakaoTime = localStorage.getItem('mw_kakao_send_time') || '09:00';
+    const kakaoKey    = localStorage.getItem('mw_kakao_app_key')       || '';
+    const kakaoSecret = localStorage.getItem('mw_kakao_client_secret') || '';
+    const kakaoToken  = localStorage.getItem('mw_kakao_refresh_token') || '';
+    const kakaoTime   = localStorage.getItem('mw_kakao_send_time')     || '09:00';
     const kakaoEnabled = localStorage.getItem('mw_kakao_enabled') === '1';
     const vercelUrl = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
 
@@ -419,9 +420,14 @@ function renderMegawariPanel() {
                 <div class="mw-kakao-step-content">
                     <p class="font-semibold text-sm mb-1">카카오 REST API 키 입력</p>
                     <p class="text-xs text-slate-500 mb-2"><a href="https://developers.kakao.com/console/app" target="_blank" class="text-indigo-500 underline">developers.kakao.com</a> → 내 애플리케이션 → REST API 키</p>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 mb-2">
                         <input id="mw-kakao-key-input" type="text" class="mw-kakao-input flex-1" placeholder="REST API 키" value="${kakaoKey}">
                         <button class="mw-kakao-btn" onclick="_mwSaveKakaoKey()">저장</button>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-1">Client Secret (보안 탭에서 활성화한 경우)</p>
+                    <div class="flex gap-2">
+                        <input id="mw-kakao-secret-input" type="text" class="mw-kakao-input flex-1" placeholder="Client Secret 코드 (없으면 비워두기)" value="${kakaoSecret}">
+                        <button class="mw-kakao-btn" onclick="_mwSaveKakaoSecret()">저장</button>
                     </div>
                 </div>
             </div>
@@ -514,10 +520,11 @@ async function _mwSendViaKakao(text) {
         return;
     }
 
+    const clientSecret = localStorage.getItem('mw_kakao_client_secret') || '';
     const res = await fetch(`${vercelBase}/api/kakao-send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, refresh_token: refreshToken, app_key: appKey }),
+        body: JSON.stringify({ text, refresh_token: refreshToken, app_key: appKey, client_secret: clientSecret }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -542,6 +549,19 @@ function _mwSaveKakaoKey() {
     alert('✅ 저장됐어요!');
 }
 window._mwSaveKakaoKey = _mwSaveKakaoKey;
+
+function _mwSaveKakaoSecret() {
+    const secret = document.getElementById('mw-kakao-secret-input')?.value?.trim();
+    if (secret === undefined) return;
+    if (secret) {
+        localStorage.setItem('mw_kakao_client_secret', secret);
+        alert('✅ Client Secret 저장됐어요!');
+    } else {
+        localStorage.removeItem('mw_kakao_client_secret');
+        alert('Client Secret을 삭제했어요.');
+    }
+}
+window._mwSaveKakaoSecret = _mwSaveKakaoSecret;
 
 function _mwSaveAutoSend() {
     const time = document.getElementById('mw-kakao-time-input')?.value || '09:00';
