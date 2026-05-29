@@ -20,8 +20,9 @@ function _getMwDayLabel(isoDate) {
 }
 
 // ── 유틸 ──────────────────────────────────────────────────────
-function _fmtRoas(v) { return v > 0 ? `${Math.round(v * 100)}%` : '-'; }
-function _fmtCtr(v)  { return v > 0 ? `${(v * 100).toFixed(2)}%` : '-'; }
+function _fmtRoas(v)    { return v > 0 ? `${Math.round(v * 100)}%` : '-'; }
+function _fmtCtr(v)     { return v > 0 ? `${(v * 100).toFixed(2)}%` : '-'; }
+function _fmtAtcRate(v) { return v > 0 ? `ATC ${(v * 100).toFixed(2)}%` : 'ATC -'; }
 function _fmtMoney(v, unit) {
     if (!v || v === 0) return '-';
     if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M${unit||''}`;
@@ -32,6 +33,12 @@ function _roasClass(roas) {
     if (roas >= 3)   return 'roas-high';
     if (roas >= 1.5) return 'roas-mid';
     if (roas >= 1)   return 'roas-low';
+    return 'roas-bad';
+}
+function _atcClass(rate) {
+    if (rate >= 0.05)  return 'roas-high';
+    if (rate >= 0.02)  return 'roas-mid';
+    if (rate >= 0.005) return 'roas-low';
     return 'roas-bad';
 }
 function _diffBadge(curr, prev) {
@@ -69,20 +76,29 @@ function _aggregateMw(data) {
         const prod = (c.product||'기타').trim();
         const plat = (c.platform||'기타').trim();
 
-        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0,revenue:0,impressions:0,clicks:0,creatives:[],byPlatform:{} };
+        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0,revenue:0,impressions:0,clicks:0,add_to_cart:0,creatives:[],byPlatform:{} };
         const dp = d.byProduct[prod];
         dp.spend+=c.spend||0; dp.revenue+=c.revenue||0; dp.impressions+=c.impressions||0; dp.clicks+=c.clicks||0;
+        dp.add_to_cart+=c.add_to_cart||0;
         dp.creatives.push(c);
-        if (!dp.byPlatform[plat]) dp.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0};
+        if (!dp.byPlatform[plat]) dp.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0,add_to_cart:0};
         dp.byPlatform[plat].spend+=c.spend||0; dp.byPlatform[plat].revenue+=c.revenue||0;
         dp.byPlatform[plat].impressions+=c.impressions||0; dp.byPlatform[plat].clicks+=c.clicks||0;
+        dp.byPlatform[plat].add_to_cart+=c.add_to_cart||0;
 
-        if (!d.byPlatform[plat]) d.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0};
+        if (!d.byPlatform[plat]) d.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0,add_to_cart:0};
         d.byPlatform[plat].spend+=c.spend||0; d.byPlatform[plat].revenue+=c.revenue||0;
         d.byPlatform[plat].impressions+=c.impressions||0; d.byPlatform[plat].clicks+=c.clicks||0;
+        d.byPlatform[plat].add_to_cart+=c.add_to_cart||0;
+
+        d.add_to_cart = (d.add_to_cart||0) + (c.add_to_cart||0);
     });
 
-    const calc = o => { o.roas = o.spend>0 ? o.revenue/o.spend : 0; o.ctr = o.impressions>0 ? o.clicks/o.impressions : 0; };
+    const calc = o => {
+        o.roas    = o.spend>0       ? o.revenue/o.spend           : 0;
+        o.ctr     = o.impressions>0 ? o.clicks/o.impressions       : 0;
+        o.atc_rate= o.clicks>0      ? (o.add_to_cart||0)/o.clicks  : 0;
+    };
     Object.values(byDate).forEach(d => {
         calc(d);
         Object.values(d.byProduct).forEach(p => { calc(p); Object.values(p.byPlatform).forEach(calc); });
@@ -214,9 +230,11 @@ function renderMegawariPanel() {
     // 전체 매체 목록
     const allPlats = [...new Set(prods.flatMap(([,p]) => Object.keys(p.byPlatform)))].sort();
 
+    // 테이블 헤더: 티저면 ATC율 컬럼 추가
     const tableHead = `<thead><tr>
         <th class="mw-th mw-th-prod">제품</th>
         <th class="mw-th">ROAS</th>
+        ${isTeaser ? `<th class="mw-th" title="Add To Cart율 (티저 핵심지표)">ATC율</th>` : ''}
         <th class="mw-th">CTR</th>
         <th class="mw-th">매출</th>
         ${allPlats.map(pl=>`<th class="mw-th mw-th-plat">${pl}</th>`).join('')}
@@ -226,16 +244,24 @@ function renderMegawariPanel() {
         const platCells = allPlats.map(pl => {
             const v = p.byPlatform[pl];
             if (!v || v.roas === 0) return `<td class="mw-td mw-td-plat"><span class="text-slate-300">-</span></td>`;
+            const mainMetric = isTeaser && v.atc_rate > 0
+                ? `<span class="mw-cell-roas ${_atcClass(v.atc_rate)}">${_fmtAtcRate(v.atc_rate)}</span>`
+                : `<span class="mw-cell-roas ${_roasClass(v.roas)}">${_fmtRoas(v.roas)}</span>`;
             return `<td class="mw-td mw-td-plat">
-                <span class="mw-cell-roas ${_roasClass(v.roas)}">${_fmtRoas(v.roas)}</span>
+                ${mainMetric}
                 <span class="mw-cell-ctr">${_fmtCtr(v.ctr)}</span>
             </td>`;
         }).join('');
 
-        // 해당 제품 TOP 소재
-        const sorted = p.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
-        const top = sorted[0];
-        const bot = sorted.length > 1 && (sorted[sorted.length-1].roas||0) < 1 ? sorted[sorted.length-1] : null;
+        // 해당 제품 TOP 소재 (티저: ATC율 기준)
+        const sortedP = p.creatives
+            .filter(c => useAtc ? (c.add_to_cart||0)>0 : (c.roas||0)>0)
+            .sort((a,b) => useAtc
+                ? (b.add_to_cart||0)/(b.clicks||1) - (a.add_to_cart||0)/(a.clicks||1)
+                : (b.roas||0)-(a.roas||0));
+        const top = sortedP[0];
+        const bot = !useAtc && sortedP.length > 1 && (sortedP[sortedP.length-1].roas||0) < 1
+            ? sortedP[sortedP.length-1] : null;
 
         return `<tr class="mw-tr">
             <td class="mw-td mw-td-prod">
@@ -244,29 +270,64 @@ function renderMegawariPanel() {
                 ${bot ? `<div class="mw-prod-bot">⚠️ ${(bot.ad_name||bot.creative_name||'').slice(0,20)}</div>` : ''}
             </td>
             <td class="mw-td"><span class="mw-roas-badge ${_roasClass(p.roas)}">${_fmtRoas(p.roas)}</span>${_diffBadge(p.roas, prev?.byProduct?.[name]?.roas)}</td>
+            ${isTeaser ? `<td class="mw-td mw-td-num"><span class="mw-roas-badge ${_atcClass(p.atc_rate)}">${_fmtAtcRate(p.atc_rate)}</span>${_diffBadge(p.atc_rate, prev?.byProduct?.[name]?.atc_rate)}</td>` : ''}
             <td class="mw-td mw-td-num">${_fmtCtr(p.ctr)}</td>
             <td class="mw-td mw-td-num">${_fmtMoney(p.revenue)}</td>
             ${platCells}
         </tr>`;
     }).join('');
 
-    // ── 소재 리스트 ───────────────────────────────────────────
-    const allC = today.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
-    const topRows = allC.slice(0,5).map((c,i)=>`
+    // ── 소재 리스트 (티저: ATC율 기준 / 본기간: ROAS 기준) ─
+    const isTeaser = dayInfo.period?.key === 'teaser';
+    const hasAtc   = today.creatives.some(c => (c.add_to_cart||0) > 0);
+    const useAtc   = isTeaser && hasAtc;
+
+    // 유효 소재 정렬
+    const sortedC = today.creatives
+        .filter(c => useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0)
+        .sort((a,b) => useAtc
+            ? (b.add_to_cart||0)/(b.clicks||1) - (a.add_to_cart||0)/(a.clicks||1)
+            : (b.roas||0) - (a.roas||0)
+        );
+
+    // ── 고효율: 제품별 최고 소재 ──────────────────────────
+    const topByProd = {};
+    sortedC.forEach(c => {
+        const prod = (c.product||'기타').trim();
+        if (!topByProd[prod]) topByProd[prod] = c;
+    });
+    const topRows = Object.entries(topByProd).map(([prod, c]) => {
+        const rate    = useAtc ? (c.add_to_cart||0)/(c.clicks||1) : (c.roas||0);
+        const metricHtml = useAtc
+            ? `<span class="mw-cr-roas ${_atcClass(rate)}">${_fmtAtcRate(rate)}</span>`
+            : `<span class="mw-cr-roas ${_roasClass(rate)}">${_fmtRoas(rate)}</span>`;
+        return `
         <div class="mw-creative-item top">
-            <span class="mw-cr-rank">${['🥇','🥈','🥉','4','5'][i]}</span>
-            <span class="mw-cr-name">${c.ad_name||c.creative_name||'-'}</span>
-            <span class="mw-cr-prod">${c.product||''}</span>
-            <span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>
-        </div>`).join('');
-    const botC = allC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
-    const botRows = botC.map(c=>`
+            <span class="mw-cr-prod-badge">${prod}</span>
+            <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,28)}</span>
+            ${metricHtml}
+        </div>`;
+    }).join('');
+
+    // ── 저효율: 하위 3개 ──────────────────────────────────
+    const worstC = useAtc
+        ? today.creatives
+            .filter(c => (c.add_to_cart||0) === 0 && (c.clicks||0) > 50)
+            .sort((a,b) => (a.clicks||0) - (b.clicks||0))
+            .slice(0, 3)
+        : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
+    const botRows = worstC.map(c => {
+        const metricHtml = useAtc
+            ? `<span class="mw-cr-roas roas-bad">ATC 0%</span>`
+            : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
+        return `
         <div class="mw-creative-item bot">
             <span class="mw-cr-rank">⚠️</span>
-            <span class="mw-cr-name">${c.ad_name||c.creative_name||'-'}</span>
+            <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,28)}</span>
             <span class="mw-cr-prod">${c.product||''}</span>
-            <span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>
-        </div>`).join('');
+            ${metricHtml}
+        </div>`;
+    }).join('');
 
     // ── 카카오 설정 상태 ──────────────────────────────────────
     const kakaoKey = localStorage.getItem('mw_kakao_app_key') || '';
@@ -325,11 +386,17 @@ function renderMegawariPanel() {
     <!-- 소재 리스트 -->
     <div class="mw-two-col">
         <div>
-            <div class="mw-section-hd">🏆 고효율 TOP5</div>
+            <div class="mw-section-hd">
+                🏆 고효율 소재 (제품별)
+                <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'ATC율 기준':'ROAS 기준'}</span>
+            </div>
             <div class="mw-creative-list">${topRows||'<p class="mw-no-data">데이터 없음</p>'}</div>
         </div>
         <div>
-            <div class="mw-section-hd">⚠️ 저효율 소재</div>
+            <div class="mw-section-hd">
+                ⚠️ 저효율 소재
+                <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'ATC 미발생':'ROAS 기준'}</span>
+            </div>
             <div class="mw-creative-list">${botRows||'<p class="mw-no-data">없음 👍</p>'}</div>
         </div>
     </div>

@@ -5854,3 +5854,31 @@ details[open] .mw-kakao-summary::before { transform: rotate(90deg); }
 .mw-btn-copy  { background: #e2e8f0; color: #334155; }
 .mw-btn-kakao { background: #fee500; color: #3b1f1f; }
 .mw-btn-copy:hover, .mw-btn-kakao:hover { opacity: 0.82; }
+
+/* ── 소재 제품 배지 (고효율 - 제품별) ── */
+.mw-cr-prod-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 2px 7px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 지표 기준 뱃지 ── */
+.mw-metric-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 99px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.mw-metric-badge.atc  { background: #dbeafe; color: #1d4ed8; }
+.mw-metric-badge.roas { background: #d1fae5; color: #065f46; }
