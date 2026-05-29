@@ -435,8 +435,10 @@ function renderMegawariPanel() {
         : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
 
     const botRows = worstC.map(c => {
+        const cnt  = c.add_to_cart||0;
+        const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
         const metricHtml = useAtc
-            ? `<span class="mw-cr-roas roas-bad">담기 0건</span>`
+            ? `<span class="mw-cr-roas roas-bad">${_fmtAtc(cnt, rate)}</span>`
             : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
         return `
         <div class="mw-creative-item bot">
