@@ -330,7 +330,7 @@ function bindEvents() {
         // 초기값 표시
         fxInput.value = window.getFxRate();
     }
-    if (fxBtn) {
+    if (fxBtn && fxInput) {
         fxBtn.addEventListener('click', async () => {
             const newRate = parseFloat(fxInput.value);
             if (isNaN(newRate) || newRate <= 0) {
@@ -408,8 +408,13 @@ function switchSection(sectionName) {
 
     // 차트 리사이즈 (display:none → block 전환 시 Chart.js가 캔버스 크기를 못 잡는 문제 방지)
     setTimeout(() => {
+        const activePanel = document.querySelector('.section-panel:not([style*="display: none"]):not([style*="display:none"])');
         Object.values(charts).forEach(c => {
-            if (c && typeof c.resize === 'function') c.resize();
+            if (!c || typeof c.resize !== 'function') return;
+            const canvas = c.canvas;
+            if (canvas && activePanel && activePanel.contains(canvas)) {
+                c.resize();
+            }
         });
     }, 50);
     // 스크롤 위치 위로

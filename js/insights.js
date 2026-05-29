@@ -382,9 +382,11 @@ function computeInsightThreshold(list) {
     return currentInsightThreshold;
 }
 
-function aggregateByKeyword(creatives, fieldName) {
+function aggregateByKeyword(creatives, fieldName, opts) {
     const map = new Map();
-    const threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    const threshold = (opts && typeof opts.threshold === 'number')
+        ? opts.threshold
+        : (currentInsightThreshold || INSIGHT_MIN_SPEND);
     creatives.forEach(c => {
         const spendCheck = Number(c.spend) || 0;
         if (spendCheck < threshold) return; // ★ 중앙값 이상 소재만
@@ -524,7 +526,7 @@ function renderAIInsights() {
     }
 
     // ★ 모든 인사이트 차트/카드의 선정 기준을 "중앙값 광고비 이상"으로 통일
-    computeInsightThreshold(list);
+    const _insightThreshold = computeInsightThreshold(list);
 
     // ★ 키워드 → 소재 매핑 빌드 (hover preview용) — 중앙값 기준 대표 소재 선정
     buildKeywordCreativeMap(list);
@@ -708,14 +710,15 @@ function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, m
         : (a, b) => (b[key] || 0) - (a[key] || 0);
     const validFilter = d => (d[key] || 0) > 0;
 
-    let data = aggregateByKeyword(list, fieldName)
+    const _threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    let data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
         .filter(a => a.count >= 3 && validFilter(a)).sort(sortFn).slice(0, maxItems);
     if (data.length < 5) {
-        data = aggregateByKeyword(list, fieldName)
+        data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
             .filter(a => a.count >= 2 && validFilter(a)).sort(sortFn).slice(0, maxItems);
     }
     if (data.length < 5) {
-        data = aggregateByKeyword(list, fieldName)
+        data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
             .filter(a => a.count >= 1 && validFilter(a)).sort(sortFn).slice(0, maxItems);
     }
 
@@ -842,7 +845,8 @@ function renderSuccessPatterns(list) {
         const sortFn = cfg.lowerBetter
             ? (a, b) => (a[k] || 0) - (b[k] || 0)
             : (a, b) => (b[k] || 0) - (a[k] || 0);
-        const item = aggregateByKeyword(list, field)
+        const _threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+        const item = aggregateByKeyword(list, field, { threshold: _threshold })
             .filter(a => a.count >= 1 && (a[k] || 0) > 0)
             .sort(sortFn)[0];
         return { item, cfg };
@@ -1075,16 +1079,17 @@ function renderAppealWordCloud(list) {
     _wordcloudLastList = list; // 캐시
 
     // 1) 원본 키워드별 집계 — ★ 최소 3개 이상 소재 검증
-    let rawData = aggregateByKeyword(list, 'appeal_points')
+    const _wcThreshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    let rawData = aggregateByKeyword(list, 'appeal_points', { threshold: _wcThreshold })
         .filter(a => a.count >= 3);
     if (rawData.length < 5) {
         // fallback 1단계: ≥2
-        rawData = aggregateByKeyword(list, 'appeal_points')
+        rawData = aggregateByKeyword(list, 'appeal_points', { threshold: _wcThreshold })
             .filter(a => a.count >= 2);
     }
     if (rawData.length < 5) {
         // fallback 2단계: ≥1
-        rawData = aggregateByKeyword(list, 'appeal_points')
+        rawData = aggregateByKeyword(list, 'appeal_points', { threshold: _wcThreshold })
             .filter(a => a.count >= 1);
     }
 
