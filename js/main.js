@@ -3595,6 +3595,54 @@ function renderProductPerformance() {
             }
         });
     });
+
+    // ──────────────────────────────────────────
+    // WORST TOP 5 렌더링
+    // ──────────────────────────────────────────
+    const worstEl = document.getElementById('worst-creatives-list');
+    const worstSummaryEl = document.getElementById('worst-summary');
+    if (worstEl) {
+        // 지표값 > 0 & 지출 > 0인 소재만 WORST 후보 (노출·클릭 없는 소재 제외)
+        let worstPool = pool.filter(c => (c[metric] || 0) > 0 && (c.impressions || 0) > 0);
+        if (!worstPool.length) worstPool = pool.filter(c => (c.impressions || 0) > 0);
+        if (!worstPool.length) worstPool = pool;
+
+        // BEST와 반대 방향으로 정렬 → 하위 5개
+        const worst = [...worstPool]
+            .sort((a, b) => sortAsc
+                ? (b[metric] || 0) - (a[metric] || 0)   // cost_per_atc: 높을수록 나쁨
+                : (a[metric] || 0) - (b[metric] || 0))  // 나머지: 낮을수록 나쁨
+            .slice(0, 5);
+
+        // BEST 소재와 중복 제거 (동일 id 제외)
+        const bestIds = new Set(best.map(c => c.id));
+        const worstFiltered = worst.filter(c => !bestIds.has(c.id));
+        const worstFinal = worstFiltered.length ? worstFiltered : worst;
+
+        if (worstSummaryEl) {
+            worstSummaryEl.innerHTML = `<span class="text-xs text-slate-400">WORST TOP 5 · ${worstPool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준</span>`;
+        }
+
+        worstEl.innerHTML = worstFinal.map((c, i) => createRankRow(c, i + 1, metric, 'worst', benchmark)).join('');
+
+        worstEl.querySelectorAll('.rank-row').forEach((row, idx) => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('.rank-comment-toggle')) return;
+                openModal(row.dataset.id, worstFinal[idx]);
+            });
+        });
+        worstEl.querySelectorAll('.rank-comment-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const row = btn.closest('.rank-row');
+                const comment = row?.querySelector('.rank-comment');
+                if (comment) {
+                    comment.classList.toggle('expanded');
+                    btn.classList.toggle('expanded');
+                }
+            });
+        });
+    }
 }
 
 // ============================

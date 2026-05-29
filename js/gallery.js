@@ -425,6 +425,42 @@ function renderCompareTable(selectedCreatives, perfData) {
     return `<tr><td style="color:var(--text-muted);font-weight:600">${m.label}</td>${cells}</tr>`;
   }).join('');
 
+  // ── AI 속성 비교 섹션 ──────────────────────────────
+  const aiFields = [
+    { label: '소구포인트', key: 'appeal_points' },
+    { label: '후킹 유형',  key: 'hook_type' },
+    { label: '타겟 감정',  key: 'target_emotion' },
+  ];
+
+  function normalizeChips(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(s => String(s).trim()).filter(Boolean);
+    return String(val).split(/[,、，·・\/]/).map(s => s.trim()).filter(Boolean);
+  }
+
+  const aiRows = aiFields.map(field => {
+    const allChips = selectedCreatives.map(cr => normalizeChips(cr[field.key]));
+    // 모든 소재에 걸쳐 공통 값 집합
+    const common = allChips.reduce((acc, chips) => {
+      if (acc === null) return new Set(chips);
+      return new Set([...acc].filter(v => chips.includes(v)));
+    }, null) || new Set();
+
+    const cells = allChips.map(chips => {
+      if (!chips.length) return `<td style="vertical-align:top"><span style="color:var(--text-muted);font-size:11px">—</span></td>`;
+      const html = chips.map(chip => {
+        const isCommon = common.has(chip);
+        const bg    = isCommon ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.15)';
+        const color = isCommon ? '#16a34a' : '#64748b';
+        const border= isCommon ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(148,163,184,0.3)';
+        return `<span style="display:inline-block;margin:2px 2px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:${bg};color:${color};border:${border}">${chip}</span>`;
+      }).join('');
+      return `<td style="vertical-align:top">${html}</td>`;
+    }).join('');
+
+    return `<tr><td style="color:var(--text-muted);font-weight:600;vertical-align:top;white-space:nowrap">${field.label}</td>${cells}</tr>`;
+  }).join('');
+
   wrap.innerHTML = `
     <p class="modal-section-title" style="margin-bottom:14px">
       <i class="fa-solid fa-table-columns"></i> 상세 지표 비교
@@ -433,6 +469,16 @@ function renderCompareTable(selectedCreatives, perfData) {
       <table class="perf-table">
         <thead>${header}</thead>
         <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p class="modal-section-title" style="margin:18px 0 10px">
+      <i class="fa-solid fa-robot"></i> AI 속성 비교
+      <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:6px">초록 = 공통 속성 · 회색 = 차별 속성</span>
+    </p>
+    <div class="table-scroll">
+      <table class="perf-table">
+        <thead><tr><th style="min-width:100px">속성</th>${selectedCreatives.map((cr, i) => `<th><span style="font-size:11.5px">${cr.title.length > 12 ? cr.title.slice(0, 12) + '…' : cr.title}</span></th>`).join('')}</tr></thead>
+        <tbody>${aiRows}</tbody>
       </table>
     </div>`;
 }
