@@ -384,9 +384,12 @@ function renderMegawariPanel() {
 
     // ── 소재 리스트 (티저: 장바구니 담기 건수 기준 / 본기간: ROAS) ─
 
+    // Meta / TikTok 단건 소재만 대상
+    const _isSinglePlat = c => /meta|tiktok|틱톡/i.test(c.platform||'');
+
     // 고효율: 담기 건수 내림차순 → 율 보조
     const sortedC = today.creatives
-        .filter(c => useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0)
+        .filter(c => _isSinglePlat(c) && (useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0))
         .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
 
     // ── 썸네일 헬퍼 ───────────────────────────────────────
@@ -425,7 +428,7 @@ function renderMegawariPanel() {
         ? today.creatives
             .filter(c => {
                 const nm = c.ad_name||c.creative_name||'';
-                return (c.add_to_cart||0) === 0 && !topCreativeIds.has(nm);
+                return _isSinglePlat(c) && (c.add_to_cart||0) === 0 && !topCreativeIds.has(nm);
             })
             .sort((a,b) => (b.clicks||0) - (a.clicks||0))
             .slice(0, 5)
@@ -507,6 +510,7 @@ function renderMegawariPanel() {
             <div class="mw-section-hd">
                 🏆 고효율 소재 TOP5
                 <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'장바구니 담기 기준':'ROAS 기준'}</span>
+                <span class="mw-metric-badge roas" style="background:#f1f5f9;color:#475569">Meta·TikTok</span>
             </div>
             <div class="mw-creative-list">${topRows||'<p class="mw-no-data">데이터 없음</p>'}</div>
         </div>
@@ -514,6 +518,7 @@ function renderMegawariPanel() {
             <div class="mw-section-hd">
                 ⚠️ 저효율 소재
                 <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'담기 0건':'ROAS 기준'}</span>
+                <span class="mw-metric-badge roas" style="background:#f1f5f9;color:#475569">Meta·TikTok</span>
             </div>
             <div class="mw-creative-list">${botRows||'<p class="mw-no-data">없음 👍</p>'}</div>
         </div>
