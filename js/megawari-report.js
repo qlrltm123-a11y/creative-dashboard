@@ -137,51 +137,132 @@ function _genAiComment(today, yesterday, dayInfo, isoDate) {
     return lines.join('\n');
 }
 
-// ── 리포트 텍스트 포맷 ───────────────────────────────────────
+// ── 리포트 텍스트 포맷 (카카오톡 최적화) ────────────────────
 function buildReportText(dateIso, byDate) {
     const today = byDate[dateIso];
     if (!today) return '해당 날짜 데이터 없음';
+
     const sortedDates = Object.keys(byDate).sort();
-    const prevIso = sortedDates[sortedDates.indexOf(dateIso) - 1];
-    const yesterday = prevIso ? byDate[prevIso] : null;
-    const dayInfo = _getMwDayLabel(dateIso);
-    const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
-    const periodLabel = dayInfo.period ? `${dayInfo.badge}${dayInfo.period.label}` : 'Megawari';
+    const prevIso    = sortedDates[sortedDates.indexOf(dateIso) - 1];
+    const yesterday  = prevIso ? byDate[prevIso] : null;
+    const dayInfo    = _getMwDayLabel(dateIso);
+    const brand      = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : '전체';
+    const periodLabel = dayInfo.period ? `${dayInfo.badge} ${dayInfo.period.label}` : 'Megawari';
+    const isTeaser   = dayInfo.period?.key === 'teaser';
+    const hasAtc     = today.creatives.some(c => (c.add_to_cart||0) > 0);
+    const useAtc     = isTeaser && hasAtc;
 
-    let txt = `📊 [${brand}] メガワリ ${periodLabel} ${dayInfo.label}\n`;
-    txt += `📅 ${dateIso.replace(/-/g,'.')}\n${'─'.repeat(22)}\n`;
-    txt += `🏆 전체\n`;
-    txt += `• ROAS: ${_fmtRoas(today.roas)}${yesterday ? ` (전일比 ${today.roas>yesterday.roas?'+':''}${Math.round((today.roas-yesterday.roas)/(yesterday.roas||1)*100)}%)` : ''}\n`;
-    txt += `• CTR:  ${_fmtCtr(today.ctr)}\n`;
-    txt += `• 매출: ${_fmtMoney(today.revenue,'원')} / 지출: ${_fmtMoney(today.spend,'원')}\n\n`;
+    const D   = '━━━━━━━━━━━━━━━━━━━━━━━';
+    const d   = '─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─';
+    const nl  = '\n';
 
-    const prods = Object.entries(today.byProduct).sort((a,b)=>b[1].roas-a[1].roas);
+    // ROAS 전일비
+    const roasDiff = yesterday
+        ? (() => {
+            const p = Math.round((today.roas - yesterday.roas) / (yesterday.roas||1) * 100);
+            return p > 0 ? ` ▲${p}%` : p < 0 ? ` ▼${Math.abs(p)}%` : ' →';
+          })()
+        : '';
+
+    // 제품별 ROAS 아이콘
+    const roasIcon = r => r >= 3 ? '🟢' : r >= 1.5 ? '🔵' : r >= 1 ? '🟡' : '🔴';
+
+    let txt = '';
+    txt += `${D}${nl}`;
+    txt += `📊 メガワリ ${periodLabel} ${dayInfo.label}${nl}`;
+    txt += `     ${brand}  ·  ${dateIso.replace(/-/g,'.')}${nl}`;
+    txt += `${D}${nl}${nl}`;
+
+    // ── KPI ──
+    txt += `🎯 오늘의 전체 성과${nl}`;
+    txt += `├ ROAS   ${_fmtRoas(today.roas)}${roasDiff}${nl}`;
+    if (useAtc) {
+        txt += `├ ATC율  ${_fmtAtcRate(today.atc_rate)}${nl}`;
+    }
+    txt += `├ CTR    ${_fmtCtr(today.ctr)}${nl}`;
+    txt += `├ 매출   ${_fmtMoney(today.revenue,'원')}${nl}`;
+    txt += `└ 지출   ${_fmtMoney(today.spend,'원')}${nl}${nl}`;
+
+    // ── 제품별 ──
+    const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
     if (prods.length) {
-        txt += `📦 제품별\n`;
-        prods.forEach(([name, p]) => {
-            txt += `[${name}] ROAS ${_fmtRoas(p.roas)} / CTR ${_fmtCtr(p.ctr)} / 매출 ${_fmtMoney(p.revenue,'원')}\n`;
-            Object.entries(p.byPlatform).sort((a,b)=>b[1].roas-a[1].roas).forEach(([pl,v]) => {
-                txt += `  • ${pl}: ${_fmtRoas(v.roas)} / ${_fmtCtr(v.ctr)}\n`;
-            });
+        txt += `${d}${nl}`;
+        txt += `📦 제품별 성과${nl}`;
+        txt += `${d}${nl}`;
+        prods.forEach(([name, p], i) => {
+            const mainVal = useAtc
+                ? `ATC ${(p.atc_rate*100).toFixed(1)}%`
+                : `ROAS ${_fmtRoas(p.roas)}`;
+            const icon = roasIcon(p.roas);
+            const isLast = i === prods.length - 1;
+            const connector = isLast ? '└' : '├';
+            txt += `${connector} ${icon} ${name}  ${mainVal}${nl}`;
+            // 매체별 한 줄 요약
+            const platList = Object.entries(p.byPlatform)
+                .sort((a,b) => b[1].roas - a[1].roas)
+                .map(([pl,v]) => `${pl} ${useAtc ? (v.atc_rate*100).toFixed(1)+'%' : _fmtRoas(v.roas)}`)
+                .join('  ·  ');
+            if (platList) txt += `${isLast?'  ':'│'}    ${platList}${nl}`;
         });
-        txt += '\n';
+        txt += nl;
     }
 
-    const all = today.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
-    if (all.length) {
-        txt += `🎯 고효율 TOP3\n`;
-        all.slice(0,3).forEach((c,i) => txt += `${i+1}. ${c.ad_name||c.creative_name||'-'} (${_fmtRoas(c.roas||0)})\n`);
-        txt += '\n';
-    }
-    const worst = all.filter(c=>(c.roas||0)<1).slice(-2).reverse();
-    if (worst.length) {
-        txt += `⚠️ 저효율 소재\n`;
-        worst.forEach(c => txt += `• ${c.ad_name||c.creative_name||'-'} (${_fmtRoas(c.roas||0)})\n`);
-        txt += '\n';
+    // ── 소재 ──
+    txt += `${d}${nl}`;
+    if (useAtc) {
+        // 티저: ATC율 기준
+        const atcSorted = today.creatives
+            .filter(c => (c.add_to_cart||0) > 0)
+            .sort((a,b) => (b.add_to_cart||0)/(b.clicks||1) - (a.add_to_cart||0)/(a.clicks||1));
+        if (atcSorted.length) {
+            txt += `🏆 고효율 소재 (ATC율 기준)${nl}`;
+            atcSorted.slice(0,3).forEach((c,i) => {
+                const rate = ((c.add_to_cart||0)/(c.clicks||1)*100).toFixed(1);
+                const medals = ['🥇','🥈','🥉'];
+                txt += `${medals[i]} ${(c.ad_name||c.creative_name||'-').slice(0,22)}${nl}`;
+                txt += `     ${c.product||''}  ATC ${rate}%${nl}`;
+            });
+            txt += nl;
+        }
+        const noAtc = today.creatives.filter(c=>(c.add_to_cart||0)===0 && (c.clicks||0)>50);
+        if (noAtc.length) {
+            txt += `⚠️ ATC 미발생 소재 (클릭 50↑)${nl}`;
+            noAtc.slice(0,3).forEach(c => {
+                txt += `· ${(c.ad_name||c.creative_name||'-').slice(0,22)}  (${c.product||''})${nl}`;
+            });
+            txt += nl;
+        }
+    } else {
+        // 본기간: ROAS 기준
+        const sorted = today.creatives.filter(c=>(c.roas||0)>0).sort((a,b)=>(b.roas||0)-(a.roas||0));
+        if (sorted.length) {
+            txt += `🏆 고효율 소재 TOP3${nl}`;
+            sorted.slice(0,3).forEach((c,i) => {
+                const medals = ['🥇','🥈','🥉'];
+                txt += `${medals[i]} ${(c.ad_name||c.creative_name||'-').slice(0,22)}${nl}`;
+                txt += `     ${c.product||''}  ROAS ${_fmtRoas(c.roas||0)}${nl}`;
+            });
+            txt += nl;
+        }
+        const worst = sorted.filter(c=>(c.roas||0)<1).slice(-3).reverse();
+        if (worst.length) {
+            txt += `⚠️ 저효율 소재${nl}`;
+            worst.forEach(c => {
+                txt += `· ${(c.ad_name||c.creative_name||'-').slice(0,22)}  ROAS ${_fmtRoas(c.roas||0)}${nl}`;
+            });
+            txt += nl;
+        }
     }
 
+    // ── AI 코멘트 ──
     const comment = _genAiComment(today, yesterday, dayInfo, dateIso);
-    if (comment) txt += `💡 AI 코멘트\n${comment}\n\n`;
+    if (comment) {
+        txt += `${d}${nl}`;
+        txt += `💡 AI 코멘트${nl}`;
+        txt += `${comment}${nl}${nl}`;
+    }
+
+    txt += `${D}${nl}`;
     txt += `📲 Creative Dashboard`;
     return txt;
 }
@@ -530,7 +611,8 @@ async function _mwSendViaKakao(text) {
     if (res.ok) {
         alert('✅ 카카오톡으로 전송됐어요!');
     } else {
-        alert(`❌ 전송 실패: ${data.error || res.status}\n클립보드에 복사합니다.`);
+        const detail = data.detail ? `\n카카오 오류: ${JSON.stringify(data.detail)}` : '';
+        alert(`❌ 전송 실패 (${res.status}): ${data.error || ''}${detail}\n\n클립보드에 복사합니다.`);
         await navigator.clipboard.writeText(text);
     }
 }
