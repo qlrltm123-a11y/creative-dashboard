@@ -1,7 +1,6 @@
 // POST /api/kakao-send
-// body: { text, refresh_token?, app_key? }
-// 서버 env: KAKAO_REFRESH_TOKEN, KAKAO_APP_KEY (Vercel Cron 전용)
-// 브라우저에서 호출 시 body 쪽 token/key 우선 사용
+// body: { text, refresh_token?, app_key?, client_secret?, creatives? }
+// creatives: [{ name, product, platform, metric, thumb_url }]
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,31 +14,27 @@ module.exports = async function handler(req, res) {
     refresh_token:  bodyRefresh,
     app_key:        bodyAppKey,
     client_secret:  bodySecret,
+    creatives:      bodyCreatives,
   } = req.body || {};
 
   if (!text) return res.status(400).json({ error: 'text 필요' });
 
-  const refreshToken = bodyRefresh || process.env.KAKAO_REFRESH_TOKEN  || '';
-  const appKey       = bodyAppKey  || process.env.KAKAO_APP_KEY        || '';
-  const clientSecret = bodySecret  || process.env.KAKAO_CLIENT_SECRET  || '';
+  const refreshToken = bodyRefresh    || process.env.KAKAO_REFRESH_TOKEN  || '';
+  const appKey       = bodyAppKey     || process.env.KAKAO_APP_KEY        || '';
+  const clientSecret = bodySecret     || process.env.KAKAO_CLIENT_SECRET  || '';
+  const creatives    = Array.isArray(bodyCreatives) ? bodyCreatives : [];
 
   if (!refreshToken || !appKey) {
-    return res.status(401).json({
-      error: 'Kakao 인증 정보 없음 — refresh_token 또는 KAKAO_REFRESH_TOKEN 환경변수 필요',
-    });
+    return res.status(401).json({ error: 'Kakao 인증 정보 없음' });
   }
 
-  // ── 1. Refresh Token → Access Token ────────────────────────
+  // ── 1. Access Token 갱신 ──────────────────────────────────
   let accessToken;
   try {
-    const tokenParams = {
-      grant_type:    'refresh_token',
-      client_id:     appKey,
-      refresh_token: refreshToken,
-    };
+    const tokenParams = { grant_type: 'refresh_token', client_id: appKey, refresh_token: refreshToken };
     if (clientSecret) tokenParams.client_secret = clientSecret;
 
-    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+    const tokenRes  = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
       body: new URLSearchParams(tokenParams).toString(),
@@ -50,41 +45,79 @@ module.exports = async function handler(req, res) {
     }
     accessToken = tokenData.access_token;
   } catch (e) {
-    return res.status(502).json({ error: `Token 갱신 네트워크 오류: ${e.message}` });
+    return res.status(502).json({ error: `Token 갱신 오류: ${e.message}` });
   }
 
-  // ── 2. 나에게 보내기 ───────────────────────────────────────
-  // text template 사용 (최대 200자 / 링크 포함 시 더 짧게)
-  // text를 여러 행으로 나눠 template에 맞게 구성
-  const truncated = text.length > 9000 ? text.slice(0, 8990) + '…' : text;
-
-  const template = {
-    object_type: 'text',
-    text: truncated,
-    link: {
-      web_url: 'https://developers.kakao.com',
-      mobile_web_url: 'https://developers.kakao.com',
-    },
-    button_title: '대시보드 열기',
-  };
-
-  try {
-    const sendRes = await fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
+  // ── 헬퍼: 나에게 보내기 ────────────────────────────────────
+  async function sendMemo(template) {
+    const r = await fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
       },
-      body: new URLSearchParams({
-        template_object: JSON.stringify(template),
-      }).toString(),
+      body: new URLSearchParams({ template_object: JSON.stringify(template) }).toString(),
     });
-    const sendData = await sendRes.json();
-    if (!sendRes.ok) {
-      return res.status(sendRes.status).json({ error: '카카오 전송 실패', detail: sendData });
-    }
-    return res.status(200).json({ ok: true, result: sendData });
-  } catch (e) {
-    return res.status(502).json({ error: `메시지 전송 네트워크 오류: ${e.message}` });
+    return { status: r.status, data: await r.json() };
   }
+
+  // ── 2. 텍스트 리포트 전송 ─────────────────────────────────
+  const truncated = text.length > 9000 ? text.slice(0, 8990) + '…' : text;
+  try {
+    const { status, data } = await sendMemo({
+      object_type:  'text',
+      text:          truncated,
+      link:          { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' },
+      button_title: '대시보드 열기',
+    });
+    if (status >= 400) {
+      return res.status(status).json({ error: '텍스트 리포트 전송 실패', detail: data });
+    }
+  } catch (e) {
+    return res.status(502).json({ error: `텍스트 전송 오류: ${e.message}` });
+  }
+
+  // ── 3. 소재 이미지 리스트 전송 (선택) ─────────────────────
+  // thumb_url이 있는 소재만 포함, 최대 3개
+  const imgCreatives = creatives.filter(c => c.thumb_url).slice(0, 3);
+  let imagesSent = 0;
+
+  if (imgCreatives.length >= 2) {
+    // 리스트 템플릿 (2~3개 아이템, 각각 이미지 포함)
+    try {
+      const contents = imgCreatives.map(c => ({
+        title:       c.name.slice(0, 25),
+        description: `${c.product ? c.product + '  ·  ' : ''}${c.metric}`,
+        image_url:   c.thumb_url,
+        link:        { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' },
+      }));
+      const { status, data } = await sendMemo({
+        object_type:  'list',
+        header_title: '🏆 고효율 소재',
+        header_link:  { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' },
+        contents,
+        buttons: [{ title: '대시보드 열기', link: { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' } }],
+      });
+      if (status < 400) imagesSent = imgCreatives.length;
+    } catch (_) { /* 이미지 전송 실패해도 텍스트는 이미 성공 */ }
+
+  } else if (imgCreatives.length === 1) {
+    // 피드 템플릿 (이미지 1개)
+    const c = imgCreatives[0];
+    try {
+      const { status } = await sendMemo({
+        object_type: 'feed',
+        content: {
+          title:       c.name.slice(0, 25),
+          description: `${c.product ? c.product + '  ·  ' : ''}${c.metric}`,
+          image_url:   c.thumb_url,
+          link:        { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' },
+        },
+        buttons: [{ title: '대시보드 열기', link: { web_url: 'https://developers.kakao.com', mobile_web_url: 'https://developers.kakao.com' } }],
+      });
+      if (status < 400) imagesSent = 1;
+    } catch (_) {}
+  }
+
+  return res.status(200).json({ ok: true, images_sent: imagesSent });
 };

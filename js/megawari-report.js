@@ -568,10 +568,55 @@ function _mwSelectDate(iso) {
 }
 window._mwSelectDate = _mwSelectDate;
 
+// ── Drive URL → 공개 썸네일 URL 변환 ─────────────────────────
+function _toPublicThumb(url) {
+    if (!url) return null;
+    // Drive file ID 추출
+    const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+              url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+              url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w480`;
+    // 이미 https URL이면 그대로
+    if (/^https?:\/\//.test(url)) return url;
+    return null;
+}
+
 // ── 리포트 텍스트 가져오기 ────────────────────────────────────
 function _mwGetReportText() {
     const byDate = _aggregateMw(_getMwData());
     return buildReportText(window._mwSelectedDate || Object.keys(byDate).sort().pop(), byDate);
+}
+
+// ── 고효율 소재 + 썸네일 수집 ────────────────────────────────
+function _mwGetTopCreativesForKakao() {
+    const byDate  = _aggregateMw(_getMwData());
+    const dateIso = window._mwSelectedDate || Object.keys(byDate).sort().pop();
+    const today   = byDate[dateIso];
+    if (!today) return [];
+
+    const isTeaser = _getMwPeriod(dateIso)?.key === 'teaser';
+    const hasAtc   = today.creatives.some(c => (c.add_to_cart||0) > 0);
+    const useAtc   = isTeaser && hasAtc;
+
+    const sorted = today.creatives
+        .filter(c => useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0)
+        .sort((a,b) => useAtc
+            ? (b.add_to_cart||0)/(b.clicks||1) - (a.add_to_cart||0)/(a.clicks||1)
+            : (b.roas||0) - (a.roas||0));
+
+    return sorted.slice(0, 3).map(c => {
+        const thumbUrl = _toPublicThumb(c.thumbnail_url || c.media_url || '');
+        const metric   = useAtc
+            ? `ATC ${((c.add_to_cart||0)/(c.clicks||1)*100).toFixed(1)}%`
+            : `ROAS ${_fmtRoas(c.roas||0)}`;
+        return {
+            name:      (c.ad_name || c.creative_name || '-').slice(0, 25),
+            product:   c.product || '',
+            platform:  c.platform || '',
+            metric,
+            thumb_url: thumbUrl,
+        };
+    }).filter(c => c.thumb_url); // 썸네일 없는 소재 제외
 }
 
 // ── 복사 ──────────────────────────────────────────────────────
@@ -588,13 +633,12 @@ function _mwCopyReport() {
 window._mwCopyReport = _mwCopyReport;
 
 // ── 카카오 API로 전송 ─────────────────────────────────────────
-async function _mwSendViaKakao(text) {
-    const vercelBase = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
+async function _mwSendViaKakao(text, creatives = []) {
+    const vercelBase   = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
     const refreshToken = localStorage.getItem('mw_kakao_refresh_token') || '';
-    const appKey = localStorage.getItem('mw_kakao_app_key') || '';
+    const appKey       = localStorage.getItem('mw_kakao_app_key') || '';
 
     if (!vercelBase || !refreshToken || !appKey) {
-        // fallback: Web Share API
         if (navigator.share) { await navigator.share({ text }); return; }
         await navigator.clipboard.writeText(text);
         alert('리포트가 클립보드에 복사됐어요!\n카카오톡에 붙여넣기 해주세요.');
@@ -602,14 +646,18 @@ async function _mwSendViaKakao(text) {
     }
 
     const clientSecret = localStorage.getItem('mw_kakao_client_secret') || '';
-    const res = await fetch(`${vercelBase}/api/kakao-send`, {
+    const payload = { text, refresh_token: refreshToken, app_key: appKey, client_secret: clientSecret };
+    if (creatives.length) payload.creatives = creatives;
+
+    const res  = await fetch(`${vercelBase}/api/kakao-send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, refresh_token: refreshToken, app_key: appKey, client_secret: clientSecret }),
+        body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (res.ok) {
-        alert('✅ 카카오톡으로 전송됐어요!');
+        const imgMsg = data.images_sent ? `\n🖼 소재 이미지 ${data.images_sent}개도 전송됐어요!` : '';
+        alert(`✅ 카카오톡으로 전송됐어요!${imgMsg}`);
     } else {
         const detail = data.detail ? `\n카카오 오류: ${JSON.stringify(data.detail)}` : '';
         alert(`❌ 전송 실패 (${res.status}): ${data.error || ''}${detail}\n\n클립보드에 복사합니다.`);
@@ -617,10 +665,16 @@ async function _mwSendViaKakao(text) {
     }
 }
 
-function _mwSendNow() { _mwSendViaKakao(_mwGetReportText()); }
+function _mwSendNow() {
+    const creatives = _mwGetTopCreativesForKakao();
+    _mwSendViaKakao(_mwGetReportText(), creatives);
+}
 window._mwSendNow = _mwSendNow;
 
-function _mwTestSend() { _mwSendViaKakao(_mwGetReportText()); }
+function _mwTestSend() {
+    const creatives = _mwGetTopCreativesForKakao();
+    _mwSendViaKakao(_mwGetReportText(), creatives);
+}
 window._mwTestSend = _mwTestSend;
 
 // ── 카카오 설정 저장 ──────────────────────────────────────────
