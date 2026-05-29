@@ -589,6 +589,22 @@
                 </div>
             </div>
 
+            <!-- 소구포인트 × 후킹 조합 히트맵 -->
+            <div class="chart-card mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="chart-title"><i class="fas fa-th mr-2 text-indigo-500"></i>소구포인트 × 후킹 조합 성과 히트맵</h3>
+                        <p class="text-xs text-slate-500 mt-1">어떤 소구포인트와 후킹 조합이 가장 효과적인지 한눈에 확인</p>
+                    </div>
+                    <select id="heatmap-metric-select" class="filter-select text-sm">
+                        <option value="roas" selected>ROAS</option>
+                        <option value="ctr">CTR</option>
+                        <option value="cvr">CVR</option>
+                    </select>
+                </div>
+                <div id="appealHookHeatmap"></div>
+            </div>
+
             <!-- Key Messages Best -->
             <div class="chart-card">
                 <div class="flex items-center justify-between mb-4">

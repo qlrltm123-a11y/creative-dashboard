@@ -479,6 +479,154 @@ function getAIInsightsList() {
     return baseList;
 }
 
+function aggregateByKeywordPair(list, field1, field2, opts) {
+    const threshold = (opts && typeof opts.threshold === 'number')
+        ? opts.threshold : (currentInsightThreshold || INSIGHT_MIN_SPEND);
+
+    const map = new Map(); // "appeal||hook" -> { spend, revenue, clicks, impressions, conversions, count }
+    const rows = new Set(); // field1 값들
+    const cols = new Set(); // field2 값들
+
+    list.forEach(c => {
+        if ((Number(c.spend) || 0) < threshold) return;
+        const vals1 = Array.isArray(c[field1]) ? c[field1] : String(c[field1] || '').split(/[,、，·・]/).map(s => s.trim()).filter(Boolean);
+        const vals2 = Array.isArray(c[field2]) ? c[field2] : String(c[field2] || '').split(/[,、，·・]/).map(s => s.trim()).filter(Boolean);
+        if (!vals1.length || !vals2.length) return;
+
+        vals1.forEach(v1 => {
+            vals2.forEach(v2 => {
+                if (!v1 || !v2) return;
+                rows.add(v1); cols.add(v2);
+                const key = v1 + '||' + v2;
+                if (!map.has(key)) map.set(key, { spend: 0, revenue: 0, clicks: 0, impressions: 0, conversions: 0, count: 0 });
+                const agg = map.get(key);
+                agg.spend       += Number(c.spend)       || 0;
+                agg.revenue     += Number(c.revenue)      || 0;
+                agg.clicks      += Number(c.clicks)       || 0;
+                agg.impressions += Number(c.impressions)  || 0;
+                agg.conversions += Number(c.conversions)  || 0;
+                agg.count++;
+            });
+        });
+    });
+
+    return { map, rows: [...rows], cols: [...cols] };
+}
+
+function renderAppealHookHeatmap(list) {
+    const container = document.getElementById('appealHookHeatmap');
+    if (!container) return;
+
+    const threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    const { map, rows, cols } = aggregateByKeywordPair(list, 'appeal_points', 'hook_type', { threshold });
+
+    if (!map.size || rows.length < 2 || cols.length < 2) {
+        container.innerHTML = '<p class="text-slate-400 text-sm text-center py-8">데이터 부족 — 소구포인트와 후킹 방식이 각각 2개 이상 필요합니다</p>';
+        return;
+    }
+
+    // 지표 선택 (기본 ROAS)
+    const metric = container.dataset.metric || 'roas';
+
+    // 셀 값 계산
+    function cellVal(agg) {
+        if (!agg) return null;
+        if (metric === 'roas')  return agg.spend > 0 ? Math.round(agg.revenue / agg.spend * 100) : null;
+        if (metric === 'ctr')   return agg.impressions > 0 ? (agg.clicks / agg.impressions * 100) : null;
+        if (metric === 'cvr')   return agg.clicks > 0 ? (agg.conversions / agg.clicks * 100) : null;
+        return null;
+    }
+
+    // 전체 값 범위 계산 (색상 정규화용)
+    const allVals = [];
+    rows.forEach(r => cols.forEach(c => {
+        const v = cellVal(map.get(r + '||' + c));
+        if (v !== null) allVals.push(v);
+    }));
+    const maxVal = Math.max(...allVals, 1);
+    const minVal = Math.min(...allVals, 0);
+    const range = maxVal - minVal || 1;
+
+    // 색상 함수 (낮음=연회색, 높음=진한 인디고/에메랄드)
+    function heatColor(val) {
+        if (val === null) return '#f1f5f9';
+        const t = (val - minVal) / range; // 0~1
+        return `rgb(${Math.round(99 + t*56)},${Math.round(102 + t*83)},${Math.round(241 - t*100)})`;
+    }
+
+    // 소재 수 적은 셀 낮은 투명도
+    function cellOpacity(agg) {
+        if (!agg) return 0;
+        return agg.count < 2 ? 0.4 : 1;
+    }
+
+    const metricLabel = { roas: 'ROAS (%)', ctr: 'CTR (%)', cvr: 'CVR (%)' }[metric] || metric;
+    const fmt = v => v === null ? '-' : metric === 'roas' ? Math.round(v) + '%' : v.toFixed(2) + '%';
+
+    // BEST 조합 TOP3 (count>=2인 것만)
+    const ranked = [];
+    rows.forEach(r => cols.forEach(c => {
+        const agg = map.get(r + '||' + c);
+        if (!agg || agg.count < 2) return;
+        const v = cellVal(agg);
+        if (v !== null) ranked.push({ r, c, v, count: agg.count });
+    }));
+    ranked.sort((a, b) => b.v - a.v);
+    const top3 = ranked.slice(0, 3);
+
+    // 행 정렬: 해당 행의 최대 셀값 기준 내림차순
+    const sortedRows = [...rows].sort((a, b) => {
+        const maxA = Math.max(...cols.map(c => cellVal(map.get(a+'||'+c)) ?? -1));
+        const maxB = Math.max(...cols.map(c => cellVal(map.get(b+'||'+c)) ?? -1));
+        return maxB - maxA;
+    }).slice(0, 12); // 최대 12행
+
+    const sortedCols = [...cols].slice(0, 8); // 최대 8열
+
+    // HTML 렌더
+    container.innerHTML = `
+    <div class="overflow-x-auto">
+        ${top3.length ? `
+        <div class="flex gap-2 mb-3 flex-wrap">
+            <span class="text-xs font-semibold text-slate-500">🏆 BEST 조합:</span>
+            ${top3.map((t, i) => `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    ${i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                    <b>${t.r}</b> × <b>${t.c}</b> — ${fmt(t.v)} (n=${t.count})
+                </span>
+            `).join('')}
+        </div>` : ''}
+        <table class="w-full text-xs border-separate" style="border-spacing:2px">
+            <thead>
+                <tr>
+                    <th class="text-left p-1 text-slate-400 font-medium min-w-[100px]">소구포인트 \\ 후킹</th>
+                    ${sortedCols.map(c => `<th class="p-1 text-center text-slate-500 font-medium max-w-[90px] truncate" title="${c}">${c.length > 8 ? c.slice(0,8)+'…' : c}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${sortedRows.map(r => `
+                    <tr>
+                        <td class="p-1 text-slate-600 font-medium whitespace-nowrap max-w-[120px] truncate" title="${r}">${r.length > 10 ? r.slice(0,10)+'…' : r}</td>
+                        ${sortedCols.map(c => {
+                            const agg = map.get(r + '||' + c);
+                            const v = cellVal(agg);
+                            const op = cellOpacity(agg);
+                            const bg = heatColor(v);
+                            const isTop = top3.some(t => t.r === r && t.c === c);
+                            return `<td class="text-center rounded" style="background:${bg};opacity:${op || 0.15};padding:6px 4px;${isTop ? 'outline:2px solid #6366f1;outline-offset:-2px;' : ''}">
+                                <span class="font-bold text-white drop-shadow-sm">${fmt(v)}</span>
+                                ${agg && agg.count < 2 ? '<br><span style="font-size:8px;color:rgba(255,255,255,0.8)">n=1</span>' : ''}
+                                ${agg && agg.count >= 2 ? `<br><span style="font-size:8px;color:rgba(255,255,255,0.7)">n=${agg.count}</span>` : ''}
+                            </td>`;
+                        }).join('')}
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        <p class="text-xs text-slate-400 mt-2">색이 진할수록 ${metricLabel} 높음 · 반투명 셀 = 소재 1개(신뢰도 낮음) · 최대 12×8 표시</p>
+    </div>`;
+}
+
 // 메인 렌더 함수
 function renderAIInsights() {
     const section = document.getElementById('ai-insights-section');
@@ -539,6 +687,7 @@ function renderAIInsights() {
     renderEmotionChart(list);
     renderTopMessages(list);
     renderAppealFunnelChart(list);
+    renderAppealHookHeatmap(list);
 
     // 선정 기준 안내 배지 갱신
     renderInsightThresholdBadge();
@@ -580,6 +729,19 @@ function bindInsightChartSelects() {
         const lbl = document.getElementById(lblId);
         if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
     });
+
+    // 히트맵 지표 셀렉트 바인딩
+    const heatmapMetricSel = document.getElementById('heatmap-metric-select');
+    if (heatmapMetricSel && heatmapMetricSel.dataset.bound !== '1') {
+        heatmapMetricSel.dataset.bound = '1';
+        heatmapMetricSel.addEventListener('change', () => {
+            const container = document.getElementById('appealHookHeatmap');
+            if (container) container.dataset.metric = heatmapMetricSel.value;
+            if (typeof renderAppealHookHeatmap === 'function' && window.allCreatives) {
+                renderAppealHookHeatmap(window.allCreatives);
+            }
+        });
+    }
 }
 
 // 선정 기준 안내 (헤더 옆에 칩으로 표시)
