@@ -5857,19 +5857,21 @@ details[open] .mw-kakao-summary::before { transform: rotate(90deg); }
 
 /* ── 소재 제품 배지 (고효율 - 제품별) ── */
 /* ── 소재 썸네일 ── */
-.mw-cr-thumb {
-    width: 52px;
-    height: 52px;
+.mw-cr-thumb,
+img.mw-cr-thumb {
+    width: 56px;
+    height: 56px;
     object-fit: cover;
-    border-radius: 7px;
+    border-radius: 8px;
     flex-shrink: 0;
     border: 1.5px solid #e2e8f0;
     background: #f1f5f9;
+    display: block;
 }
 .mw-cr-thumb-empty {
-    width: 52px;
-    height: 52px;
-    border-radius: 7px;
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
     flex-shrink: 0;
     border: 1.5px dashed #cbd5e1;
     background: #f8fafc;
@@ -5877,7 +5879,7 @@ details[open] .mw-kakao-summary::before { transform: rotate(90deg); }
     align-items: center;
     justify-content: center;
     color: #cbd5e1;
-    font-size: 16px;
+    font-size: 18px;
 }
 .mw-cr-info {
     flex: 1;
@@ -5886,6 +5888,9 @@ details[open] .mw-kakao-summary::before { transform: rotate(90deg); }
     gap: 3px;
     min-width: 0;
 }
+/* buildDriveImgHtml이 picture 태그를 반환하는 경우 대응 */
+.mw-creative-item picture { flex-shrink: 0; }
+.mw-creative-item picture img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1.5px solid #e2e8f0; display: block; }
 
 .mw-cr-prod-badge {
     font-size: 9.5px;

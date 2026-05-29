@@ -397,19 +397,25 @@ function renderMegawariPanel() {
     });
     const topCreativeIds = new Set(Object.values(topByProd).map(c => c.ad_name||c.creative_name||''));
 
+    const _mwThumb = (c) => {
+        const raw = c.thumbnail_url || c.media_url || '';
+        const fallback = `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
+        if (!raw) return fallback;
+        if (typeof window.buildDriveImgHtml === 'function') {
+            return window.buildDriveImgHtml(raw, { className: 'mw-cr-thumb', alt: '', style: '' });
+        }
+        return `<img class="mw-cr-thumb" src="${raw}" alt="" onerror="this.outerHTML='${fallback.replace(/'/g,"&#39;")}'">`;
+    };
+
     const topRows = Object.entries(topByProd).map(([prod, c]) => {
-        const cnt      = c.add_to_cart||0;
-        const rate     = (c.clicks||0)>0 ? cnt/c.clicks : 0;
-        const thumbUrl = _toPublicThumb(c.thumbnail_url || c.media_url || '');
-        const thumbHtml = thumbUrl
-            ? `<img class="mw-cr-thumb" src="${thumbUrl}" alt="" onerror="this.style.display='none'">`
-            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
+        const cnt  = c.add_to_cart||0;
+        const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
         const metricHtml = useAtc
             ? `<span class="mw-cr-roas ${_atcClass(cnt)}">${_fmtAtc(cnt, rate)}</span>`
             : `<span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>`;
         return `
         <div class="mw-creative-item top">
-            ${thumbHtml}
+            ${_mwThumb(c)}
             <div class="mw-cr-info">
                 <span class="mw-cr-prod-badge">${prod}</span>
                 <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
@@ -430,16 +436,12 @@ function renderMegawariPanel() {
         : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
 
     const botRows = worstC.map(c => {
-        const thumbUrl = _toPublicThumb(c.thumbnail_url || c.media_url || '');
-        const thumbHtml = thumbUrl
-            ? `<img class="mw-cr-thumb" src="${thumbUrl}" alt="" onerror="this.style.display='none'">`
-            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
         const metricHtml = useAtc
             ? `<span class="mw-cr-roas roas-bad">담기 0건</span>`
             : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
         return `
         <div class="mw-creative-item bot">
-            ${thumbHtml}
+            ${_mwThumb(c)}
             <div class="mw-cr-info">
                 <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'').slice(0,8)||'기타'}</span>
                 <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
