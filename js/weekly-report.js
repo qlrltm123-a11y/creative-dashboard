@@ -110,6 +110,16 @@ function _wrByPlatform(list) {
     })).sort((a, b) => b.spend - a.spend);
 }
 
+/* ── Drive URL → img HTML 헬퍼 (fallback 체인 포함) ── */
+function _wrThumbHtml(url, className, fallbackHtml) {
+    const fb = fallbackHtml || `<div class="${className}-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:18px"><i class="fas fa-image"></i></div>`;
+    if (!url) return fb;
+    if (typeof window.buildDriveImgHtml === 'function') {
+        return window.buildDriveImgHtml(url, { className, loading: 'lazy', finalFallbackHtml: fb });
+    }
+    return `<img class="${className}" src="${url}" loading="lazy" onerror="this.outerHTML='${fb.replace(/'/g, "\\'")}'">`;
+}
+
 /* ── 소재별 집계 ── */
 function _wrByCreative(list) {
     const m = {};
@@ -267,20 +277,12 @@ function _wrPlatformSectionHtml(byPlatform) {
 /* ── 소재별 섹션 HTML ── */
 function _wrCreativeSectionHtml(byCreative) {
     if (!byCreative.length) return '';
-    // Google Drive URL 변환 (drive-converter 사용 가능 시)
-    const toThumb = (url) => {
-        if (!url) return '';
-        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
-        return url;
-    };
     const cards = byCreative.map((c, i) => {
-        const thumb = toThumb(c.thumb);
         return `
         <div class="wr-creative-card">
             <div class="wr-creative-thumb-wrap">
-                ${thumb
-                    ? `<img class="wr-creative-thumb" src="${thumb}" loading="lazy"
-                           onerror="this.parentElement.innerHTML='<div class=wr-no-thumb><i class=fas\\ fa-image></i></div>'">`
+                ${c.thumb
+                    ? _wrThumbHtml(c.thumb, 'wr-creative-thumb', '<div class="wr-no-thumb"><i class="fas fa-image"></i></div>')
                     : `<div class="wr-no-thumb"><i class="fas fa-image"></i></div>`
                 }
                 <span class="wr-rank-badge">#${i+1}</span>
@@ -326,26 +328,20 @@ function _wrByProductInsight(list) {
         prodMap[prod].push(c);
     });
 
-    const toThumb = url => {
-        if (!url) return '';
-        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
-        return url;
-    };
-
     return Object.entries(prodMap).map(([product, items]) => {
-        // 소재별 집계
+        // 소재별 집계 (thumb은 원본 URL 그대로 보관 → 렌더 시 buildDriveImgHtml 사용)
         const creMap = {};
         items.forEach(c => {
             const key = (c.ad_name || c.creative_name || String(c.id || '')).trim();
             if (!key) return;
             if (!creMap[key]) creMap[key] = {
                 name: c.ad_name || c.creative_name || key,
-                thumb: toThumb(c.thumbnail_url || c.media_url || ''),
+                thumb: c.thumbnail_url || c.media_url || '',
                 platform: c.platform || '',
                 spend:0, impr:0, clicks:0, rev:0, conv:0,
             };
             if (!creMap[key].thumb && (c.thumbnail_url || c.media_url))
-                creMap[key].thumb = toThumb(c.thumbnail_url || c.media_url);
+                creMap[key].thumb = c.thumbnail_url || c.media_url;
             creMap[key].spend  += c.spend       || 0;
             creMap[key].impr   += c.impressions || 0;
             creMap[key].clicks += c.clicks      || 0;
@@ -392,11 +388,7 @@ function _wrProductInsightSectionHtml(productData) {
             <div class="wr-pi-row">
                 <span class="wr-pi-rank" style="background:${i===0?'#fbbf24':'#e2e8f0'};color:${i===0?'#78350f':'#64748b'}">${i+1}</span>
                 <div class="wr-pi-thumb-wrap">
-                    ${c.thumb
-                        ? `<img class="wr-pi-thumb" src="${c.thumb}" loading="lazy"
-                               onerror="this.parentElement.innerHTML='<div class=wr-pi-no-img><i class=fas\\ fa-image></i></div>'">`
-                        : `<div class="wr-pi-no-img"><i class="fas fa-image"></i></div>`
-                    }
+                    ${_wrThumbHtml(c.thumb, 'wr-pi-thumb', '<div class="wr-pi-no-img"><i class="fas fa-image"></i></div>')}
                 </div>
                 <div class="wr-pi-cre-info">
                     <div class="wr-pi-cre-name" title="${c.name.replace(/"/g,'&quot;')}">${c.name}</div>
@@ -523,12 +515,17 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
         _wr.event   ? `이벤트: ${_wr.event}` : '',
     ].filter(Boolean).join(' | ') || '필터 없음';
 
-    // URL → 변환된 base64 또는 원본 URL
+    // URL → base64(변환 성공) 또는 thumbnail API URL 폴백
     const toThumb = (url) => {
         if (!url) return '';
-        const converted = typeof window.convertDriveUrl === 'function' ? window.convertDriveUrl(url) : url;
-        // imgMap에 base64가 있으면 우선 사용
-        return imgMap[converted] || imgMap[url] || converted;
+        // imgMap에 base64 있으면 최우선 (클립보드 복사 시)
+        if (imgMap[url]) return imgMap[url];
+        // Drive URL → thumbnail API URL (Confluence에서 로드 가능)
+        if (typeof window.buildDriveImgHtml === 'undefined' && url.includes('drive.google.com')) {
+            const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+        }
+        return url;
     };
 
     const css = `
