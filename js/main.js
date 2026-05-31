@@ -943,30 +943,19 @@ function getPerformancePool() {
 
     // 1) 브랜드 + 섹션 필터 적용
     let base = getBrandCreatives('performance');
-    console.log(`[Pool] getBrandCreatives → ${base.length}개 (brand=${currentBrand}, platform=${currentPlatform})`);
-    if (base.length && base.length <= 20) {
-        // 소규모 플랫폼 진단: 각 소재의 핵심 지표 출력
-        console.log('[Pool] 소재 목록:', base.map(c => ({
-            ad_name: c.ad_name, platform: c.platform, spend: c.spend, impressions: c.impressions, clicks: c.clicks, ctr: c.ctr
-        })));
-    }
 
     // 2) ad_name 단위 집계
     if (typeof aggregateByAdName === 'function') {
         base = aggregateByAdName(base);
     }
-    console.log(`[Pool] aggregateByAdName → ${base.length}개`);
 
     // 3) 노출/클릭/광고비 중 하나라도 있으면 포함 (X/Meta/TikTok 인지도 캠페인 등 spend=0 케이스 포함)
-    const beforeFilter = base.length;
     const filtered = base.filter(c => (c.impressions || 0) > 0 || (c.clicks || 0) > 0 || (c.spend || 0) > 0);
     // 모두 걸러지면 원본 유지 (컬럼명 불인식 등으로 숫자가 전부 0인 경우 대비)
     base = filtered.length > 0 ? filtered : base;
-    console.log(`[Pool] data filter → ${base.length}개 (spend/impr/clicks > 0) [제외: ${beforeFilter - base.length}개]`);
 
     // 4) 중앙값 광고비 + ₩10,000 하한선
     const { qualified, medianSpend, threshold } = filterByMedianSpend(base, { minRequired: PERFORMANCE_MIN_REQUIRED });
-    console.log(`[Pool] filterByMedianSpend → qualified=${qualified.length}개, median=₩${Math.round(medianSpend)}, threshold=₩${Math.round(threshold)}`);
 
     const result = {
         key: cacheKey,
@@ -1226,15 +1215,20 @@ function destroyChart(key) {
 }
 
 function renderBrandChart() {
-    destroyChart('brand');
     const brands = ['BOH', 'WM', 'CG'];
     const data = brands.map(b => {
         const list = allCreatives.filter(c => c.brand === b);
         const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
         const revenue = list.reduce((s, c) => s + (c.revenue || 0), 0);
-        // ROAS를 비율로 저장 (표시 시 ×100)
         return { brand: b, spend, revenue, roas: spend ? (revenue / spend) : 0 };
     });
+
+    if (charts.brand) {
+        charts.brand.data.datasets[0].data = data.map(d => d.spend);
+        charts.brand.data.datasets[1].data = data.map(d => d.revenue);
+        charts.brand.update('none');
+        return;
+    }
 
     const ctx = document.getElementById('brandChart');
     charts.brand = new Chart(ctx, {
@@ -1283,7 +1277,6 @@ function renderBrandChart() {
 }
 
 function renderPlatformChart() {
-    destroyChart('platform');
     const list = getBrandCreatives();
     const platformMap = {};
     list.forEach(c => {
@@ -1291,6 +1284,14 @@ function renderPlatformChart() {
     });
     const labels = Object.keys(platformMap);
     const values = Object.values(platformMap);
+
+    if (charts.platform) {
+        charts.platform.data.labels = labels;
+        charts.platform.data.datasets[0].data = values;
+        charts.platform.data.datasets[0].backgroundColor = labels.map(l => PLATFORM_COLORS[l] || '#94a3b8');
+        charts.platform.update('none');
+        return;
+    }
 
     const ctx = document.getElementById('platformChart');
     charts.platform = new Chart(ctx, {

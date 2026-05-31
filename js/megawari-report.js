@@ -965,8 +965,6 @@ let _mwRoasChart = null;
 function _renderMwRoasChart(byDate, sortedDates) {
     const ctx = document.getElementById('mwRoasLineChart');
     if (!ctx) return;
-    if (_mwRoasChart) { _mwRoasChart.destroy(); _mwRoasChart = null; }
-
     let cumSpend = 0, cumRevenue = 0;
     const labels = [], cumRoasData = [], dailyRoasData = [];
 
@@ -982,6 +980,14 @@ function _renderMwRoasChart(byDate, sortedDates) {
     });
 
     if (!labels.length) return;
+
+    if (_mwRoasChart) {
+        _mwRoasChart.data.labels = labels;
+        _mwRoasChart.data.datasets[0].data = cumRoasData;
+        _mwRoasChart.data.datasets[1].data = dailyRoasData;
+        _mwRoasChart.update('none');
+        return;
+    }
 
     _mwRoasChart = new Chart(ctx, {
         type: 'line',
