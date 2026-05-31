@@ -78,6 +78,7 @@ window.updateDashboard = function() {
     window._creativeFatigue = detectCreativeFatigue(allCreatives); // ★ 소재 피로도 감지
     invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
     if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache(); // ★ 메가와리 캐시 무효화
+    if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache(); // ★ 주간 보고서 갱신
     populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
     populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
     populateEventOptions();    // ★ Event 옵션 (event 컬럼이 있을 때만 표시)
@@ -383,7 +384,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, performance: false, ai: false, generate: false, megawari: false };
+let _renderedSections = { overview: true, performance: false, ai: false, generate: false, megawari: false, weekly: false };
 let _currentSection = 'overview';
 
 function switchSection(sectionName) {
@@ -413,6 +414,8 @@ function switchSection(sectionName) {
                 if (typeof window.renderGeneratePanel === 'function') window.renderGeneratePanel();
             } else if (sectionName === 'megawari') {
                 if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
+            } else if (sectionName === 'weekly') {
+                if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
             }
             if (panel) panel.classList.remove('section-loading');
         });

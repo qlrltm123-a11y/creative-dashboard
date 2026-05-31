@@ -1,0 +1,508 @@
+// ============================================================
+//  주간 업무 보고서 (Weekly Work Report)  ── weekly-report.js
+// ============================================================
+
+/* ── 필터 상태 (window 노출 — HTML onchange에서 접근) ── */
+window._wr = { product: '', event: '', dateFrom: '', dateTo: '' };
+let _wr = window._wr;
+
+/* ── 초기 로드 시 이번 주 날짜 자동 설정 ── */
+(function _wrInitDates() {
+    const now = new Date();
+    const day = now.getDay();
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - ((day + 6) % 7));
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const fmt = d => d.toISOString().slice(0, 10);
+    _wr.dateFrom = fmt(mon);
+    _wr.dateTo   = fmt(sun);
+})();
+
+/* ── 날짜 퀵셋 (0=이번주, -1=저번주) ── */
+window._wrSetWeek = function(offset) {
+    const now = new Date();
+    const day = now.getDay();
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - ((day + 6) % 7) + offset * 7);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const fmt = d => d.toISOString().slice(0, 10);
+    _wr.dateFrom = fmt(mon);
+    _wr.dateTo   = fmt(sun);
+    const fe = document.getElementById('wr-date-from');
+    const te = document.getElementById('wr-date-to');
+    if (fe) fe.value = _wr.dateFrom;
+    if (te) te.value = _wr.dateTo;
+    renderWeeklyReport();
+};
+
+/* ── 날짜 필터 전체 해제 ── */
+window._wrClearDates = function() {
+    _wr.dateFrom = '';
+    _wr.dateTo   = '';
+    const fe = document.getElementById('wr-date-from');
+    const te = document.getElementById('wr-date-to');
+    if (fe) fe.value = '';
+    if (te) te.value = '';
+    renderWeeklyReport();
+};
+
+/* ── 필터 적용 데이터 ── */
+function _wrGetList() {
+    let list = window.allCreatives || [];
+    if (_wr.product) list = list.filter(c => (c.product || '').trim() === _wr.product);
+    if (_wr.event)   list = list.filter(c => (c.event   || '').trim() === _wr.event);
+    if (_wr.dateFrom || _wr.dateTo) {
+        list = list.filter(c => {
+            const d = (c.start_date || '').slice(0, 10);
+            if (!d) return true;
+            if (_wr.dateFrom && d < _wr.dateFrom) return false;
+            if (_wr.dateTo   && d > _wr.dateTo)   return false;
+            return true;
+        });
+    }
+    return list;
+}
+
+/* ── KPI 집계 ── */
+function _wrSum(list) {
+    let spend=0, impr=0, clicks=0, rev=0, conv=0, atc=0;
+    list.forEach(c => {
+        spend  += c.spend        || 0;
+        impr   += c.impressions  || 0;
+        clicks += c.clicks       || 0;
+        rev    += c.revenue      || 0;
+        conv   += c.conversions  || 0;
+        atc    += c.add_to_cart  || 0;
+    });
+    return {
+        spend, impr, clicks, rev, conv, atc,
+        ctr:  impr  > 0 ? clicks / impr  : 0,
+        roas: spend > 0 ? rev    / spend  : 0,
+        cpa:  conv  > 0 ? spend  / conv   : 0,
+    };
+}
+
+/* ── 매체별 집계 ── */
+function _wrByPlatform(list) {
+    const m = {};
+    list.forEach(c => {
+        const p = c.platform || '기타';
+        if (!m[p]) m[p] = {spend:0,impr:0,clicks:0,rev:0,conv:0};
+        m[p].spend  += c.spend       || 0;
+        m[p].impr   += c.impressions || 0;
+        m[p].clicks += c.clicks      || 0;
+        m[p].rev    += c.revenue     || 0;
+        m[p].conv   += c.conversions || 0;
+    });
+    return Object.entries(m).map(([p, d]) => ({
+        platform: p, ...d,
+        ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
+        roas: d.spend > 0 ? d.rev    / d.spend  : 0,
+    })).sort((a, b) => b.spend - a.spend);
+}
+
+/* ── 소재별 집계 ── */
+function _wrByCreative(list) {
+    const m = {};
+    list.forEach(c => {
+        const key = (c.ad_name || c.creative_name || String(c.id || '')).trim();
+        if (!key) return;
+        if (!m[key]) m[key] = {
+            name:     c.ad_name || c.creative_name || key,
+            thumb:    c.thumbnail_url || c.media_url || '',
+            platform: c.platform || '',
+            product:  c.product  || '',
+            spend:0, impr:0, clicks:0, rev:0, conv:0,
+        };
+        // 썸네일 있으면 덮어씌우기 (집계 중 첫 번째 있는 것 사용)
+        if (!m[key].thumb && (c.thumbnail_url || c.media_url)) {
+            m[key].thumb = c.thumbnail_url || c.media_url;
+        }
+        m[key].spend  += c.spend       || 0;
+        m[key].impr   += c.impressions || 0;
+        m[key].clicks += c.clicks      || 0;
+        m[key].rev    += c.revenue     || 0;
+        m[key].conv   += c.conversions || 0;
+    });
+    return Object.values(m).map(d => ({
+        ...d,
+        ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
+        roas: d.spend > 0 ? d.rev    / d.spend  : 0,
+    })).sort((a, b) => b.spend - a.spend).slice(0, 30);
+}
+
+/* ── 포맷 헬퍼 ── */
+function _wrN(n)  { return Math.round(n).toLocaleString('ko-KR'); }
+function _wrW(n)  { return '₩' + _wrN(n); }
+function _wrP(r)  { return (r * 100).toFixed(2) + '%'; }
+function _wrR(r)  { return (r * 100).toFixed(0) + '%'; }
+
+/* ── 필터 select 옵션 채우기 ── */
+function _wrPopulateSelects() {
+    const list = window.allCreatives || [];
+    const products = [...new Set(list.map(c => c.product).filter(Boolean))].sort();
+    const events   = [...new Set(list.map(c => c.event).filter(Boolean))].sort();
+
+    const pe = document.getElementById('wr-product-sel');
+    const ee = document.getElementById('wr-event-sel');
+    if (pe) {
+        const cur = _wr.product;
+        pe.innerHTML = '<option value="">전체 제품</option>' +
+            products.map(p => `<option value="${p}"${p===cur?' selected':''}>${p}</option>`).join('');
+    }
+    if (ee) {
+        const cur = _wr.event;
+        ee.innerHTML = '<option value="">전체 이벤트</option>' +
+            events.map(e => `<option value="${e}"${e===cur?' selected':''}>${e}</option>`).join('');
+    }
+}
+
+/* ── 플랫폼 색상 ── */
+const _WR_PLAT_COLOR = {
+    Meta: '#1877f2', Google: '#ea4335', Tiktok: '#000000', TikTok: '#000000',
+    Naver: '#03c75a', Kakao: '#fee500', X: '#1da1f2',
+};
+function _wrPlatColor(p) { return _WR_PLAT_COLOR[p] || '#6366f1'; }
+
+/* ── KPI 섹션 HTML ── */
+function _wrKpiSectionHtml(kpi, count) {
+    const cards = [
+        { lbl:'집행비',   val: _wrW(kpi.spend),   icon:'fa-won-sign',      color:'#ef4444' },
+        { lbl:'노출수',   val: _wrN(kpi.impr),    icon:'fa-eye',           color:'#6366f1' },
+        { lbl:'클릭수',   val: _wrN(kpi.clicks),  icon:'fa-mouse-pointer', color:'#3b82f6' },
+        { lbl:'CTR',      val: _wrP(kpi.ctr),     icon:'fa-percentage',    color:'#06b6d4' },
+        { lbl:'매출',     val: _wrW(kpi.rev),     icon:'fa-chart-line',    color:'#10b981' },
+        { lbl:'ROAS',     val: _wrR(kpi.roas),    icon:'fa-bullseye',      color:'#f97316' },
+        { lbl:'전환수',   val: _wrN(kpi.conv),    icon:'fa-check-circle',  color:'#8b5cf6' },
+        { lbl:'소재 수',  val: count + '개',       icon:'fa-image',         color:'#64748b' },
+    ];
+    return `
+    <div class="wr-section" id="wr-kpi-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-chart-bar mr-1.5" style="color:#6366f1"></i>KPI 요약</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('kpi', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-kpi-grid">
+            ${cards.map(c => `
+            <div class="wr-kpi-card">
+                <div class="wr-kpi-icon" style="color:${c.color}"><i class="fas ${c.icon}"></i></div>
+                <div class="wr-kpi-lbl">${c.lbl}</div>
+                <div class="wr-kpi-val">${c.val}</div>
+            </div>`).join('')}
+        </div>
+    </div>`;
+}
+
+/* ── 매체별 섹션 HTML ── */
+function _wrPlatformSectionHtml(byPlatform) {
+    if (!byPlatform.length) return '';
+    const total = byPlatform.reduce((s, p) => s + p.spend, 0);
+    const rows = byPlatform.map(p => {
+        const pct = total > 0 ? (p.spend / total * 100).toFixed(1) : '0';
+        return `
+        <tr class="wr-tr">
+            <td class="wr-td">
+                <span class="wr-plat-dot" style="background:${_wrPlatColor(p.platform)}"></span>
+                <strong>${p.platform}</strong>
+            </td>
+            <td class="wr-td wr-td-num">${_wrW(p.spend)}<span class="wr-pct-badge">${pct}%</span></td>
+            <td class="wr-td wr-td-num">${_wrN(p.impr)}</td>
+            <td class="wr-td wr-td-num">${_wrN(p.clicks)}</td>
+            <td class="wr-td wr-td-num">${_wrP(p.ctr)}</td>
+            <td class="wr-td wr-td-num">${_wrW(p.rev)}</td>
+            <td class="wr-td wr-td-num wr-roas-cell">${_wrR(p.roas)}</td>
+            <td class="wr-td wr-td-num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
+        </tr>`;
+    }).join('');
+    return `
+    <div class="wr-section" id="wr-platform-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-broadcast-tower mr-1.5" style="color:#3b82f6"></i>매체별 성과</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('platform', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-table-wrap">
+            <table class="wr-table">
+                <thead><tr>
+                    <th class="wr-th wr-th-left">매체</th>
+                    <th class="wr-th">집행비</th>
+                    <th class="wr-th">노출</th>
+                    <th class="wr-th">클릭</th>
+                    <th class="wr-th">CTR</th>
+                    <th class="wr-th">매출</th>
+                    <th class="wr-th">ROAS</th>
+                    <th class="wr-th">전환</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+/* ── 소재별 섹션 HTML ── */
+function _wrCreativeSectionHtml(byCreative) {
+    if (!byCreative.length) return '';
+    // Google Drive URL 변환 (drive-converter 사용 가능 시)
+    const toThumb = (url) => {
+        if (!url) return '';
+        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
+        return url;
+    };
+    const cards = byCreative.map((c, i) => {
+        const thumb = toThumb(c.thumb);
+        return `
+        <div class="wr-creative-card">
+            <div class="wr-creative-thumb-wrap">
+                ${thumb
+                    ? `<img class="wr-creative-thumb" src="${thumb}" loading="lazy"
+                           onerror="this.parentElement.innerHTML='<div class=wr-no-thumb><i class=fas\\ fa-image></i></div>'">`
+                    : `<div class="wr-no-thumb"><i class="fas fa-image"></i></div>`
+                }
+                <span class="wr-rank-badge">#${i+1}</span>
+            </div>
+            <div class="wr-creative-body">
+                <div class="wr-creative-name" title="${c.name.replace(/"/g,'&quot;')}">${c.name}</div>
+                <div class="wr-creative-tags">
+                    ${c.platform ? `<span class="wr-tag-plat" style="background:${_wrPlatColor(c.platform)}20;color:${_wrPlatColor(c.platform)}">${c.platform}</span>` : ''}
+                    ${c.product  ? `<span class="wr-tag-prod">${c.product}</span>` : ''}
+                </div>
+                <div class="wr-creative-stats">
+                    <div class="wr-stat"><div class="wr-stat-lbl">집행비</div><div class="wr-stat-val">${_wrW(c.spend)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">노출</div><div class="wr-stat-val">${_wrN(c.impr)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">CTR</div><div class="wr-stat-val">${_wrP(c.ctr)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">ROAS</div><div class="wr-stat-val wr-roas-cell">${_wrR(c.roas)}</div></div>
+                    ${c.conv > 0 ? `<div class="wr-stat"><div class="wr-stat-lbl">전환</div><div class="wr-stat-val">${_wrN(c.conv)}</div></div>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    return `
+    <div class="wr-section" id="wr-creative-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>소재별 성과 TOP ${byCreative.length}</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-creative-grid">
+            ${cards}
+        </div>
+    </div>`;
+}
+
+/* ── 메인 렌더 ── */
+function renderWeeklyReport() {
+    _wrPopulateSelects();
+
+    const list        = _wrGetList();
+    const kpi         = _wrSum(list);
+    const byPlatform  = _wrByPlatform(list);
+    const byCreative  = _wrByCreative(list);
+
+    // 날짜 범위 라벨
+    const rangeEl = document.getElementById('wr-range-label');
+    if (rangeEl) {
+        const hasDates = _wr.dateFrom || _wr.dateTo;
+        rangeEl.textContent = hasDates
+            ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'} · ${list.length}개 소재`
+            : `전체 기간 · ${list.length}개 소재`;
+    }
+
+    const body = document.getElementById('wr-body');
+    if (!body) return;
+
+    if (!list.length) {
+        body.innerHTML = `<div class="wr-empty">
+            <i class="fas fa-inbox fa-2x mb-3 block opacity-30"></i>
+            <p>해당 조건의 데이터가 없습니다.<br>시트를 연동하거나 필터를 조정해주세요.</p>
+        </div>`;
+        return;
+    }
+
+    body.innerHTML =
+        _wrKpiSectionHtml(kpi, list.length) +
+        _wrPlatformSectionHtml(byPlatform) +
+        _wrCreativeSectionHtml(byCreative) +
+        `<div class="wr-copy-all-row">
+            <button class="wr-copy-all-btn" id="wr-copy-all-btn" onclick="window._wrCopyAll(this)">
+                <i class="fas fa-file-export mr-2"></i>전체 보고서 복사 (Confluence 붙여넣기용)
+            </button>
+        </div>`;
+}
+window.renderWeeklyReport = renderWeeklyReport;
+
+/* ─────────────────────────────────────────────
+   Confluence HTML 빌드
+───────────────────────────────────────────── */
+function _wrBuildConfluenceHtml(sections) {
+    const list       = _wrGetList();
+    const kpi        = _wrSum(list);
+    const byPlatform = _wrByPlatform(list);
+    const byCreative = _wrByCreative(list);
+
+    const rangeText  = (_wr.dateFrom || _wr.dateTo)
+        ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'}`
+        : '전체 기간';
+    const filterText = [
+        _wr.product ? `제품: ${_wr.product}` : '',
+        _wr.event   ? `이벤트: ${_wr.event}` : '',
+    ].filter(Boolean).join(' | ') || '필터 없음';
+
+    const toThumb = (url) => {
+        if (!url) return '';
+        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
+        return url;
+    };
+
+    const css = `
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #334155; margin: 0; padding: 16px; }
+        h2 { font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
+        h3 { font-size: 13px; font-weight: 700; color: #475569; margin: 24px 0 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 4px; }
+        th { background: #f8fafc; padding: 7px 10px; font-size: 11px; font-weight: 600; color: #64748b; border: 1px solid #e2e8f0; text-align: center; white-space: nowrap; }
+        td { padding: 7px 10px; border: 1px solid #e2e8f0; vertical-align: middle; }
+        td.left { text-align: left; }
+        td.num  { text-align: right; font-variant-numeric: tabular-nums; }
+        td.roas { text-align: right; font-weight: 700; color: #7c3aed; }
+        img.thumb { width: 72px; height: 56px; object-fit: cover; border-radius: 6px; display: block; margin: 0 auto; }
+        .meta { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+        .pct { font-size: 10px; color: #94a3b8; margin-left: 4px; }
+    `;
+
+    let html = `<html><head><meta charset="UTF-8"><style>${css}</style></head><body>`;
+    html += `<h2>📋 주간 업무 보고서</h2>`;
+    html += `<p style="color:#64748b;font-size:12px;margin:0 0 16px">📅 <strong>${rangeText}</strong> &nbsp;|&nbsp; 🔍 ${filterText} &nbsp;|&nbsp; 소재 수: <strong>${list.length}개</strong></p>`;
+
+    /* KPI */
+    if (!sections || sections.includes('kpi')) {
+        html += `<h3>📊 KPI 요약</h3><table><thead><tr>
+            <th>집행비</th><th>노출수</th><th>클릭수</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환수</th>
+        </tr></thead><tbody><tr>
+            <td class="num">${_wrW(kpi.spend)}</td>
+            <td class="num">${_wrN(kpi.impr)}</td>
+            <td class="num">${_wrN(kpi.clicks)}</td>
+            <td class="num">${_wrP(kpi.ctr)}</td>
+            <td class="num">${_wrW(kpi.rev)}</td>
+            <td class="roas">${_wrR(kpi.roas)}</td>
+            <td class="num">${kpi.conv > 0 ? _wrN(kpi.conv) : '-'}</td>
+        </tr></tbody></table>`;
+    }
+
+    /* 매체별 */
+    if (!sections || sections.includes('platform')) {
+        const total = byPlatform.reduce((s, p) => s + p.spend, 0);
+        html += `<h3>📺 매체별 성과</h3><table><thead><tr>
+            <th style="text-align:left">매체</th><th>집행비</th><th>비중</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+        </tr></thead><tbody>`;
+        byPlatform.forEach(p => {
+            const pct = total > 0 ? (p.spend / total * 100).toFixed(1) + '%' : '-';
+            html += `<tr>
+                <td class="left"><strong>${p.platform}</strong></td>
+                <td class="num">${_wrW(p.spend)}</td>
+                <td class="num">${pct}</td>
+                <td class="num">${_wrN(p.impr)}</td>
+                <td class="num">${_wrN(p.clicks)}</td>
+                <td class="num">${_wrP(p.ctr)}</td>
+                <td class="num">${_wrW(p.rev)}</td>
+                <td class="roas">${_wrR(p.roas)}</td>
+                <td class="num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    /* 소재별 (이미지 포함) */
+    if (!sections || sections.includes('creatives')) {
+        html += `<h3>🎨 소재별 성과 TOP ${byCreative.length}</h3><table><thead><tr>
+            <th>#</th><th>소재 이미지</th><th style="text-align:left;min-width:160px">소재명</th>
+            <th>매체</th><th>제품</th><th>집행비</th><th>노출</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+        </tr></thead><tbody>`;
+        byCreative.forEach((c, i) => {
+            const thumb = toThumb(c.thumb);
+            const imgHtml = thumb
+                ? `<img class="thumb" src="${thumb}" alt="thumb">`
+                : '-';
+            html += `<tr>
+                <td class="num">${i + 1}</td>
+                <td style="text-align:center">${imgHtml}</td>
+                <td class="left" style="max-width:200px;word-break:break-word">${c.name}</td>
+                <td style="text-align:center">${c.platform || '-'}</td>
+                <td style="text-align:center">${c.product  || '-'}</td>
+                <td class="num">${_wrW(c.spend)}</td>
+                <td class="num">${_wrN(c.impr)}</td>
+                <td class="num">${_wrP(c.ctr)}</td>
+                <td class="num">${_wrW(c.rev)}</td>
+                <td class="roas">${_wrR(c.roas)}</td>
+                <td class="num">${c.conv > 0 ? _wrN(c.conv) : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    html += `<p style="font-size:10px;color:#cbd5e1;margin-top:24px">Generated by Performance Creative Dashboard</p></body></html>`;
+    return html;
+}
+
+/* ── 클립보드 복사 실행 ── */
+async function _wrDoCopy(htmlStr, btnEl) {
+    try {
+        if (navigator.clipboard && window.ClipboardItem) {
+            const blob = new Blob([htmlStr], { type: 'text/html' });
+            await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+        } else {
+            // 폴백: execCommand
+            const el = document.createElement('div');
+            el.innerHTML = htmlStr;
+            el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+            document.body.appendChild(el);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            sel.addRange(range);
+            document.execCommand('copy');
+            sel.removeAllRanges();
+            document.body.removeChild(el);
+        }
+        /* 성공 피드백 */
+        if (btnEl) {
+            const orig = btnEl.innerHTML;
+            const origBg = btnEl.style.background;
+            btnEl.innerHTML = '<i class="fas fa-check mr-1"></i>복사됨!';
+            btnEl.style.background = '#059669';
+            btnEl.style.color = '#fff';
+            setTimeout(() => {
+                btnEl.innerHTML = orig;
+                btnEl.style.background = origBg;
+                btnEl.style.color = '';
+            }, 2200);
+        }
+    } catch (e) {
+        console.error('[WR] copy failed:', e);
+        alert('복사 실패. 브라우저 클립보드 권한을 허용해주세요.');
+    }
+}
+
+window._wrCopySection = function(section, btnEl) {
+    const html = _wrBuildConfluenceHtml([section]);
+    _wrDoCopy(html, btnEl);
+};
+
+window._wrCopyAll = function(btnEl) {
+    const html = _wrBuildConfluenceHtml(null);
+    _wrDoCopy(html, btnEl);
+};
+
+/* ── 외부에서 캐시 무효화 시 재렌더 트리거 ── */
+window._invalidateWrCache = function() {
+    // 현재 weekly 탭이 활성화돼 있으면 즉시 재렌더
+    const panel = document.querySelector('.section-panel[data-panel="weekly"]');
+    if (panel && panel.classList.contains('active')) {
+        renderWeeklyReport();
+    }
+};

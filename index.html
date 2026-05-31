@@ -160,6 +160,11 @@
                 <span class="label">메가와리</span>
                 <span class="sub">일별 성과 · 카카오 리포트</span>
             </button>
+            <button class="section-tab" data-section="weekly">
+                <i class="fas fa-clipboard-list"></i>
+                <span class="label">주간 업무</span>
+                <span class="sub">보고서 · Confluence 복사</span>
+            </button>
         </nav>
 
         <!-- ============ SECTION: OVERVIEW ============ -->
@@ -670,6 +675,64 @@
         </div>
         <!-- ============ /SECTION: 메가와리 ============ -->
 
+        <!-- ============ SECTION: 주간 업무 보고서 ============ -->
+        <div class="section-panel" data-panel="weekly">
+            <!-- 헤더 -->
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-clipboard-list text-indigo-500"></i> 주간 업무 보고서
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">소재·제품·이벤트 기준 주간 성과 요약 · Confluence 복사</p>
+                </div>
+            </div>
+
+            <!-- 필터 바 -->
+            <div class="wr-filter-bar">
+                <!-- 날짜 범위 -->
+                <div class="wr-filter-group">
+                    <label class="wr-filter-label"><i class="fas fa-calendar mr-1"></i>기간</label>
+                    <input type="date" id="wr-date-from" class="wr-date-input"
+                        onchange="window._wr.dateFrom=this.value; renderWeeklyReport()">
+                    <span class="wr-date-sep">~</span>
+                    <input type="date" id="wr-date-to" class="wr-date-input"
+                        onchange="window._wr.dateTo=this.value; renderWeeklyReport()">
+                    <button class="wr-quick-btn" onclick="window._wrSetWeek(0)">이번 주</button>
+                    <button class="wr-quick-btn" onclick="window._wrSetWeek(-1)">저번 주</button>
+                    <button class="wr-quick-btn wr-quick-btn-reset" onclick="window._wrClearDates()">전체</button>
+                </div>
+                <!-- 제품 필터 -->
+                <div class="wr-filter-group">
+                    <label class="wr-filter-label"><i class="fas fa-box mr-1"></i>제품</label>
+                    <select id="wr-product-sel" class="wr-select"
+                        onchange="window._wr.product=this.value; renderWeeklyReport()">
+                        <option value="">전체 제품</option>
+                    </select>
+                </div>
+                <!-- 이벤트 필터 -->
+                <div class="wr-filter-group">
+                    <label class="wr-filter-label"><i class="fas fa-calendar-star mr-1"></i>이벤트</label>
+                    <select id="wr-event-sel" class="wr-select"
+                        onchange="window._wr.event=this.value; renderWeeklyReport()">
+                        <option value="">전체 이벤트</option>
+                    </select>
+                </div>
+                <!-- 범위 라벨 -->
+                <div class="wr-range-label-wrap">
+                    <span id="wr-range-label" class="wr-range-label">-</span>
+                </div>
+            </div>
+
+            <!-- 보고서 본문 -->
+            <div id="wr-body" class="wr-body">
+                <div class="wr-empty">
+                    <i class="fas fa-spinner fa-spin fa-lg mb-2 block opacity-40"></i>
+                    <p>로딩 중...</p>
+                </div>
+            </div>
+        </div>
+        <!-- ============ /SECTION: 주간 업무 보고서 ============ -->
+
     </main>
 
     <!-- AI 이미지 생성 Modal -->
@@ -868,6 +931,7 @@
     <script src="js/insights.js"></script>
     <script src="js/generate_v2.js"></script>
     <script src="js/megawari-report.js"></script>
+    <script src="js/weekly-report.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
