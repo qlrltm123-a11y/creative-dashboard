@@ -51,6 +51,9 @@ window._wrClearDates = function() {
 /* ── 필터 적용 데이터 ── */
 function _wrGetList() {
     let list = window.allCreatives || [];
+    // ★ 전역 브랜드 필터 적용
+    const brand = window.currentBrand || 'ALL';
+    if (brand !== 'ALL') list = list.filter(c => c.brand === brand);
     if (_wr.product) list = list.filter(c => (c.product || '').trim() === _wr.product);
     if (_wr.event)   list = list.filter(c => (c.event   || '').trim() === _wr.event);
     if (_wr.dateFrom || _wr.dateTo) {
