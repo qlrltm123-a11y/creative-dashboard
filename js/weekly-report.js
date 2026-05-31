@@ -139,11 +139,21 @@ function _wrW(n)  { return '₩' + _wrN(n); }
 function _wrP(r)  { return (r * 100).toFixed(2) + '%'; }
 function _wrR(r)  { return (r * 100).toFixed(0) + '%'; }
 
-/* ── 필터 select 옵션 채우기 ── */
+/* ── 필터 select 옵션 채우기 (이벤트 ↔ 제품 연동 필터링) ── */
 function _wrPopulateSelects() {
     const list = window.allCreatives || [];
-    const products = [...new Set(list.map(c => c.product).filter(Boolean))].sort();
-    const events   = [...new Set(list.map(c => c.event).filter(Boolean))].sort();
+
+    // 이벤트 선택 시 → 해당 이벤트에 속한 제품만 표시
+    const forProducts = _wr.event
+        ? list.filter(c => (c.event || '').trim() === _wr.event)
+        : list;
+    const products = [...new Set(forProducts.map(c => c.product).filter(Boolean))].sort();
+
+    // 제품 선택 시 → 해당 제품에 속한 이벤트만 표시
+    const forEvents = _wr.product
+        ? list.filter(c => (c.product || '').trim() === _wr.product)
+        : list;
+    const events = [...new Set(forEvents.map(c => c.event).filter(Boolean))].sort();
 
     const pe = document.getElementById('wr-product-sel');
     const ee = document.getElementById('wr-event-sel');
@@ -151,6 +161,8 @@ function _wrPopulateSelects() {
         const cur = _wr.product;
         pe.innerHTML = '<option value="">전체 제품</option>' +
             products.map(p => `<option value="${p}"${p===cur?' selected':''}>${p}</option>`).join('');
+        // 선택된 제품이 새 목록에 없으면 리셋
+        if (cur && !products.includes(cur)) { _wr.product = ''; pe.value = ''; }
     }
     if (ee) {
         const cur = _wr.event;
@@ -295,6 +307,151 @@ function _wrCreativeSectionHtml(byCreative) {
     </div>`;
 }
 
+/* ─────────────────────────────────────────────
+   제품별 인사이트 섹션
+───────────────────────────────────────────── */
+function _wrByProductInsight(list) {
+    const prodMap = {};
+    list.forEach(c => {
+        const prod = (c.product || '기타').trim();
+        if (!prodMap[prod]) prodMap[prod] = [];
+        prodMap[prod].push(c);
+    });
+
+    const toThumb = url => {
+        if (!url) return '';
+        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
+        return url;
+    };
+
+    return Object.entries(prodMap).map(([product, items]) => {
+        // 소재별 집계
+        const creMap = {};
+        items.forEach(c => {
+            const key = (c.ad_name || c.creative_name || String(c.id || '')).trim();
+            if (!key) return;
+            if (!creMap[key]) creMap[key] = {
+                name: c.ad_name || c.creative_name || key,
+                thumb: toThumb(c.thumbnail_url || c.media_url || ''),
+                platform: c.platform || '',
+                spend:0, impr:0, clicks:0, rev:0, conv:0,
+            };
+            if (!creMap[key].thumb && (c.thumbnail_url || c.media_url))
+                creMap[key].thumb = toThumb(c.thumbnail_url || c.media_url);
+            creMap[key].spend  += c.spend       || 0;
+            creMap[key].impr   += c.impressions || 0;
+            creMap[key].clicks += c.clicks      || 0;
+            creMap[key].rev    += c.revenue     || 0;
+            creMap[key].conv   += c.conversions || 0;
+        });
+        const top5 = Object.values(creMap)
+            .map(d => ({ ...d, ctr: d.impr>0 ? d.clicks/d.impr : 0, roas: d.spend>0 ? d.rev/d.spend : 0 }))
+            .sort((a, b) => b.spend - a.spend)
+            .slice(0, 5);
+
+        // 소구포인트 빈도
+        const appealMap = {};
+        items.forEach(c => {
+            const aps = Array.isArray(c.appeal_points) ? c.appeal_points
+                : (c.appeal_points ? String(c.appeal_points).split(',').map(s=>s.trim()) : []);
+            aps.filter(Boolean).forEach(ap => { appealMap[ap] = (appealMap[ap]||0) + 1; });
+        });
+        const topAppeals = Object.entries(appealMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+        // 후킹포인트 빈도
+        const hookMap = {};
+        items.forEach(c => {
+            const hooks = Array.isArray(c.hook_type) ? c.hook_type
+                : (c.hook_type ? [c.hook_type] : []);
+            hooks.filter(Boolean).forEach(h => { hookMap[h] = (hookMap[h]||0) + 1; });
+        });
+        const topHooks = Object.entries(hookMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
+        return { product, top5, topAppeals, topHooks, kpi: _wrSum(items) };
+    }).sort((a,b) => b.kpi.spend - a.kpi.spend);
+}
+
+function _wrProductInsightSectionHtml(productData) {
+    if (!productData.length) return '';
+
+    const COLORS = ['#6366f1','#f97316','#10b981','#ef4444','#8b5cf6','#06b6d4','#f59e0b','#ec4899'];
+
+    const prodCards = productData.map((pd, pi) => {
+        const color = COLORS[pi % COLORS.length];
+
+        // TOP 5 소재 행
+        const top5Rows = pd.top5.map((c, i) => `
+            <div class="wr-pi-row">
+                <span class="wr-pi-rank" style="background:${i===0?'#fbbf24':'#e2e8f0'};color:${i===0?'#78350f':'#64748b'}">${i+1}</span>
+                <div class="wr-pi-thumb-wrap">
+                    ${c.thumb
+                        ? `<img class="wr-pi-thumb" src="${c.thumb}" loading="lazy"
+                               onerror="this.parentElement.innerHTML='<div class=wr-pi-no-img><i class=fas\\ fa-image></i></div>'">`
+                        : `<div class="wr-pi-no-img"><i class="fas fa-image"></i></div>`
+                    }
+                </div>
+                <div class="wr-pi-cre-info">
+                    <div class="wr-pi-cre-name" title="${c.name.replace(/"/g,'&quot;')}">${c.name}</div>
+                    <div class="wr-pi-cre-meta">
+                        ${c.platform ? `<span class="wr-pi-plat">${c.platform}</span>` : ''}
+                        <span class="wr-pi-spend">${_wrW(c.spend)}</span>
+                        <span class="wr-pi-ctr">CTR ${_wrP(c.ctr)}</span>
+                        <span class="wr-pi-roas" style="color:${color}">ROAS ${_wrR(c.roas)}</span>
+                    </div>
+                </div>
+            </div>`).join('');
+
+        // 소구포인트 태그
+        const appealTags = pd.topAppeals.length
+            ? pd.topAppeals.map(([ap, cnt]) =>
+                `<span class="wr-insight-tag" style="background:${color}18;color:${color};border-color:${color}40">${ap}<em>${cnt}</em></span>`
+            ).join('')
+            : '<span class="wr-no-data">데이터 없음</span>';
+
+        // 후킹포인트 태그
+        const hookTags = pd.topHooks.length
+            ? pd.topHooks.map(([h, cnt]) =>
+                `<span class="wr-insight-tag wr-hook-tag">${h}<em>${cnt}</em></span>`
+            ).join('')
+            : '<span class="wr-no-data">데이터 없음</span>';
+
+        return `
+        <div class="wr-pi-card">
+            <div class="wr-pi-header" style="border-top:3px solid ${color}">
+                <div class="wr-pi-product-name" style="color:${color}">${pd.product}</div>
+                <div class="wr-pi-kpis">
+                    <span>집행비 <strong>${_wrW(pd.kpi.spend)}</strong></span>
+                    <span>ROAS <strong style="color:${color}">${_wrR(pd.kpi.roas)}</strong></span>
+                    <span>CTR <strong>${_wrP(pd.kpi.ctr)}</strong></span>
+                </div>
+            </div>
+            <div class="wr-pi-body">
+                <div class="wr-pi-col wr-pi-col-main">
+                    <div class="wr-pi-sub-hd">🏆 집행비 TOP 5 소재</div>
+                    <div class="wr-pi-rows">${top5Rows}</div>
+                </div>
+                <div class="wr-pi-col wr-pi-col-side">
+                    <div class="wr-pi-sub-hd">💡 소구포인트 (상위)</div>
+                    <div class="wr-insight-tags">${appealTags}</div>
+                    <div class="wr-pi-sub-hd" style="margin-top:12px">⚡ 후킹 유형 (상위)</div>
+                    <div class="wr-insight-tags">${hookTags}</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="wr-section" id="wr-product-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-box-open mr-1.5" style="color:#f97316"></i>제품별 소재 인사이트</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('products', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-pi-grid">${prodCards}</div>
+    </div>`;
+}
+
 /* ── 메인 렌더 ── */
 function renderWeeklyReport() {
     _wrPopulateSelects();
@@ -303,6 +460,7 @@ function renderWeeklyReport() {
     const kpi         = _wrSum(list);
     const byPlatform  = _wrByPlatform(list);
     const byCreative  = _wrByCreative(list);
+    const byProduct   = _wrByProductInsight(list);
 
     // 날짜 범위 라벨
     const rangeEl = document.getElementById('wr-range-label');
@@ -327,6 +485,7 @@ function renderWeeklyReport() {
     body.innerHTML =
         _wrKpiSectionHtml(kpi, list.length) +
         _wrPlatformSectionHtml(byPlatform) +
+        _wrProductInsightSectionHtml(byProduct) +
         _wrCreativeSectionHtml(byCreative) +
         `<div class="wr-copy-all-row">
             <button class="wr-copy-all-btn" id="wr-copy-all-btn" onclick="window._wrCopyAll(this)">
@@ -344,6 +503,7 @@ function _wrBuildConfluenceHtml(sections) {
     const kpi        = _wrSum(list);
     const byPlatform = _wrByPlatform(list);
     const byCreative = _wrByCreative(list);
+    const byProduct  = _wrByProductInsight(list);
 
     const rangeText  = (_wr.dateFrom || _wr.dateTo)
         ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'}`
@@ -414,6 +574,48 @@ function _wrBuildConfluenceHtml(sections) {
             </tr>`;
         });
         html += `</tbody></table>`;
+    }
+
+    /* 제품별 인사이트 */
+    if (!sections || sections.includes('products')) {
+        byProduct.forEach(pd => {
+            html += `<h3>📦 ${pd.product} — 집행비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)}</h3>`;
+            // TOP 5 테이블
+            html += `<table><thead><tr>
+                <th>#</th><th style="width:80px">소재 이미지</th>
+                <th style="text-align:left">소재명</th><th>매체</th>
+                <th>집행비</th><th>CTR</th><th>매출</th><th>ROAS</th>
+            </tr></thead><tbody>`;
+            pd.top5.forEach((c, i) => {
+                const imgHtml = c.thumb ? `<img class="thumb" src="${c.thumb}" alt="">` : '-';
+                html += `<tr>
+                    <td class="num">${i+1}</td>
+                    <td style="text-align:center">${imgHtml}</td>
+                    <td class="left" style="max-width:200px;word-break:break-word">${c.name}</td>
+                    <td style="text-align:center">${c.platform||'-'}</td>
+                    <td class="num">${_wrW(c.spend)}</td>
+                    <td class="num">${_wrP(c.ctr)}</td>
+                    <td class="num">${_wrW(c.rev)}</td>
+                    <td class="roas">${_wrR(c.roas)}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            // 소구/후킹 인사이트
+            if (pd.topAppeals.length || pd.topHooks.length) {
+                html += `<table style="margin-top:6px"><tr>`;
+                html += `<td style="width:50%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">💡 소구포인트 (빈도순)</strong><br><br>`;
+                pd.topAppeals.forEach(([ap, cnt]) => {
+                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:11px">${ap} (${cnt})</span>`;
+                });
+                html += `</td><td style="width:50%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">⚡ 후킹 유형 (빈도순)</strong><br><br>`;
+                pd.topHooks.forEach(([h, cnt]) => {
+                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">${h} (${cnt})</span>`;
+                });
+                html += `</td></tr></table>`;
+            }
+        });
     }
 
     /* 소재별 (이미지 포함) */
