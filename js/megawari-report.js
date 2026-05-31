@@ -90,7 +90,6 @@ function _invalidateMwCache() {
 window._invalidateMwCache = _invalidateMwCache;
 
 // ── 날짜별 집계 (캐시) ────────────────────────────────────────
-let _mwAggCache = null; // { src, result }
 function _aggregateMw(data) {
     if (_mwAggCache && _mwAggCache.src === data) return _mwAggCache.result;
     const result = _aggregateMwImpl(data);
