@@ -5956,3 +5956,37 @@ img.mw-cr-thumb {
 }
 .mw-metric-badge.atc  { background: #dbeafe; color: #1d4ed8; }
 .mw-metric-badge.roas { background: #d1fae5; color: #065f46; }
+
+/* ── 소재 변동 감지 ── */
+.mw-shift-wrap { padding: 4px 0 12px; }
+.mw-shift-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 640px) { .mw-shift-cols { grid-template-columns: 1fr; } }
+.mw-shift-label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+.mw-shift-label.up { color: #065f46; }
+.mw-shift-label.dn { color: #7f1d1d; }
+.mw-shift-card { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; border: 1px solid; }
+.mw-shift-card.up { background: #f0fdf4; border-color: #bbf7d0; }
+.mw-shift-card.dn { background: #fef2f2; border-color: #fecaca; }
+.mw-shift-icon { font-size: 16px; flex-shrink: 0; }
+.mw-shift-body { flex: 1; min-width: 0; }
+.mw-shift-name { font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mw-shift-prod { font-size: 10px; color: #64748b; margin-bottom: 2px; }
+.mw-shift-metrics { font-size: 11px; color: #475569; line-height: 1.5; }
+.mw-shift-pct { font-size: 14px; font-weight: 800; flex-shrink: 0; align-self: center; }
+.mw-shift-pct.up { color: #059669; }
+.mw-shift-pct.dn { color: #dc2626; }
+.mw-shift-empty { font-size: 11px; color: #94a3b8; padding: 6px 0; }
+/* ── 제품별 효율 비교 ── */
+.mw-pcc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.mw-pcc { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+.mw-pcc.top { border-color: #fbbf24; background: linear-gradient(135deg,#fffbeb 0%,#fff 60%); }
+.mw-pcc-crown { font-size: 10px; font-weight: 700; color: #92400e; background: #fef3c7; border-radius: 4px; padding: 1px 6px; display: inline-block; margin-bottom: 4px; }
+.mw-pcc-name { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mw-pcc-bar-wrap { height: 6px; background: #f1f5f9; border-radius: 3px; margin-bottom: 6px; overflow: hidden; }
+.mw-pcc-bar { height: 100%; border-radius: 3px; }
+.mw-pcc-roas-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.mw-pcc-ctr { font-size: 11px; color: #64748b; }
+.mw-pcc-stats { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid #f1f5f9; padding-top: 6px; }
+.mw-pcc-stat { display: flex; flex-direction: column; min-width: 44px; }
+.mw-pcc-stat-lbl { font-size: 9px; color: #94a3b8; font-weight: 600; }
+.mw-pcc-stat-val { font-size: 11px; font-weight: 700; color: #334155; }

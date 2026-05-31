@@ -512,6 +512,14 @@ function renderMegawariPanel() {
         <canvas id="mwRoasLineChart" style="height:220px;max-height:220px"></canvas>
     </div>
 
+    <!-- 소재 변동 감지 -->
+    <div class="mw-section-hd">🚨 소재 변동 감지 <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-weight:600">전일 대비 ±30%</span></div>
+    <div class="mw-shift-wrap">${_buildShiftAlert(_detectCreativeShifts(today ? today.creatives || [] : [], prev ? prev.creatives || [] : []))}</div>
+
+    <!-- 제품별 효율 비교 -->
+    <div class="mw-section-hd">📦 제품별 효율 비교</div>
+    <div class="mw-pcc-grid">${_buildProductCompareCards(prods, isTeaser)}</div>
+
     <!-- 소재 리스트 -->
     <div class="mw-two-col">
         <div>
@@ -765,6 +773,117 @@ function _mwKakaoLogin() {
 window._mwKakaoLogin = _mwKakaoLogin;
 
 window.renderMegawariPanel = renderMegawariPanel;
+
+// ── 소재 변동 감지 ───────────────────────────────────────────
+function _detectCreativeShifts(todayCreatives, prevCreatives, threshold) {
+    threshold = threshold || 0.30;
+    if (!prevCreatives || !prevCreatives.length) return { up: [], dn: [] };
+    const prevMap = {};
+    prevCreatives.forEach(function(c) {
+        var key = (c.ad_name || c.creative_name || '').trim();
+        if (key) prevMap[key] = c;
+    });
+    var up = [], dn = [];
+    todayCreatives.forEach(function(c) {
+        var key = (c.ad_name || c.creative_name || '').trim();
+        var p = prevMap[key];
+        if (!p) return;
+        var prevRoas = (p.roas != null ? p.roas : (p.spend > 0 ? p.revenue / p.spend : 0));
+        var currRoas = (c.roas != null ? c.roas : (c.spend > 0 ? c.revenue / c.spend : 0));
+        var prevCtr  = (p.ctr  != null ? p.ctr  : (p.impressions > 0 ? p.clicks / p.impressions : 0));
+        var currCtr  = (c.ctr  != null ? c.ctr  : (c.impressions > 0 ? c.clicks / c.impressions : 0));
+        var roasPct  = prevRoas > 0 ? (currRoas - prevRoas) / prevRoas : null;
+        var ctrPct   = prevCtr  > 0 ? (currCtr  - prevCtr)  / prevCtr  : null;
+        var candidates = [roasPct, ctrPct].filter(function(v) { return v !== null; });
+        if (!candidates.length) return;
+        var maxPct = candidates.reduce(function(best, v) {
+            return Math.abs(v) > Math.abs(best) ? v : best;
+        }, 0);
+        var item = {
+            name: key.slice(0, 30),
+            product: (c.product || '').slice(0, 12),
+            roasPct: roasPct, ctrPct: ctrPct,
+            currRoas: currRoas, prevRoas: prevRoas,
+            currCtr: currCtr, prevCtr: prevCtr,
+            mainPct: maxPct
+        };
+        if (maxPct >= threshold)       up.push(item);
+        else if (maxPct <= -threshold) dn.push(item);
+    });
+    up.sort(function(a, b) { return b.mainPct - a.mainPct; });
+    dn.sort(function(a, b) { return a.mainPct - b.mainPct; });
+    return { up: up, dn: dn };
+}
+
+function _buildShiftAlert(shifts) {
+    var fmtPct = function(v) {
+        if (v === null || v === undefined) return '-';
+        return (v >= 0 ? '+' : '') + Math.round(v * 100) + '%';
+    };
+    if (!shifts.up.length && !shifts.dn.length) {
+        return '<div class="mw-shift-empty">전일 대비 ±30% 이상 변동 소재 없음 ✅</div>';
+    }
+    function renderCard(item, type) {
+        var isUp = type === 'up';
+        var roasStr = item.roasPct !== null
+            ? 'ROAS ' + (item.currRoas > 0 ? Math.round(item.currRoas * 100) + '%' : '-')
+              + ' (전일 ' + (item.prevRoas > 0 ? Math.round(item.prevRoas * 100) + '%' : '-')
+              + ', <b>' + fmtPct(item.roasPct) + '</b>)' : '';
+        var ctrStr = item.ctrPct !== null
+            ? 'CTR ' + (item.currCtr > 0 ? (item.currCtr * 100).toFixed(2) + '%' : '-')
+              + ' (전일 ' + (item.prevCtr > 0 ? (item.prevCtr * 100).toFixed(2) + '%' : '-')
+              + ', <b>' + fmtPct(item.ctrPct) + '</b>)' : '';
+        var metrics = [roasStr, ctrStr].filter(Boolean).join(' &middot; ');
+        return '<div class="mw-shift-card ' + (isUp ? 'up' : 'dn') + '">'
+            + '<div class="mw-shift-icon">' + (isUp ? '📈' : '📉') + '</div>'
+            + '<div class="mw-shift-body">'
+            + '<div class="mw-shift-name">' + item.name + '</div>'
+            + (item.product ? '<div class="mw-shift-prod">' + item.product + '</div>' : '')
+            + '<div class="mw-shift-metrics">' + metrics + '</div>'
+            + '</div>'
+            + '<div class="mw-shift-pct ' + (isUp ? 'up' : 'dn') + '">' + fmtPct(item.mainPct) + '</div>'
+            + '</div>';
+    }
+    var upCards = shifts.up.slice(0, 4).map(function(i) { return renderCard(i, 'up'); }).join('');
+    var dnCards = shifts.dn.slice(0, 4).map(function(i) { return renderCard(i, 'dn'); }).join('');
+    return '<div class="mw-shift-cols">'
+        + '<div><div class="mw-shift-label up">🟢 상승 소재 (' + shifts.up.length + '건)</div>'
+        + (upCards || '<div class="mw-shift-empty">없음</div>') + '</div>'
+        + '<div><div class="mw-shift-label dn">🔴 하락 소재 (' + shifts.dn.length + '건)</div>'
+        + (dnCards || '<div class="mw-shift-empty">없음</div>') + '</div>'
+        + '</div>';
+}
+
+function _buildProductCompareCards(prods, isTeaser) {
+    if (!prods || !prods.length) return '<div class="mw-shift-empty">제품 데이터 없음</div>';
+    var maxRoas = Math.max.apply(null, prods.map(function(e) { return e[1].roas || 0; }).concat([0.01]));
+    return prods.map(function(entry, i) {
+        var name = entry[0], p = entry[1];
+        var isTop = i === 0;
+        var roasBarW = maxRoas > 0 ? Math.round((p.roas / maxRoas) * 100) : 0;
+        var barColor = (p.roas >= 3) ? '#10b981' : (p.roas >= 1.5) ? '#3b82f6' : (p.roas >= 1) ? '#f59e0b' : '#ef4444';
+        var roasStr = p.roas > 0 ? Math.round(p.roas * 100) + '%' : '-';
+        var ctrStr  = p.ctr  > 0 ? (p.ctr * 100).toFixed(2) + '%' : '-';
+        var atcHtml = isTeaser
+            ? '<div class="mw-pcc-stat"><span class="mw-pcc-stat-lbl">담기</span>'
+              + '<span class="mw-pcc-stat-val">' + (p.add_to_cart || 0).toLocaleString() + '</span></div>' : '';
+        return '<div class="mw-pcc' + (isTop ? ' top' : '') + '">'
+            + (isTop ? '<div class="mw-pcc-crown">👑 1위</div>' : '')
+            + '<div class="mw-pcc-name">' + name + '</div>'
+            + '<div class="mw-pcc-bar-wrap"><div class="mw-pcc-bar" style="width:' + roasBarW + '%;background:' + barColor + '"></div></div>'
+            + '<div class="mw-pcc-roas-row">'
+            + '<span style="font-size:13px;font-weight:800;color:' + barColor + '">' + roasStr + '</span>'
+            + '<span class="mw-pcc-ctr">CTR ' + ctrStr + '</span>'
+            + '</div>'
+            + '<div class="mw-pcc-stats">'
+            + '<div class="mw-pcc-stat"><span class="mw-pcc-stat-lbl">매출</span>'
+            + '<span class="mw-pcc-stat-val">' + (p.revenue >= 1e8 ? (p.revenue/1e8).toFixed(1)+'억' : p.revenue >= 1e4 ? Math.round(p.revenue/1e4)+'만' : (p.revenue||0).toLocaleString()) + '</span></div>'
+            + '<div class="mw-pcc-stat"><span class="mw-pcc-stat-lbl">지출</span>'
+            + '<span class="mw-pcc-stat-val">' + (p.spend >= 1e8 ? (p.spend/1e8).toFixed(1)+'억' : p.spend >= 1e4 ? Math.round(p.spend/1e4)+'만' : (p.spend||0).toLocaleString()) + '</span></div>'
+            + atcHtml
+            + '</div></div>';
+    }).join('');
+}
 
 // ── D+N 누적 ROAS 라인 차트 ─────────────────────────────────
 let _mwRoasChart = null;
