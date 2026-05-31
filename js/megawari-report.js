@@ -510,6 +510,7 @@ function renderMegawariPanel() {
     const container = document.getElementById('megawari-panel-body');
     if (!container) return;
 
+    try {
     const mwData = _getMwData();
     if (!mwData.length) {
         container.innerHTML = `<div class="mw-empty"><i class="fas fa-fire text-3xl text-slate-200 mb-3"></i><p class="font-semibold text-slate-500">Megawari 이벤트 데이터가 없어요</p><p class="text-xs text-slate-400 mt-1">이벤트 필터에 "megawari" 항목이 있는 데이터를 불러와주세요</p></div>`;
@@ -517,16 +518,28 @@ function renderMegawariPanel() {
     }
 
     const byDate = _aggregateMw(mwData);
+    // 기간 필터 없이 전체 날짜 사용 (데이터가 없으면 빈 탭 표시 방지)
     const periodStart = MW_PERIODS[0].start;
     const periodEnd   = MW_PERIODS[MW_PERIODS.length - 1].end;
-    const sortedDates = Object.keys(byDate).sort()
+    let sortedDates = Object.keys(byDate).sort()
         .filter(iso => iso >= periodStart && iso <= periodEnd);
+    // 기간 내 데이터가 없으면 전체 날짜 사용
+    if (!sortedDates.length) sortedDates = Object.keys(byDate).sort();
     _mwSortedDates = sortedDates;
+
+    if (!sortedDates.length) {
+        container.innerHTML = `<div class="mw-empty"><p class="font-semibold text-slate-500">날짜 데이터가 없어요</p></div>`;
+        return;
+    }
 
     window._mwSelectedDate = window._mwSelectedDate && sortedDates.includes(window._mwSelectedDate)
         ? window._mwSelectedDate : sortedDates[sortedDates.length - 1];
 
     const sel = window._mwSelectedDate;
+    if (!sel || !byDate[sel]) {
+        container.innerHTML = `<div class="mw-empty"><p class="font-semibold text-slate-500">선택한 날짜 데이터가 없어요</p></div>`;
+        return;
+    }
 
     // ── 카카오 설정 (렌더마다 최신 값) ──────────────────────
     const kakaoKey    = localStorage.getItem('mw_kakao_app_key')       || '';
@@ -607,6 +620,11 @@ function renderMegawariPanel() {
     </div>`;
 
     _renderMwRoasChart(byDate, sortedDates);
+
+    } catch(e) {
+        console.error('[Megawari] renderMegawariPanel error:', e);
+        container.innerHTML = `<div class="mw-empty"><p class="font-semibold text-slate-500">렌더링 오류: ${e.message}</p><p class="text-xs text-slate-400 mt-1">콘솔(F12)에서 상세 오류를 확인해주세요</p></div>`;
+    }
 }
 
 // ── 날짜 선택 (빠른 전환: 탭 토글 + 본문만 교체) ───────────
