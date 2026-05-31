@@ -5485,7 +5485,9 @@ body {
 ══════════════════════════════════════════════ */
 .mw-panel-body {
     padding: 16px 0 32px;
+    overflow: hidden;
 }
+.mw-panel-body .mw-table-wrap { overflow-x: auto; }
 
 /* ── 빈 상태 ── */
 .mw-empty {
@@ -5957,8 +5959,6 @@ img.mw-cr-thumb {
 
 /* ── 소재 변동 감지 ── */
 .mw-shift-wrap { padding: 4px 0 12px; }
-.mw-shift-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-@media (max-width: 640px) { .mw-shift-cols { grid-template-columns: 1fr; } }
 .mw-shift-label { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
 .mw-shift-label.up { color: #065f46; }
 .mw-shift-label.dn { color: #7f1d1d; }
@@ -5971,7 +5971,7 @@ img.mw-cr-thumb {
 .mw-shift-name { font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 .mw-shift-plat { font-size: 9px; font-weight: 600; color: #6366f1; background: #eef2ff; border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
 .mw-shift-prod { font-size: 10px; color: #64748b; margin-bottom: 2px; }
-.mw-shift-metrics { font-size: 10px; color: #475569; line-height: 1.6; }
+.mw-shift-metrics { font-size: 10px; color: #475569; line-height: 1.6; word-break: break-all; overflow-wrap: break-word; }
 .mw-shift-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; align-self: center; }
 .mw-shift-pct.up { color: #059669; }
 .mw-shift-pct.dn { color: #dc2626; }
@@ -5990,14 +5990,30 @@ img.mw-cr-thumb {
 .mw-pcc-stat { display: flex; flex-direction: column; min-width: 44px; }
 .mw-pcc-stat-lbl { font-size: 9px; color: #94a3b8; font-weight: 600; }
 .mw-pcc-stat-val { font-size: 11px; font-weight: 700; color: #334155; }
-/* ── 메가와리 메인 2단 그리드 ── */
-.mw-main-grid {
+/* ── ROW A/B: AI 코멘트(좌 40%) + ROAS 차트(우 60%) ── */
+.mw-row-ab {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 24px;
+    grid-template-columns: 2fr 3fr;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: start;
 }
+.mw-row-ab-a, .mw-row-ab-b { min-width: 0; }
+
+/* ── ROW C/D: 제품 비교 카드(좌 35%) + 소재 변동 감지(우 65%) ── */
+.mw-row-cd {
+    display: grid;
+    grid-template-columns: 2fr 3fr;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: start;
+}
+.mw-row-cd-a, .mw-row-cd-b { min-width: 0; }
+
+/* 소재 변동 감지 — 2열 카드 */
+.mw-shift-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
 @media (max-width: 900px) {
-    .mw-main-grid { grid-template-columns: 1fr; }
+    .mw-row-ab, .mw-row-cd { grid-template-columns: 1fr; }
+    .mw-shift-cols { grid-template-columns: 1fr; }
 }
-.mw-col-left, .mw-col-right { min-width: 0; }

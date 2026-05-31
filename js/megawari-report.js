@@ -481,10 +481,10 @@ function renderMegawariPanel() {
     const aiComment = _genAiComment(today, prev, dayInfo, sel);
 
     container.innerHTML = `
-    <!-- 날짜 탭 (전체 폭) -->
+    <!-- 날짜 탭 -->
     <div class="mw-date-tabs">${dateTabs}</div>
 
-    <!-- KPI 바 (전체 폭) -->
+    <!-- KPI 바 -->
     <div class="mw-kpi-bar">
         <div class="mw-kpi-item">
             <div class="mw-kpi-lbl">전체 ROAS</div>
@@ -508,44 +508,39 @@ function renderMegawariPanel() {
         </div>
     </div>
 
-    <!-- 메인 2단 그리드 -->
-    <div class="mw-main-grid">
-
-        <!-- 왼쪽 컬럼 -->
-        <div class="mw-col-left">
-            <!-- AI 코멘트 -->
-            <div class="mw-ai-box">
-                <div class="mw-ai-hd"><i class="fas fa-robot"></i> AI 코멘트</div>
-                <div class="mw-ai-body">${aiComment.replace(/\n/g,'<br>')}</div>
-            </div>
-
-            <!-- D+N 누적 ROAS 추이 라인 차트 -->
+    <!-- ROW 1: AI 코멘트(좌) + D+N 차트(우) -->
+    <div class="mw-row-ab">
+        <div class="mw-ai-box mw-row-ab-a">
+            <div class="mw-ai-hd"><i class="fas fa-robot"></i> AI 코멘트</div>
+            <div class="mw-ai-body">${aiComment.replace(/\n/g,'<br>')}</div>
+        </div>
+        <div class="mw-row-ab-b">
             <div class="mw-section-hd">📈 D+N 누적 ROAS 추이</div>
-            <div class="chart-card mb-4" style="padding:16px">
-                <canvas id="mwRoasLineChart" style="height:220px;max-height:220px"></canvas>
+            <div class="chart-card" style="padding:14px">
+                <canvas id="mwRoasLineChart" style="height:180px;max-height:180px"></canvas>
             </div>
+        </div>
+    </div>
 
-            <!-- 소재 변동 감지 -->
+    <!-- ROW 2: 제품별 성과 테이블 (전체 폭) -->
+    <div class="mw-section-hd">📊 제품별 성과 (매체 교차)</div>
+    <div class="mw-table-wrap mb-4">
+        <table class="mw-table">${tableHead}<tbody>${tableBody}</tbody></table>
+    </div>
+
+    <!-- ROW 3: 제품 비교 카드 + 소재 변동 감지 -->
+    <div class="mw-row-cd">
+        <div class="mw-row-cd-a">
+            <div class="mw-section-hd">📦 제품별 효율 비교</div>
+            <div class="mw-pcc-grid">${_buildProductCompareCards(prods, isTeaser)}</div>
+        </div>
+        <div class="mw-row-cd-b">
             <div class="mw-section-hd">🚨 소재 변동 감지 <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-weight:600">전일 대비 ±30%</span></div>
             <div class="mw-shift-wrap">${_buildShiftAlert(_detectCreativeShifts(today ? today.creatives || [] : [], prev ? prev.creatives || [] : []))}</div>
         </div>
+    </div>
 
-        <!-- 오른쪽 컬럼 -->
-        <div class="mw-col-right">
-            <!-- 제품 × 매체 테이블 -->
-            <div class="mw-section-hd">📊 제품별 성과 (매체 교차)</div>
-            <div class="mw-table-wrap">
-                <table class="mw-table"><${tableHead}<tbody>${tableBody}</tbody></table>
-            </div>
-
-            <!-- 제품별 효율 비교 -->
-            <div class="mw-section-hd mt-4">📦 제품별 효율 비교</div>
-            <div class="mw-pcc-grid">${_buildProductCompareCards(prods, isTeaser)}</div>
-        </div>
-
-    </div><!-- /mw-main-grid -->
-
-    <!-- 소재 리스트 (전체 폭) -->
+    <!-- ROW 4: 고효율/저효율 소재 -->
     <div class="mw-two-col">
         <div>
             <div class="mw-section-hd">
