@@ -501,7 +501,9 @@ window.renderWeeklyReport = renderWeeklyReport;
 /* ─────────────────────────────────────────────
    Confluence HTML 빌드
 ───────────────────────────────────────────── */
-function _wrBuildConfluenceHtml(sections) {
+// imgMap: { originalUrl: base64DataUrl } — 없으면 원본 URL 폴백
+function _wrBuildConfluenceHtml(sections, imgMap) {
+    imgMap = imgMap || {};
     const list       = _wrGetList();
     const kpi        = _wrSum(list);
     const byPlatform = _wrByPlatform(list);
@@ -516,10 +518,12 @@ function _wrBuildConfluenceHtml(sections) {
         _wr.event   ? `이벤트: ${_wr.event}` : '',
     ].filter(Boolean).join(' | ') || '필터 없음';
 
+    // URL → 변환된 base64 또는 원본 URL
     const toThumb = (url) => {
         if (!url) return '';
-        if (typeof window.convertDriveUrl === 'function') return window.convertDriveUrl(url);
-        return url;
+        const converted = typeof window.convertDriveUrl === 'function' ? window.convertDriveUrl(url) : url;
+        // imgMap에 base64가 있으면 우선 사용
+        return imgMap[converted] || imgMap[url] || converted;
     };
 
     const css = `
@@ -653,6 +657,88 @@ function _wrBuildConfluenceHtml(sections) {
     return html;
 }
 
+/* ─────────────────────────────────────────────
+   이미지 → Base64 변환 (Canvas 방식)
+   - crossOrigin='anonymous' 로 로드 → canvas.toDataURL()
+   - CORS 차단 시 원본 URL 그대로 폴백
+   - 타임아웃: 8초
+───────────────────────────────────────────── */
+function _wrImgToBase64(url) {
+    if (!url) return Promise.resolve('');
+    return new Promise(resolve => {
+        const timer = setTimeout(() => resolve(url), 8000);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            clearTimeout(timer);
+            try {
+                const MAX = 140;
+                const ratio = img.naturalWidth / (img.naturalHeight || 1);
+                const w = ratio >= 1 ? MAX : Math.round(MAX * ratio);
+                const h = ratio >= 1 ? Math.round(MAX / ratio) : MAX;
+                const cvs = document.createElement('canvas');
+                cvs.width  = w || MAX;
+                cvs.height = h || MAX;
+                cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
+                resolve(cvs.toDataURL('image/jpeg', 0.85));
+            } catch (e) {
+                // tainted canvas (CORS 미허용) → 원본 URL 폴백
+                resolve(url);
+            }
+        };
+        img.onerror = () => { clearTimeout(timer); resolve(url); };
+        img.src = url;
+    });
+}
+
+/* 여러 URL 동시 변환 → { url: base64 } map 반환 */
+async function _wrFetchAllBase64(urls) {
+    const unique = [...new Set(urls.filter(Boolean))];
+    const pairs  = await Promise.all(unique.map(async u => [u, await _wrImgToBase64(u)]));
+    return Object.fromEntries(pairs);
+}
+
+/* 현재 보고서에 등장하는 썸네일 URL 전체 수집 */
+function _wrCollectThumbUrls() {
+    const list       = _wrGetList();
+    const byCreative = _wrByCreative(list);
+    const byProduct  = _wrByProductInsight(list);
+    const toThumb    = u => { if (!u) return ''; return typeof window.convertDriveUrl === 'function' ? window.convertDriveUrl(u) : u; };
+
+    const urls = new Set();
+    byCreative.forEach(c => { if (c.thumb) urls.add(toThumb(c.thumb)); });
+    byProduct.forEach(pd => pd.top5.forEach(c => { if (c.thumb) urls.add(c.thumb); }));
+    return [...urls];
+}
+
+/* ── 버튼 로딩 상태 ── */
+function _wrBtnLoading(btnEl) {
+    if (!btnEl) return;
+    btnEl._origHtml = btnEl.innerHTML;
+    btnEl._origBg   = btnEl.style.background;
+    btnEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>이미지 변환 중…';
+    btnEl.style.background = '#64748b';
+    btnEl.disabled = true;
+}
+function _wrBtnDone(btnEl, ok) {
+    if (!btnEl) return;
+    if (ok) {
+        btnEl.innerHTML = '<i class="fas fa-check mr-1"></i>복사됨!';
+        btnEl.style.background = '#059669';
+        btnEl.style.color = '#fff';
+        setTimeout(() => {
+            btnEl.innerHTML = btnEl._origHtml || '복사';
+            btnEl.style.background = btnEl._origBg || '';
+            btnEl.style.color = '';
+            btnEl.disabled = false;
+        }, 2400);
+    } else {
+        btnEl.innerHTML = btnEl._origHtml || '복사';
+        btnEl.style.background = btnEl._origBg || '';
+        btnEl.disabled = false;
+    }
+}
+
 /* ── 클립보드 복사 실행 ── */
 async function _wrDoCopy(htmlStr, btnEl) {
     try {
@@ -660,7 +746,7 @@ async function _wrDoCopy(htmlStr, btnEl) {
             const blob = new Blob([htmlStr], { type: 'text/html' });
             await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
         } else {
-            // 폴백: execCommand
+            // 폴백: execCommand (plain HTML)
             const el = document.createElement('div');
             el.innerHTML = htmlStr;
             el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
@@ -674,34 +760,35 @@ async function _wrDoCopy(htmlStr, btnEl) {
             sel.removeAllRanges();
             document.body.removeChild(el);
         }
-        /* 성공 피드백 */
-        if (btnEl) {
-            const orig = btnEl.innerHTML;
-            const origBg = btnEl.style.background;
-            btnEl.innerHTML = '<i class="fas fa-check mr-1"></i>복사됨!';
-            btnEl.style.background = '#059669';
-            btnEl.style.color = '#fff';
-            setTimeout(() => {
-                btnEl.innerHTML = orig;
-                btnEl.style.background = origBg;
-                btnEl.style.color = '';
-            }, 2200);
-        }
+        _wrBtnDone(btnEl, true);
     } catch (e) {
         console.error('[WR] copy failed:', e);
+        _wrBtnDone(btnEl, false);
         alert('복사 실패. 브라우저 클립보드 권한을 허용해주세요.');
     }
 }
 
-window._wrCopySection = function(section, btnEl) {
-    const html = _wrBuildConfluenceHtml([section]);
-    _wrDoCopy(html, btnEl);
-};
+/* ── 이미지 base64 변환 → HTML 빌드 → 복사 (통합 플로우) ── */
+async function _wrCopyWithImages(sections, btnEl) {
+    _wrBtnLoading(btnEl);
+    try {
+        // 1) 썸네일 URL 수집 & 병렬 base64 변환
+        const thumbUrls = _wrCollectThumbUrls();
+        const imgMap    = thumbUrls.length ? await _wrFetchAllBase64(thumbUrls) : {};
 
-window._wrCopyAll = function(btnEl) {
-    const html = _wrBuildConfluenceHtml(null);
-    _wrDoCopy(html, btnEl);
-};
+        // 2) imgMap을 주입해서 HTML 빌드
+        const html = _wrBuildConfluenceHtml(sections, imgMap);
+
+        // 3) 클립보드 복사
+        await _wrDoCopy(html, btnEl);
+    } catch(e) {
+        console.error('[WR] _wrCopyWithImages error:', e);
+        _wrBtnDone(btnEl, false);
+    }
+}
+
+window._wrCopySection = function(section, btnEl) { _wrCopyWithImages([section], btnEl); };
+window._wrCopyAll     = function(btnEl)          { _wrCopyWithImages(null,      btnEl); };
 
 /* ── 외부에서 캐시 무효화 시 재렌더 트리거 ── */
 window._invalidateWrCache = function() {
