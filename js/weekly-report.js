@@ -48,12 +48,16 @@ window._wrClearDates = function() {
     renderWeeklyReport();
 };
 
+/* ── 브랜드 필터 적용된 기본 목록 (main.js getBrandCreatives 미러) ── */
+function _wrBrandList() {
+    const brand = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : null) || 'ALL';
+    const all   = window.allCreatives || [];
+    return brand === 'ALL' ? all : all.filter(c => c.brand === brand);
+}
+
 /* ── 필터 적용 데이터 ── */
 function _wrGetList() {
-    let list = window.allCreatives || [];
-    // ★ 전역 브랜드 필터 적용
-    const brand = window.currentBrand || 'ALL';
-    if (brand !== 'ALL') list = list.filter(c => c.brand === brand);
+    let list = _wrBrandList();
     if (_wr.product) list = list.filter(c => (c.product || '').trim() === _wr.product);
     if (_wr.event)   list = list.filter(c => (c.event   || '').trim() === _wr.event);
     if (_wr.dateFrom || _wr.dateTo) {
@@ -144,7 +148,8 @@ function _wrR(r)  { return (r * 100).toFixed(0) + '%'; }
 
 /* ── 필터 select 옵션 채우기 (이벤트 ↔ 제품 연동 필터링) ── */
 function _wrPopulateSelects() {
-    const list = window.allCreatives || [];
+    // 브랜드 필터 먼저 적용 → 드롭다운에도 현재 브랜드 데이터만 표시
+    const list = _wrBrandList();
 
     // 이벤트 선택 시 → 해당 이벤트에 속한 제품만 표시
     const forProducts = _wr.event
@@ -792,9 +797,15 @@ window._wrCopyAll     = function(btnEl)          { _wrCopyWithImages(null,      
 
 /* ── 외부에서 캐시 무효화 시 재렌더 트리거 ── */
 window._invalidateWrCache = function() {
-    // 현재 weekly 탭이 활성화돼 있으면 즉시 재렌더
     const panel = document.querySelector('.section-panel[data-panel="weekly"]');
     if (panel && panel.classList.contains('active')) {
+        // 브랜드/데이터 변경 시 선택 제품/이벤트가 새 브랜드에 없을 수 있으므로 리셋
+        _wr.product = '';
+        _wr.event   = '';
+        const ps = document.getElementById('wr-product-sel');
+        const es = document.getElementById('wr-event-sel');
+        if (ps) ps.value = '';
+        if (es) es.value = '';
         renderWeeklyReport();
     }
 };

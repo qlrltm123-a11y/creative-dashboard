@@ -437,6 +437,8 @@ function switchSection(sectionName) {
 }
 window.switchSection = switchSection;
 
+// ★ 주간 업무 등 외부 JS에서 브랜드 상태를 읽을 수 있도록 getter 노출
+window.getCurrentBrand = () => currentBrand;
 
 // ============================
 // Filtering
