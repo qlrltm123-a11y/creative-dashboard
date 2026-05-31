@@ -77,6 +77,7 @@ window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
     window._creativeFatigue = detectCreativeFatigue(allCreatives); // ★ 소재 피로도 감지
     invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
+    if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache(); // ★ 메가와리 캐시 무효화
     populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
     populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
     populateEventOptions();    // ★ Event 옵션 (event 컬럼이 있을 때만 표시)

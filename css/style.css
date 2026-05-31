@@ -5484,9 +5484,7 @@ body {
    메가와리 리포트 패널
 ══════════════════════════════════════════════ */
 .mw-panel-body {
-    padding: 16px 12px 32px;
-    max-width: 900px;
-    margin: 0 auto;
+    padding: 16px 0 32px;
 }
 
 /* ── 빈 상태 ── */
@@ -5967,12 +5965,14 @@ img.mw-cr-thumb {
 .mw-shift-card { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; margin-bottom: 4px; border: 1px solid; }
 .mw-shift-card.up { background: #f0fdf4; border-color: #bbf7d0; }
 .mw-shift-card.dn { background: #fef2f2; border-color: #fecaca; }
-.mw-shift-icon { font-size: 16px; flex-shrink: 0; }
+.mw-shift-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.06); }
 .mw-shift-body { flex: 1; min-width: 0; }
-.mw-shift-name { font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mw-shift-name-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 1px; }
+.mw-shift-name { font-size: 11px; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+.mw-shift-plat { font-size: 9px; font-weight: 600; color: #6366f1; background: #eef2ff; border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
 .mw-shift-prod { font-size: 10px; color: #64748b; margin-bottom: 2px; }
-.mw-shift-metrics { font-size: 11px; color: #475569; line-height: 1.5; }
-.mw-shift-pct { font-size: 14px; font-weight: 800; flex-shrink: 0; align-self: center; }
+.mw-shift-metrics { font-size: 10px; color: #475569; line-height: 1.6; }
+.mw-shift-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; align-self: center; }
 .mw-shift-pct.up { color: #059669; }
 .mw-shift-pct.dn { color: #dc2626; }
 .mw-shift-empty { font-size: 11px; color: #94a3b8; padding: 6px 0; }

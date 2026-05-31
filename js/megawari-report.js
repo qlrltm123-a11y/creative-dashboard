@@ -62,20 +62,34 @@ function _diffBadge(curr, prev) {
     return `<span class="mw-diff flat">→</span>`;
 }
 
-// ── 메가와리 데이터 필터 ──────────────────────────────────────
+// ── 메가와리 데이터 필터 (캐시) ──────────────────────────────
+let _mwDataCache = null; // { src, brand, data }
 function _getMwData() {
     const raw = Array.isArray(window.allCreatives) ? window.allCreatives : [];
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : null;
+    if (_mwDataCache && _mwDataCache.src === raw && _mwDataCache.brand === brand) return _mwDataCache.data;
     let data = raw.filter(c => {
         const ev = (c.event || '').toLowerCase().replace(/\s/g, '');
         return ev.includes('megawari') || ev.includes('メガワリ') || ev.includes('mega');
     });
     if (brand) data = data.filter(c => c.brand === brand);
+    _mwDataCache = { src: raw, brand, data };
     return data;
 }
 
-// ── 날짜별 집계 ───────────────────────────────────────────────
+// 캐시 무효화 (데이터 새로고침 시 호출)
+function _invalidateMwCache() { _mwDataCache = null; _mwAggCache = null; }
+window._invalidateMwCache = _invalidateMwCache;
+
+// ── 날짜별 집계 (캐시) ────────────────────────────────────────
+let _mwAggCache = null; // { src, result }
 function _aggregateMw(data) {
+    if (_mwAggCache && _mwAggCache.src === data) return _mwAggCache.result;
+    const result = _aggregateMwImpl(data);
+    _mwAggCache = { src: data, result };
+    return result;
+}
+function _aggregateMwImpl(data) {
     const byDate = {};
     data.forEach(c => {
         const raw = c.start_date || c.date || '';
@@ -811,8 +825,10 @@ function _detectCreativeShifts(todayCreatives, prevCreatives, threshold) {
             return Math.abs(v) > Math.abs(best) ? v : best;
         }, 0);
         var item = {
-            name: key.slice(0, 30),
+            name: key.slice(0, 35),
             product: (c.product || '').slice(0, 12),
+            platform: (c.platform || '').slice(0, 15),
+            thumb: c.thumbnail_url || c.media_url || '',
             roasPct: roasPct, ctrPct: ctrPct,
             currRoas: currRoas, prevRoas: prevRoas,
             currCtr: currCtr, prevCtr: prevCtr,
@@ -836,19 +852,33 @@ function _buildShiftAlert(shifts) {
     }
     function renderCard(item, type) {
         var isUp = type === 'up';
+        // 썸네일
+        var thumbHtml = '';
+        if (item.thumb) {
+            var thumbSrc = item.thumb;
+            var m = thumbSrc.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || thumbSrc.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (m) thumbSrc = 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w120';
+            thumbHtml = '<img class="mw-shift-thumb" src="' + thumbSrc + '" alt="" onerror="this.style.display=\'none\'">';
+        }
+        // 지표 문자열
         var roasStr = item.roasPct !== null
             ? 'ROAS ' + (item.currRoas > 0 ? Math.round(item.currRoas * 100) + '%' : '-')
-              + ' (전일 ' + (item.prevRoas > 0 ? Math.round(item.prevRoas * 100) + '%' : '-')
-              + ', <b>' + fmtPct(item.roasPct) + '</b>)' : '';
+              + '→' + (item.prevRoas > 0 ? Math.round(item.prevRoas * 100) + '%' : '-')
+              + ' <b style="color:' + (isUp?'#059669':'#dc2626') + '">' + fmtPct(item.roasPct) + '</b>' : '';
         var ctrStr = item.ctrPct !== null
             ? 'CTR ' + (item.currCtr > 0 ? (item.currCtr * 100).toFixed(2) + '%' : '-')
-              + ' (전일 ' + (item.prevCtr > 0 ? (item.prevCtr * 100).toFixed(2) + '%' : '-')
-              + ', <b>' + fmtPct(item.ctrPct) + '</b>)' : '';
+              + '→' + (item.prevCtr > 0 ? (item.prevCtr * 100).toFixed(2) + '%' : '-')
+              + ' <b style="color:' + (isUp?'#059669':'#dc2626') + '">' + fmtPct(item.ctrPct) + '</b>' : '';
         var metrics = [roasStr, ctrStr].filter(Boolean).join(' &middot; ');
+        var platBadge = item.platform
+            ? '<span class="mw-shift-plat">' + item.platform + '</span>' : '';
         return '<div class="mw-shift-card ' + (isUp ? 'up' : 'dn') + '">'
-            + '<div class="mw-shift-icon">' + (isUp ? '📈' : '📉') + '</div>'
+            + thumbHtml
             + '<div class="mw-shift-body">'
-            + '<div class="mw-shift-name">' + item.name + '</div>'
+            + '<div class="mw-shift-name-row">'
+            + '<span class="mw-shift-name">' + item.name + '</span>'
+            + platBadge
+            + '</div>'
             + (item.product ? '<div class="mw-shift-prod">' + item.product + '</div>' : '')
             + '<div class="mw-shift-metrics">' + metrics + '</div>'
             + '</div>'
