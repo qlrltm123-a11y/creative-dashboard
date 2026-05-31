@@ -63,7 +63,12 @@ function _diffBadge(curr, prev) {
 }
 
 // ── 메가와리 데이터 필터 (캐시) ──────────────────────────────
-let _mwDataCache = null; // { src, brand, data }
+let _mwDataCache = null;   // { src, brand, data }
+let _mwAggCache  = null;   // { src, result }
+let _mwHtmlCache = {};     // { [dateKey]: htmlString }
+let _mwShiftCache = {};    // { [prevIso+'_'+selIso]: shifts }
+let _mwSortedDates = null; // 마지막 계산된 sortedDates
+
 function _getMwData() {
     const raw = Array.isArray(window.allCreatives) ? window.allCreatives : [];
     const brand = (typeof currentBrand !== 'undefined' && currentBrand !== 'ALL') ? currentBrand : null;
@@ -78,7 +83,10 @@ function _getMwData() {
 }
 
 // 캐시 무효화 (데이터 새로고침 시 호출)
-function _invalidateMwCache() { _mwDataCache = null; _mwAggCache = null; }
+function _invalidateMwCache() {
+    _mwDataCache = null; _mwAggCache = null;
+    _mwHtmlCache = {}; _mwShiftCache = {}; _mwSortedDates = null;
+}
 window._invalidateMwCache = _invalidateMwCache;
 
 // ── 날짜별 집계 (캐시) ────────────────────────────────────────
@@ -298,194 +306,40 @@ function buildReportText(dateIso, byDate) {
     return txt;
 }
 
-// ── 패널 렌더 ─────────────────────────────────────────────────
-function renderMegawariPanel() {
-    const container = document.getElementById('megawari-panel-body');
-    if (!container) return;
-
-    const mwData = _getMwData();
-    if (!mwData.length) {
-        container.innerHTML = `<div class="mw-empty"><i class="fas fa-fire text-3xl text-slate-200 mb-3"></i><p class="font-semibold text-slate-500">Megawari 이벤트 데이터가 없어요</p><p class="text-xs text-slate-400 mt-1">이벤트 필터에 "megawari" 항목이 있는 데이터를 불러와주세요</p></div>`;
-        return;
-    }
-
-    const byDate = _aggregateMw(mwData);
-    // 메가와리 기간(티저+본기간) 안에 있는 날짜만 탭에 표시
-    const periodStart = MW_PERIODS[0].start;
-    const periodEnd   = MW_PERIODS[MW_PERIODS.length - 1].end;
-    const sortedDates = Object.keys(byDate).sort()
-        .filter(iso => iso >= periodStart && iso <= periodEnd);
-    window._mwSelectedDate = window._mwSelectedDate && sortedDates.includes(window._mwSelectedDate)
-        ? window._mwSelectedDate : sortedDates[sortedDates.length - 1];
-
-    const sel = window._mwSelectedDate;
-    const today = byDate[sel];
-    const dayInfo = _getMwDayLabel(sel);
-    const prevIso = sortedDates[sortedDates.indexOf(sel) - 1];
-    const prev = prevIso ? byDate[prevIso] : null;
-
-    // ── 날짜 탭 ───────────────────────────────────────────────
-    let dateTabs = '';
+// ── 날짜 탭 HTML 생성 (분리) ──────────────────────────────────
+function _buildDateTabs(sortedDates, sel, byDate) {
+    let html = '';
     let lastKey = null;
     sortedDates.forEach(iso => {
         const info = _getMwDayLabel(iso);
         if (info.period?.key !== lastKey) {
             lastKey = info.period?.key || null;
-            if (info.period) dateTabs += `<span class="mw-period-chip" style="color:${info.period.color};border-color:${info.period.color}20;background:${info.period.color}0d">${info.badge} ${info.period.label}</span>`;
+            if (info.period) html += `<span class="mw-period-chip" style="color:${info.period.color};border-color:${info.period.color}20;background:${info.period.color}0d">${info.badge} ${info.period.label}</span>`;
         }
         const isActive = iso === sel;
-        dateTabs += `<button class="mw-date-tab${isActive?' active':''}" onclick="_mwSelectDate('${iso}')"
+        html += `<button class="mw-date-tab${isActive?' active':''}" onclick="_mwSelectDate('${iso}')"
             style="${isActive?`border-color:${info.color};box-shadow:0 0 0 3px ${info.color}22`:''}" >
             <span class="mw-dtab-d" style="color:${info.color}">${info.label}</span>
             <span class="mw-dtab-date">${info.sub}</span>
         </button>`;
     });
+    return html;
+}
 
-    // ── 기간 판단 (전체에서 공유) ────────────────────────────
+// ── 본문 HTML 생성 (날짜별 캐시) ─────────────────────────────
+function _buildMwBodyHtml(sel, byDate, sortedDates) {
+    if (_mwHtmlCache[sel]) return _mwHtmlCache[sel];
+
+    const today  = byDate[sel];
+    const prevIso = sortedDates[sortedDates.indexOf(sel) - 1];
+    const prev   = prevIso ? byDate[prevIso] : null;
+    const dayInfo = _getMwDayLabel(sel);
     const isTeaser = dayInfo.period?.key === 'teaser';
     const hasAtc   = today.creatives.some(c => (c.add_to_cart||0) > 0);
     const useAtc   = isTeaser && hasAtc;
 
-    // ── 제품 × 매체 테이블 ────────────────────────────────────
-    const prods = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
-    // 전체 매체 목록
-    const allPlats = [...new Set(prods.flatMap(([,p]) => Object.keys(p.byPlatform)))].sort();
-
-    // 테이블 헤더: 티저면 장바구니 담기 컬럼 추가
-    const tableHead = `<thead><tr>
-        <th class="mw-th mw-th-prod">제품</th>
-        <th class="mw-th">ROAS</th>
-        ${isTeaser ? `<th class="mw-th" title="장바구니 담기 건수 및 율">담기</th>` : ''}
-        <th class="mw-th">CTR</th>
-        <th class="mw-th">매출</th>
-        ${allPlats.map(pl=>`<th class="mw-th mw-th-plat">${pl}</th>`).join('')}
-    </tr></thead>`;
-
-    const tableBody = prods.map(([name, p]) => {
-        const platCells = allPlats.map(pl => {
-            const v = p.byPlatform[pl];
-            if (!v || v.roas === 0) return `<td class="mw-td mw-td-plat"><span class="text-slate-300">-</span></td>`;
-            const mainMetric = isTeaser
-                ? `<span class="mw-cell-roas ${_atcClass(v.add_to_cart||0)}">${_fmtAtc(v.add_to_cart||0, v.atc_rate)}</span>`
-                : `<span class="mw-cell-roas ${_roasClass(v.roas)}">${_fmtRoas(v.roas)}</span>`;
-            return `<td class="mw-td mw-td-plat">
-                ${mainMetric}
-                <span class="mw-cell-ctr">${_fmtCtr(v.ctr)}</span>
-            </td>`;
-        }).join('');
-
-        // 해당 제품 TOP 소재 (티저: 담기 건수 기준)
-        const sortedP = p.creatives
-            .filter(c => useAtc ? (c.add_to_cart||0)>0 : (c.roas||0)>0)
-            .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
-        const top = sortedP[0];
-        const bot = !useAtc && sortedP.length > 1 && (sortedP[sortedP.length-1].roas||0) < 1
-            ? sortedP[sortedP.length-1] : null;
-
-        return `<tr class="mw-tr">
-            <td class="mw-td mw-td-prod">
-                <div class="mw-prod-name">${name}</div>
-                ${top ? `<div class="mw-prod-top">🏆 ${(top.ad_name||top.creative_name||'').slice(0,20)}</div>` : ''}
-                ${bot ? `<div class="mw-prod-bot">⚠️ ${(bot.ad_name||bot.creative_name||'').slice(0,20)}</div>` : ''}
-            </td>
-            <td class="mw-td"><span class="mw-roas-badge ${_roasClass(p.roas)}">${_fmtRoas(p.roas)}</span>${_diffBadge(p.roas, prev?.byProduct?.[name]?.roas)}</td>
-            ${isTeaser ? `<td class="mw-td mw-td-num"><span class="mw-roas-badge ${_atcClass(p.add_to_cart||0)}">${_fmtAtc(p.add_to_cart||0, p.atc_rate)}</span></td>` : ''}
-            <td class="mw-td mw-td-num">${_fmtCtr(p.ctr)}</td>
-            <td class="mw-td mw-td-num">${_fmtMoney(p.revenue)}</td>
-            ${platCells}
-        </tr>`;
-    }).join('');
-
-    // ── 소재 리스트 (티저: 장바구니 담기 건수 기준 / 본기간: ROAS) ─
-
-    // Meta / TikTok 단건 소재만 대상
-    const _isSinglePlat = c => /meta|tiktok|틱톡/i.test(c.platform||'');
-
-    // 고효율: 담기 건수 내림차순 → 율 보조
-    const sortedC = today.creatives
-        .filter(c => _isSinglePlat(c) && (useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0))
-        .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
-
-    // ── 썸네일 헬퍼 ───────────────────────────────────────
-    const _mwThumb = (c) => {
-        const raw = c.thumbnail_url || c.media_url || '';
-        const fallback = `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
-        if (!raw) return fallback;
-        if (typeof window.buildDriveImgHtml === 'function') {
-            return window.buildDriveImgHtml(raw, { className: 'mw-cr-thumb', alt: '', style: '' });
-        }
-        return `<img class="mw-cr-thumb" src="${raw}" alt="" onerror="this.outerHTML='${fallback.replace(/'/g,"&#39;")}'">`;
-    };
-
-    // ── 고효율: 개별 소재 TOP5 ───────────────────────────
-    const topCreativeIds = new Set(sortedC.slice(0,5).map(c => c.ad_name||c.creative_name||''));
-
-    const topRows = sortedC.slice(0, 5).map(c => {
-        const cnt  = c.add_to_cart||0;
-        const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
-        const metricHtml = useAtc
-            ? `<span class="mw-cr-roas ${_atcClass(cnt)}">${_fmtAtc(cnt, rate)}</span>`
-            : `<span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>`;
-        return `
-        <div class="mw-creative-item top">
-            ${_mwThumb(c)}
-            <div class="mw-cr-info">
-                <span class="mw-cr-prod-badge">${(c.product||'기타').slice(0,10)}</span>
-                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
-            </div>
-            ${metricHtml}
-        </div>`;
-    }).join('');
-
-    // ── 저효율: 담기 0건 (고효율에 없는 소재, 클릭 많은 순) ──
-    const worstC = useAtc
-        ? today.creatives
-            .filter(c => {
-                const nm = c.ad_name||c.creative_name||'';
-                return _isSinglePlat(c) && (c.add_to_cart||0) === 0 && !topCreativeIds.has(nm);
-            })
-            .sort((a,b) => (b.clicks||0) - (a.clicks||0))
-            .slice(0, 5)
-        : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
-
-    const botRows = worstC.map(c => {
-        const cnt  = c.add_to_cart||0;
-        const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
-        const metricHtml = useAtc
-            ? `<span class="mw-cr-roas roas-bad">${_fmtAtc(cnt, rate)}</span>`
-            : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
-        return `
-        <div class="mw-creative-item bot">
-            ${_mwThumb(c)}
-            <div class="mw-cr-info">
-                <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'').slice(0,8)||'기타'}</span>
-                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
-            </div>
-            ${metricHtml}
-        </div>`;
-    }).join('');
-
-    // ── 카카오 설정 상태 ──────────────────────────────────────
-    const kakaoKey    = localStorage.getItem('mw_kakao_app_key')       || '';
-    const kakaoSecret = localStorage.getItem('mw_kakao_client_secret') || '';
-    const kakaoToken  = localStorage.getItem('mw_kakao_refresh_token') || '';
-    const kakaoTime   = localStorage.getItem('mw_kakao_send_time')     || '09:00';
-    const kakaoEnabled = localStorage.getItem('mw_kakao_enabled') === '1';
-    const vercelUrl = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
-
-    const kakaoStatus = kakaoKey && kakaoToken
-        ? `<span class="mw-kakao-ok">✅ 연결됨 — 매일 ${kakaoTime} 자동발송${kakaoEnabled?' 켜짐':' 꺼짐'}</span>`
-        : `<span class="mw-kakao-warn">⚙️ 카카오 설정 필요</span>`;
-
-    // AI 코멘트
-    const aiComment = _genAiComment(today, prev, dayInfo, sel);
-
-    container.innerHTML = `
-    <!-- 날짜 탭 -->
-    <div class="mw-date-tabs">${dateTabs}</div>
-
-    <!-- KPI 바 -->
-    <div class="mw-kpi-bar">
+    // ── KPI 바 ───────────────────────────────────────────────
+    const kpiHtml = `<div class="mw-kpi-bar">
         <div class="mw-kpi-item">
             <div class="mw-kpi-lbl">전체 ROAS</div>
             <div class="mw-kpi-val ${_roasClass(today.roas)}">${_fmtRoas(today.roas)}</div>
@@ -506,8 +360,100 @@ function renderMegawariPanel() {
             <div class="mw-kpi-val">${_fmtMoney(today.spend)}</div>
             <div class="mw-kpi-unit">원</div>
         </div>
-    </div>
+    </div>`;
 
+    // ── AI 코멘트 ───────────────────────────────────────────
+    const aiComment = _genAiComment(today, prev, dayInfo, sel);
+
+    // ── 제품 × 매체 테이블 ──────────────────────────────────
+    const prods   = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
+    const allPlats = [...new Set(prods.flatMap(([,p]) => Object.keys(p.byPlatform)))].sort();
+    const tableHead = `<thead><tr>
+        <th class="mw-th mw-th-prod">제품</th>
+        <th class="mw-th">ROAS</th>
+        ${isTeaser ? `<th class="mw-th" title="장바구니 담기">담기</th>` : ''}
+        <th class="mw-th">CTR</th>
+        <th class="mw-th">매출</th>
+        ${allPlats.map(pl=>`<th class="mw-th mw-th-plat">${pl}</th>`).join('')}
+    </tr></thead>`;
+    const tableBody = prods.map(([name, p]) => {
+        const platCells = allPlats.map(pl => {
+            const v = p.byPlatform[pl];
+            if (!v || v.roas === 0) return `<td class="mw-td mw-td-plat"><span class="text-slate-300">-</span></td>`;
+            const mainMetric = isTeaser
+                ? `<span class="mw-cell-roas ${_atcClass(v.add_to_cart||0)}">${_fmtAtc(v.add_to_cart||0, v.atc_rate)}</span>`
+                : `<span class="mw-cell-roas ${_roasClass(v.roas)}">${_fmtRoas(v.roas)}</span>`;
+            return `<td class="mw-td mw-td-plat">${mainMetric}<span class="mw-cell-ctr">${_fmtCtr(v.ctr)}</span></td>`;
+        }).join('');
+        const sortedP = p.creatives.filter(c => useAtc ? (c.add_to_cart||0)>0 : (c.roas||0)>0)
+            .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
+        const top = sortedP[0];
+        const bot = !useAtc && sortedP.length > 1 && (sortedP[sortedP.length-1].roas||0) < 1 ? sortedP[sortedP.length-1] : null;
+        return `<tr class="mw-tr">
+            <td class="mw-td mw-td-prod">
+                <div class="mw-prod-name">${name}</div>
+                ${top ? `<div class="mw-prod-top">🏆 ${(top.ad_name||top.creative_name||'').slice(0,20)}</div>` : ''}
+                ${bot ? `<div class="mw-prod-bot">⚠️ ${(bot.ad_name||bot.creative_name||'').slice(0,20)}</div>` : ''}
+            </td>
+            <td class="mw-td"><span class="mw-roas-badge ${_roasClass(p.roas)}">${_fmtRoas(p.roas)}</span>${_diffBadge(p.roas, prev?.byProduct?.[name]?.roas)}</td>
+            ${isTeaser ? `<td class="mw-td mw-td-num"><span class="mw-roas-badge ${_atcClass(p.add_to_cart||0)}">${_fmtAtc(p.add_to_cart||0, p.atc_rate)}</span></td>` : ''}
+            <td class="mw-td mw-td-num">${_fmtCtr(p.ctr)}</td>
+            <td class="mw-td mw-td-num">${_fmtMoney(p.revenue)}</td>
+            ${platCells}
+        </tr>`;
+    }).join('');
+
+    // ── 소재 변동 감지 (캐시) ───────────────────────────────
+    const shiftKey = `${prevIso||''}__${sel}`;
+    if (!_mwShiftCache[shiftKey]) {
+        _mwShiftCache[shiftKey] = _buildShiftAlert(_detectCreativeShifts(
+            today.creatives || [], prev ? prev.creatives || [] : []));
+    }
+    const shiftHtml = _mwShiftCache[shiftKey];
+
+    // ── 소재 리스트 ─────────────────────────────────────────
+    const _isSinglePlat = c => /meta|tiktok|틱톡/i.test(c.platform||'');
+    const sortedC = today.creatives
+        .filter(c => _isSinglePlat(c) && (useAtc ? (c.add_to_cart||0) > 0 : (c.roas||0) > 0))
+        .sort((a,b) => useAtc ? _atcScore(b)-_atcScore(a) : (b.roas||0)-(a.roas||0));
+    const topCreativeIds = new Set(sortedC.slice(0,5).map(c => c.ad_name||c.creative_name||''));
+    const topRows = sortedC.slice(0,5).map(c => {
+        const cnt  = c.add_to_cart||0; const rate = (c.clicks||0)>0 ? cnt/c.clicks : 0;
+        const metricHtml = useAtc
+            ? `<span class="mw-cr-roas ${_atcClass(cnt)}">${_fmtAtc(cnt, rate)}</span>`
+            : `<span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>`;
+        const raw = c.thumbnail_url || c.media_url || '';
+        let thumbSrc = raw;
+        const m = raw.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || raw.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (m) thumbSrc = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120`;
+        const thumbHtml = thumbSrc
+            ? `<img class="mw-cr-thumb" src="${thumbSrc}" alt="" loading="lazy" onerror="this.style.display='none'">`
+            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
+        return `<div class="mw-creative-item top">${thumbHtml}
+            <div class="mw-cr-info">
+                <span class="mw-cr-prod-badge">${(c.product||'기타').slice(0,10)}</span>
+                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            </div>${metricHtml}</div>`;
+    }).join('');
+    const worstC = useAtc
+        ? today.creatives.filter(c => { const nm=c.ad_name||c.creative_name||''; return _isSinglePlat(c)&&(c.add_to_cart||0)===0&&!topCreativeIds.has(nm); })
+            .sort((a,b)=>(b.clicks||0)-(a.clicks||0)).slice(0,5)
+        : sortedC.filter(c=>(c.roas||0)<1).slice(-3).reverse();
+    const botRows = worstC.map(c => {
+        const cnt=c.add_to_cart||0; const rate=(c.clicks||0)>0?cnt/c.clicks:0;
+        const metricHtml = useAtc
+            ? `<span class="mw-cr-roas roas-bad">${_fmtAtc(cnt, rate)}</span>`
+            : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
+        return `<div class="mw-creative-item bot">
+            <div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>
+            <div class="mw-cr-info">
+                <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'기타').slice(0,8)}</span>
+                <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
+            </div>${metricHtml}</div>`;
+    }).join('');
+
+    const html = `
+    ${kpiHtml}
     <!-- ROW 1: AI 코멘트(좌) + D+N 차트(우) -->
     <div class="mw-row-ab">
         <div class="mw-ai-box mw-row-ab-a">
@@ -521,13 +467,11 @@ function renderMegawariPanel() {
             </div>
         </div>
     </div>
-
-    <!-- ROW 2: 제품별 성과 테이블 (전체 폭) -->
+    <!-- ROW 2: 제품별 성과 테이블 -->
     <div class="mw-section-hd">📊 제품별 성과 (매체 교차)</div>
     <div class="mw-table-wrap mb-4">
         <table class="mw-table">${tableHead}<tbody>${tableBody}</tbody></table>
     </div>
-
     <!-- ROW 3: 제품 비교 카드 + 소재 변동 감지 -->
     <div class="mw-row-cd">
         <div class="mw-row-cd-a">
@@ -536,31 +480,72 @@ function renderMegawariPanel() {
         </div>
         <div class="mw-row-cd-b">
             <div class="mw-section-hd">🚨 소재 변동 감지 <span style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-weight:600">전일 대비 ±30%</span></div>
-            <div class="mw-shift-wrap">${_buildShiftAlert(_detectCreativeShifts(today ? today.creatives || [] : [], prev ? prev.creatives || [] : []))}</div>
+            <div class="mw-shift-wrap">${shiftHtml}</div>
         </div>
     </div>
-
     <!-- ROW 4: 고효율/저효율 소재 -->
     <div class="mw-two-col">
         <div>
-            <div class="mw-section-hd">
-                🏆 고효율 소재 TOP5
+            <div class="mw-section-hd">🏆 고효율 소재 TOP5
                 <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'장바구니 담기 기준':'ROAS 기준'}</span>
                 <span class="mw-metric-badge roas" style="background:#f1f5f9;color:#475569">Meta·TikTok</span>
             </div>
             <div class="mw-creative-list">${topRows||'<p class="mw-no-data">데이터 없음</p>'}</div>
         </div>
         <div>
-            <div class="mw-section-hd">
-                ⚠️ 저효율 소재
+            <div class="mw-section-hd">⚠️ 저효율 소재
                 <span class="mw-metric-badge ${useAtc?'atc':'roas'}">${useAtc?'담기 0건':'ROAS 기준'}</span>
                 <span class="mw-metric-badge roas" style="background:#f1f5f9;color:#475569">Meta·TikTok</span>
             </div>
             <div class="mw-creative-list">${botRows||'<p class="mw-no-data">없음 👍</p>'}</div>
         </div>
-    </div>
+    </div>`;
 
-    <!-- 카카오 자동발송 설정 -->
+    _mwHtmlCache[sel] = html;
+    return html;
+}
+
+// ── 패널 렌더 (초기 / 전체 재렌더) ──────────────────────────
+function renderMegawariPanel() {
+    const container = document.getElementById('megawari-panel-body');
+    if (!container) return;
+
+    const mwData = _getMwData();
+    if (!mwData.length) {
+        container.innerHTML = `<div class="mw-empty"><i class="fas fa-fire text-3xl text-slate-200 mb-3"></i><p class="font-semibold text-slate-500">Megawari 이벤트 데이터가 없어요</p><p class="text-xs text-slate-400 mt-1">이벤트 필터에 "megawari" 항목이 있는 데이터를 불러와주세요</p></div>`;
+        return;
+    }
+
+    const byDate = _aggregateMw(mwData);
+    const periodStart = MW_PERIODS[0].start;
+    const periodEnd   = MW_PERIODS[MW_PERIODS.length - 1].end;
+    const sortedDates = Object.keys(byDate).sort()
+        .filter(iso => iso >= periodStart && iso <= periodEnd);
+    _mwSortedDates = sortedDates;
+
+    window._mwSelectedDate = window._mwSelectedDate && sortedDates.includes(window._mwSelectedDate)
+        ? window._mwSelectedDate : sortedDates[sortedDates.length - 1];
+
+    const sel = window._mwSelectedDate;
+
+    // ── 카카오 설정 (렌더마다 최신 값) ──────────────────────
+    const kakaoKey    = localStorage.getItem('mw_kakao_app_key')       || '';
+    const kakaoToken  = localStorage.getItem('mw_kakao_refresh_token') || '';
+    const kakaoSecret = localStorage.getItem('mw_kakao_client_secret') || '';
+    const kakaoTime   = localStorage.getItem('mw_kakao_send_time')     || '09:00';
+    const kakaoEnabled = localStorage.getItem('mw_kakao_enabled') === '1';
+    const vercelUrl = (localStorage.getItem('hf_vercel_url') || '').replace(/\/$/, '');
+    const kakaoStatus = kakaoKey && kakaoToken
+        ? `<span class="mw-kakao-ok">✅ 연결됨 — 매일 ${kakaoTime} 자동발송${kakaoEnabled?' 켜짐':' 꺼짐'}</span>`
+        : `<span class="mw-kakao-warn">⚙️ 카카오 설정 필요</span>`;
+
+    // ── 날짜 탭 + 본문(캐시) ─────────────────────────────────
+    const dateTabs = _buildDateTabs(sortedDates, sel, byDate);
+    const bodyHtml = _buildMwBodyHtml(sel, byDate, sortedDates);
+
+    container.innerHTML = `
+    <div class="mw-date-tabs">${dateTabs}</div>
+    ${bodyHtml}
     <details class="mw-kakao-wrap" ${!kakaoKey&&!kakaoToken?'open':''}>
         <summary class="mw-kakao-summary">
             <i class="fas fa-comment" style="color:#3b1f1f"></i>
@@ -589,13 +574,10 @@ function renderMegawariPanel() {
                     <p class="font-semibold text-sm mb-1">카카오 로그인 → Refresh Token 발급</p>
                     <p class="text-xs text-slate-500 mb-2">로그인 후 나에게 보내기 권한(talk_message)을 허용해주세요</p>
                     <div class="flex gap-2 mb-2">
-                        <button class="mw-kakao-btn kakao-yellow" onclick="_mwKakaoLogin()">
-                            카카오 로그인
-                        </button>
+                        <button class="mw-kakao-btn kakao-yellow" onclick="_mwKakaoLogin()">카카오 로그인</button>
                         ${kakaoToken ? `<span class="text-xs text-emerald-600 self-center">✅ 토큰 저장됨</span>` : ''}
                     </div>
-                    ${kakaoToken ? `<p class="text-xs text-slate-500">Refresh Token (Vercel 환경변수 <code>KAKAO_REFRESH_TOKEN</code>에도 등록):</p>
-                    <input type="text" class="mw-kakao-input w-full mt-1" value="${kakaoToken}" readonly onclick="this.select()">` : ''}
+                    ${kakaoToken ? `<p class="text-xs text-slate-500">Refresh Token:</p><input type="text" class="mw-kakao-input w-full mt-1" value="${kakaoToken}" readonly onclick="this.select()">` : ''}
                 </div>
             </div>
             <div class="mw-kakao-step">
@@ -614,30 +596,69 @@ function renderMegawariPanel() {
                             <i class="fas fa-paper-plane mr-1"></i>지금 바로 전송
                         </button>
                     </div>
-                    ${vercelUrl ? `<p class="text-xs text-slate-400 mt-2">Vercel Cron 엔드포인트: <code>${vercelUrl}/api/megawari-cron</code></p>` : '<p class="text-xs text-amber-600 mt-2">⚠️ Vercel URL이 설정되어야 자동발송이 작동합니다 (광고 생성 탭에서 설정)</p>'}
+                    ${vercelUrl ? `<p class="text-xs text-slate-400 mt-2">Vercel Cron: <code>${vercelUrl}/api/megawari-cron</code></p>` : '<p class="text-xs text-amber-600 mt-2">⚠️ Vercel URL 설정 필요 (광고 생성 탭)</p>'}
                 </div>
             </div>
         </div>
     </details>
-
-    <!-- 하단 버튼 -->
     <div class="mw-share-bar">
-        <button class="mw-btn-copy" onclick="_mwCopyReport()">
-            <i class="fas fa-copy mr-1.5"></i>리포트 복사
-        </button>
-        <button class="mw-btn-kakao" onclick="_mwSendNow()">
-            <i class="fas fa-comment mr-1.5"></i>카카오 전송
-        </button>
+        <button class="mw-btn-copy" onclick="_mwCopyReport()"><i class="fas fa-copy mr-1.5"></i>리포트 복사</button>
+        <button class="mw-btn-kakao" onclick="_mwSendNow()"><i class="fas fa-comment mr-1.5"></i>카카오 전송</button>
     </div>`;
 
     _renderMwRoasChart(byDate, sortedDates);
 }
 
-// ── 날짜 선택 ─────────────────────────────────────────────────
+// ── 날짜 선택 (빠른 전환: 탭 토글 + 본문만 교체) ───────────
 function _mwSelectDate(iso) {
+    if (window._mwSelectedDate === iso) return; // 동일 날짜 클릭 무시
     window._mwSelectedDate = iso;
-    renderMegawariPanel();
-    setTimeout(() => document.querySelector('.mw-date-tab.active')?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}), 50);
+
+    const container = document.getElementById('megawari-panel-body');
+    const mwData = _getMwData();
+    if (!container || !mwData.length) { renderMegawariPanel(); return; }
+
+    const byDate = _aggregateMw(mwData);
+    const sortedDates = _mwSortedDates || Object.keys(byDate).sort();
+
+    // 1. 날짜 탭 active 클래스만 DOM 직접 업데이트
+    const tabs = container.querySelectorAll('.mw-date-tab');
+    tabs.forEach(btn => {
+        const btnIso = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        if (!btnIso) return;
+        const info = _getMwDayLabel(btnIso);
+        const isActive = btnIso === iso;
+        btn.className = `mw-date-tab${isActive ? ' active' : ''}`;
+        btn.style.borderColor = isActive ? info.color : '';
+        btn.style.boxShadow   = isActive ? `0 0 0 3px ${info.color}22` : '';
+    });
+    setTimeout(() => container.querySelector('.mw-date-tab.active')?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}), 30);
+
+    // 2. 본문은 캐시 or 새로 빌드 후 교체 (날짜탭 제외한 영역)
+    const bodyHtml = _buildMwBodyHtml(iso, byDate, sortedDates);
+
+    // 날짜탭 다음 형제부터 카카오/버튼 직전까지 교체
+    const tabsEl  = container.querySelector('.mw-date-tabs');
+    const kakaoEl = container.querySelector('.mw-kakao-wrap');
+    const shareEl = container.querySelector('.mw-share-bar');
+
+    // 날짜탭과 카카오/버튼 사이의 기존 노드 제거
+    if (tabsEl && kakaoEl) {
+        let node = tabsEl.nextSibling;
+        while (node && node !== kakaoEl) {
+            const next = node.nextSibling;
+            container.removeChild(node);
+            node = next;
+        }
+        // 새 본문 삽입
+        const tmp = document.createElement('div');
+        tmp.innerHTML = bodyHtml;
+        while (tmp.firstChild) container.insertBefore(tmp.firstChild, kakaoEl);
+    } else {
+        renderMegawariPanel(); return;
+    }
+
+    _renderMwRoasChart(byDate, sortedDates);
 }
 window._mwSelectDate = _mwSelectDate;
 
