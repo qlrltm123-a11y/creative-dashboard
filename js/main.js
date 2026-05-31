@@ -75,31 +75,48 @@ async function loadData() {
 // 시트 연동 후 전역 갱신을 위해 노출
 window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
-    window._creativeFatigue = detectCreativeFatigue(allCreatives); // ★ 소재 피로도 감지
-    invalidatePerformancePoolCache(); // ★ 데이터 갱신 시 풀 캐시 무효화
-    if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache(); // ★ 메가와리 캐시 무효화
-    if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache(); // ★ 주간 보고서 갱신
-    populatePlatformOptions(); // ★ 매체(Platform) 옵션 먼저 (브랜드별 가용 매체 갱신)
-    populateRetailOptions();   // ★ Retail 채널 옵션 (retail 컬럼이 있을 때만 표시)
-    populateEventOptions();    // ★ Event 옵션 (event 컬럼이 있을 때만 표시)
-    populateCampaignOptions(); // ★ 전역 캠페인 옵션 (매체 필터 적용 후 갱신)
-    populatePerformanceFilterOptions(); // ★ 성과 분석 섹션 필터
-    populateAiFilterOptions();           // ★ AI 인사이트 섹션 필터
-    populateWinningProductOptions();     // ★ 위닝 요소 인사이트 제품 필터
-    updateKPIs();
-    updateCharts();
-    // renderProductKPIs(); // 제거됨 (제품별 성과 요약 섹션 제거)
+    invalidatePerformancePoolCache();
+    if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache();
+    if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache();
+
+    // ① 피로도 감지는 백그라운드로 (메인 스레드 비차단)
+    setTimeout(() => { window._creativeFatigue = detectCreativeFatigue(allCreatives); }, 0);
+
+    // ② 현재 탭 외 섹션은 stale 마킹 → 다음 진입 시 재렌더
+    Object.keys(_renderedSections).forEach(k => {
+        if (k !== 'overview' && k !== _currentSection) _renderedSections[k] = false;
+    });
+
+    // ③ 필터 옵션 갱신 (select DOM 재구성 — 빠름)
+    populatePlatformOptions();
+    populateRetailOptions();
+    populateEventOptions();
+    populateCampaignOptions();
+    populatePerformanceFilterOptions();
+    populateAiFilterOptions();
+    populateWinningProductOptions();
     populateProductOptions();
     populateAppealInsightProductOptions();
     populatePlatformMatrixProductOptions();
-    if (_renderedSections.performance) {
+
+    // ④ 개요 탭은 항상 즉시 갱신 (KPI + 차트 + 위닝 요소)
+    updateKPIs();
+    updateCharts(); // renderWinningElements 포함
+
+    // ⑤ 현재 활성 섹션만 렌더 (비활성 섹션은 절대 렌더하지 않음)
+    if (_currentSection === 'performance') {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
         renderProductPerformance();
-    } else {
-        renderProductPerformance();
+    } else if (_currentSection === 'ai') {
+        if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
+    } else if (_currentSection === 'megawari') {
+        if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
+    } else if (_currentSection === 'weekly') {
+        if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
     }
-    if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
+    // overview: updateKPIs + updateCharts 만으로 충분 (renderProductPerformance 불필요)
+
     document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
 };
 
@@ -396,7 +413,9 @@ function switchSection(sectionName) {
         p.classList.toggle('active', p.dataset.panel === sectionName);
     });
 
-    // ★ Lazy render: 첫 진입 시에만 렌더 (이후엔 필터 변경 시에만 갱신)
+    // ★ stale(_renderedSections=false) 이거나 첫 진입이면 렌더
+    //   updateDashboard에서 브랜드 변경 시 비활성 섹션을 false로 마킹해두므로
+    //   탭 전환 시 자동으로 최신 데이터로 재렌더됨
     if (!_renderedSections[sectionName]) {
         _renderedSections[sectionName] = true;
         const panel = document.querySelector(`.section-panel[data-panel="${sectionName}"]`);
@@ -1152,8 +1171,6 @@ function updateKPIs() {
     // ★ 가중평균 CTR = 전체 clicks / 전체 impressions (단순 평균보다 정확)
     const avgCtrRatio = impressions > 0 ? (clicks / impressions) : 0;
     const roasRatio   = spend > 0 ? (revenue / spend) : 0;
-
-    console.log(`[KPI] brand=${currentBrand} event=${currentEvent} | 소재${list.length}개 | 광고비₩${Math.round(spend).toLocaleString()} | 노출${impressions.toLocaleString()} | ROAS${Math.round(roasRatio*100)}%`);
 
     // 노출/클릭/전환 — 풀 콤마 + 보조 한국어 단위
     document.getElementById('kpi-impressions').innerHTML = formatKpiCount(impressions);
@@ -3567,8 +3584,6 @@ function renderProductPerformance() {
     if (!bestEl) return;
 
     const { data: dataArr, isAllPlatform } = _getPerfData();
-
-    console.log(`[BEST TOP5] 소재수=${dataArr.length} | brand=${currentBrand} | platform=${currentPlatform} | event=${currentEvent}`);
 
     if (!dataArr.length) {
         if (summaryEl) summaryEl.innerHTML = '';

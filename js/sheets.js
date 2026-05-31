@@ -216,11 +216,6 @@ function csvToObjects(csvText) {
     // 별칭 매핑 적용
     const headers = rawHeaders.map(h => COLUMN_ALIASES[h] || h);
 
-    // 🔍 진단 로그: 어떤 헤더가 인식됐는지 확인
-    console.log('[Sheets] 원본 헤더:', rawHeaders);
-    console.log('[Sheets] 매핑된 헤더:', headers);
-    console.log('[Sheets] 데이터 행 수:', rows.length - 1);
-
     const numberFields = ['impressions', 'clicks', 'ctr', 'spend', 'conversions', 'cpa', 'roas', 'revenue', 'cpc', 'cvr', 'add_to_cart', 'atc_rate', 'cost_per_atc'];
     const arrayFields = ['appeal_points', 'hook_type', 'target_emotion'];
 
