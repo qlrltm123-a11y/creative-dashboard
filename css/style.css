@@ -5405,6 +5405,55 @@ body {
     color: #94a3b8;
     line-height: 1.2;
 }
+.mw-dtab-roas {
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-top: 1px;
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+/* 날짜 탭 ROAS는 background 제거 - 색상만 */
+.mw-dtab-roas.roas-high { color: #059669; background: #f0fdf4; }
+.mw-dtab-roas.roas-mid  { color: #2563eb; background: #eff6ff; }
+.mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
+.mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
+
+/* ── 이벤트 전체 누적 KPI 바 ── */
+.mw-event-total {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 14px;
+    font-size: 12px;
+}
+.mw-event-total-lbl {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    white-space: nowrap;
+    margin-right: 4px;
+}
+.mw-event-kpi {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+.mw-event-kpi span {
+    font-size: 10.5px;
+    color: #94a3b8;
+}
+.mw-event-kpi strong {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #334155;
+}
 
 /* ── KPI 바 ── */
 .mw-kpi-bar {

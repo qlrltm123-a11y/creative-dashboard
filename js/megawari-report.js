@@ -315,6 +315,32 @@ function buildReportText(dateIso, byDate) {
     return txt;
 }
 
+// ── 이벤트 전체 누적 KPI 바 ───────────────────────────────────
+function _buildEventTotalBar(byDate, sortedDates) {
+    let spend = 0, revenue = 0, impr = 0, clicks = 0, atc = 0;
+    sortedDates.forEach(iso => {
+        const d = byDate[iso]; if (!d) return;
+        spend   += d.spend       || 0;
+        revenue += d.revenue     || 0;
+        impr    += d.impressions || 0;
+        clicks  += d.clicks      || 0;
+        atc     += d.add_to_cart || 0;
+    });
+    const roas = spend > 0 ? revenue / spend : 0;
+    const ctr  = impr  > 0 ? clicks  / impr  : 0;
+    const days = sortedDates.length;
+
+    return `<div class="mw-event-total">
+        <span class="mw-event-total-lbl">이벤트 전체 (${days}일)</span>
+        <span class="mw-event-kpi"><span>ROAS</span><strong class="${_roasClass(roas)}" style="font-size:13px">${_fmtRoas(roas)}</strong></span>
+        <span class="mw-event-kpi"><span>광고비</span><strong>${_fmtKRW(spend)}</strong></span>
+        <span class="mw-event-kpi"><span>매출</span><strong>${_fmtKRW(revenue)}</strong></span>
+        <span class="mw-event-kpi"><span>CTR</span><strong>${_fmtCtr(ctr)}</strong></span>
+        <span class="mw-event-kpi"><span>클릭</span><strong>${clicks.toLocaleString()}</strong></span>
+        ${atc > 0 ? `<span class="mw-event-kpi"><span>장바구니</span><strong>${atc}건</strong></span>` : ''}
+    </div>`;
+}
+
 // ── 날짜 탭 HTML 생성 (분리) ──────────────────────────────────
 function _buildDateTabs(sortedDates, sel, byDate) {
     let html = '';
@@ -326,10 +352,13 @@ function _buildDateTabs(sortedDates, sel, byDate) {
             if (info.period) html += `<span class="mw-period-chip" style="color:${info.period.color};border-color:${info.period.color}20;background:${info.period.color}0d">${info.badge} ${info.period.label}</span>`;
         }
         const isActive = iso === sel;
+        const dayRoas  = byDate[iso]?.roas || 0;
+        const roasCls  = _roasClass(dayRoas);
         html += `<button class="mw-date-tab${isActive?' active':''}" onclick="_mwSelectDate('${iso}')"
             style="${isActive?`border-color:${info.color};box-shadow:0 0 0 3px ${info.color}22`:''}" >
             <span class="mw-dtab-d" style="color:${info.color}">${info.label}</span>
             <span class="mw-dtab-date">${info.sub}</span>
+            <span class="mw-dtab-roas ${roasCls}">${dayRoas > 0 ? _fmtRoas(dayRoas) : '-'}</span>
         </button>`;
     });
     return html;
@@ -724,12 +753,14 @@ function renderMegawariPanel() {
         ? `<span class="mw-kakao-ok">✅ 연결됨 — 매일 ${kakaoTime} 자동발송${kakaoEnabled?' 켜짐':' 꺼짐'}</span>`
         : `<span class="mw-kakao-warn">⚙️ 카카오 설정 필요</span>`;
 
-    // ── 날짜 탭 + 본문(캐시) ─────────────────────────────────
-    const dateTabs = _buildDateTabs(sortedDates, sel, byDate);
-    const bodyHtml = _buildMwBodyHtml(sel, byDate, sortedDates);
+    // ── 날짜 탭 + 누적 KPI 바 + 본문(캐시) ──────────────────
+    const dateTabs    = _buildDateTabs(sortedDates, sel, byDate);
+    const eventTotBar = _buildEventTotalBar(byDate, sortedDates);
+    const bodyHtml    = _buildMwBodyHtml(sel, byDate, sortedDates);
 
     container.innerHTML = `
     <div class="mw-date-tabs">${dateTabs}</div>
+    ${eventTotBar}
     ${bodyHtml}
     <details class="mw-kakao-wrap" ${!kakaoKey&&!kakaoToken?'open':''}>
         <summary class="mw-kakao-summary">

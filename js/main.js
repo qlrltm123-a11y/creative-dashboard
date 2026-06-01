@@ -421,7 +421,10 @@ function switchSection(sectionName) {
         const panel = document.querySelector(`.section-panel[data-panel="${sectionName}"]`);
         if (panel) panel.classList.add('section-loading');
         requestAnimationFrame(() => {
-            if (sectionName === 'performance') {
+            if (sectionName === 'overview') {
+                // 브랜드 바뀐 뒤 개요로 돌아오면 위닝 요소 재렌더
+                if (typeof renderWinningElements === 'function') renderWinningElements();
+            } else if (sectionName === 'performance') {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
                 renderAppealInsight();
@@ -1218,11 +1221,14 @@ function updateKPIs() {
 // Charts
 // ============================
 function updateCharts() {
-    // ★ 개요 탭(항상 활성)에 필요한 컨텐츠
+    // 브랜드/플랫폼 차트는 개요에 항상 필요
     renderBrandChart();
     renderPlatformChart();
-    if (typeof renderWinningElements === 'function') renderWinningElements();
-    // ★ 속도 개선: 성과 분석 섹션은 진입했을 때만 렌더
+    // ★ 위닝 요소는 개요 탭이 활성일 때만 렌더 (매 브랜드 전환마다 실행되던 버그 수정)
+    if (_currentSection === 'overview') {
+        if (typeof renderWinningElements === 'function') renderWinningElements();
+    }
+    // 성과 분석 섹션은 진입했을 때만 렌더
     if (_renderedSections.performance) {
         renderAppealInsight();
         renderPlatformCreativeMatrix();
