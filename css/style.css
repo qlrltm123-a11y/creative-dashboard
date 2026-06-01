@@ -5419,6 +5419,20 @@ body {
 .mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
 
+/* ── 예산 재분배 플래그 ── */
+.mw-realloc {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+    cursor: help;
+}
+.mw-realloc.realloc-up   { background: #dcfce7; color: #15803d; }
+.mw-realloc.realloc-down { background: #fee2e2; color: #b91c1c; }
+.mw-realloc.realloc-hold { background: #f1f5f9; color: #64748b; }
+
 /* ── 선택일 실적 레이블 ── */
 .mw-kpi-day-lbl {
     font-size: 11px;

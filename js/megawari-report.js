@@ -111,18 +111,20 @@ function _aggregateMwImpl(data) {
     data.forEach(c => {
         const raw = c.start_date || c.date || '';
         const iso = raw ? new Date(raw).toISOString().split('T')[0] : '0000-00-00';
-        if (!byDate[iso]) byDate[iso] = { iso, spend:0, revenue:0, impressions:0, clicks:0, byProduct:{}, byPlatform:{}, creatives:[] };
+        if (!byDate[iso]) byDate[iso] = { iso, spend:0, revenue:0, impressions:0, clicks:0, conversions:0, byProduct:{}, byPlatform:{}, creatives:[] };
         const d = byDate[iso];
         d.spend += c.spend||0; d.revenue += c.revenue||0;
         d.impressions += c.impressions||0; d.clicks += c.clicks||0;
+        d.conversions += c.conversions||0;
         d.creatives.push(c);
 
         const prod = (c.product||'기타').trim();
         const plat = (c.platform||'기타').trim();
 
-        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0,revenue:0,impressions:0,clicks:0,add_to_cart:0,creatives:[],byPlatform:{} };
+        if (!d.byProduct[prod]) d.byProduct[prod] = { spend:0,revenue:0,impressions:0,clicks:0,conversions:0,add_to_cart:0,creatives:[],byPlatform:{} };
         const dp = d.byProduct[prod];
         dp.spend+=c.spend||0; dp.revenue+=c.revenue||0; dp.impressions+=c.impressions||0; dp.clicks+=c.clicks||0;
+        dp.conversions+=c.conversions||0;
         dp.add_to_cart+=c.add_to_cart||0;
         dp.creatives.push(c);
         if (!dp.byPlatform[plat]) dp.byPlatform[plat]={spend:0,revenue:0,impressions:0,clicks:0,add_to_cart:0};
@@ -433,15 +435,32 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
     // ── 제품 × 매체 테이블 ──────────────────────────────────
     const prods   = Object.entries(today.byProduct).sort((a,b) => b[1].roas - a[1].roas);
     const allPlats = [...new Set(prods.flatMap(([,p]) => Object.keys(p.byPlatform)))].sort();
+
+    // ── 예산 재분배 진단: 이벤트 블렌디드 ROAS + 제품별 집행비 비중 ──
+    const totalSpend = prods.reduce((s,[,p]) => s + (p.spend||0), 0);
+    const blendedRoas = today.spend > 0 ? today.revenue / today.spend : 0;
+    // 재분배 플래그: 고ROAS+저비중→증액 / 저ROAS+고비중→감액 / 그외→유지
+    const _reallocFlag = (p) => {
+        const share = totalSpend > 0 ? p.spend / totalSpend : 0;
+        const roasRatio = blendedRoas > 0 ? p.roas / blendedRoas : 1;
+        if (roasRatio >= 1.15 && share < 0.30)  return { lbl:'증액', cls:'realloc-up',   tip:`효율 우수(평균 대비 +${Math.round((roasRatio-1)*100)}%)·비중 ${Math.round(share*100)}% → 예산 증액 후보` };
+        if (roasRatio < 0.85 && share >= 0.20)  return { lbl:'감액', cls:'realloc-down', tip:`효율 미달(평균 대비 ${Math.round((roasRatio-1)*100)}%)·비중 ${Math.round(share*100)}% → 예산 감액 검토` };
+        return { lbl:'유지', cls:'realloc-hold', tip:`비중 ${Math.round(share*100)}% · 효율 평균 수준` };
+    };
+
     const tableHead = `<thead><tr>
         <th class="mw-th mw-th-prod">제품</th>
+        <th class="mw-th" title="예산 재분배 진단: 효율(ROAS) × 집행비 비중">재분배</th>
         <th class="mw-th">ROAS</th>
         ${isTeaser ? `<th class="mw-th" title="장바구니 담기">담기</th>` : ''}
         <th class="mw-th">CTR</th>
+        <th class="mw-th" title="클릭→전환 전환율">CVR</th>
         <th class="mw-th">매출</th>
         ${allPlats.map(pl=>`<th class="mw-th mw-th-plat">${pl}</th>`).join('')}
     </tr></thead>`;
     const tableBody = prods.map(([name, p]) => {
+        const flag = _reallocFlag(p);
+        const cvr  = (p.clicks||0) > 0 ? (p.conversions||0) / p.clicks : 0;
         const platCells = allPlats.map(pl => {
             const v = p.byPlatform[pl];
             if (!v || v.roas === 0) return `<td class="mw-td mw-td-plat"><span class="text-slate-300">-</span></td>`;
@@ -460,9 +479,11 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
                 ${top ? `<div class="mw-prod-top">🏆 ${(top.ad_name||top.creative_name||'').slice(0,20)}</div>` : ''}
                 ${bot ? `<div class="mw-prod-bot">⚠️ ${(bot.ad_name||bot.creative_name||'').slice(0,20)}</div>` : ''}
             </td>
+            <td class="mw-td"><span class="mw-realloc ${flag.cls}" title="${flag.tip}">${flag.lbl}</span></td>
             <td class="mw-td"><span class="mw-roas-badge ${_roasClass(p.roas)}">${_fmtRoas(p.roas)}</span>${_diffBadge(p.roas, prev?.byProduct?.[name]?.roas)}</td>
             ${isTeaser ? `<td class="mw-td mw-td-num"><span class="mw-roas-badge ${_atcClass(p.add_to_cart||0)}">${_fmtAtc(p.add_to_cart||0, p.atc_rate)}</span></td>` : ''}
             <td class="mw-td mw-td-num">${_fmtCtr(p.ctr)}</td>
+            <td class="mw-td mw-td-num">${cvr > 0 ? (cvr*100).toFixed(2)+'%' : '-'}</td>
             <td class="mw-td mw-td-num">${_fmtMoney(p.revenue)}</td>
             ${platCells}
         </tr>`;
