@@ -145,6 +145,11 @@
                 <span class="label">성과 분석</span>
                 <span class="sub">TOP 소재 · 갤러리</span>
             </button>
+            <button class="section-tab" data-section="funnel">
+                <i class="fas fa-filter"></i>
+                <span class="label">퍼널</span>
+                <span class="sub">유입→구매 전환 · 분기 비교</span>
+            </button>
             <button class="section-tab" data-section="ai">
                 <i class="fas fa-magic-wand-sparkles"></i>
                 <span class="label">AI 인사이트</span>
@@ -159,6 +164,11 @@
                 <i class="fas fa-fire"></i>
                 <span class="label">메가와리</span>
                 <span class="sub">일별 성과 · 카카오 리포트</span>
+            </button>
+            <button class="section-tab" data-section="gmv">
+                <i class="fas fa-gauge-high"></i>
+                <span class="label">GMV</span>
+                <span class="sub">실시간 매출 시뮬레이션</span>
             </button>
             <button class="section-tab" data-section="weekly">
                 <i class="fas fa-clipboard-list"></i>
@@ -732,6 +742,20 @@
             </div>
         </div>
         <!-- ============ /SECTION: 주간 업무 보고서 ============ -->
+
+        <!-- ============ SECTION: 퍼널 (iframe 통합) ============ -->
+        <div class="section-panel" data-panel="funnel">
+            <iframe id="funnel-frame" class="embed-frame" title="퍼널 전환율 대시보드"
+                    data-src="funnel.html" loading="lazy"></iframe>
+        </div>
+        <!-- ============ /SECTION: 퍼널 ============ -->
+
+        <!-- ============ SECTION: GMV 시뮬레이터 (iframe 통합) ============ -->
+        <div class="section-panel" data-panel="gmv">
+            <iframe id="gmv-frame" class="embed-frame" title="브랜드 매출 시뮬레이터"
+                    data-src="gmv.html" loading="lazy"></iframe>
+        </div>
+        <!-- ============ /SECTION: GMV ============ -->
 
     </main>
 

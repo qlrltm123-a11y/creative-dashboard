@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>브랜드 매출 시뮬레이터</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --card: #20243a;
+  --border: #2e3250;
+  --accent: #6c63ff;
+  --accent2: #00d4aa;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --boh: #a78bfa;
+  --wm: #00d4aa;
+  --cg: #f59e0b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+/* ── HEADER ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header h1 { font-size: 1.2rem; font-weight: 700; background: linear-gradient(135deg, #6c63ff, #00d4aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header-right { display: flex; align-items: center; gap: 14px; }
+#clock { font-size: 0.82rem; color: var(--muted); }
+
+/* date selector */
+.date-select { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 0.82rem; outline: none; cursor: pointer; }
+.today-badge { background: var(--accent); color: #fff; font-size: 0.68rem; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+
+/* ── TABS ── */
+.tabs { display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; }
+.tab {
+  padding: 14px 24px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab.tab-boh.active { border-bottom-color: var(--boh); color: var(--boh); }
+.tab.tab-wm.active  { border-bottom-color: var(--wm);  color: var(--wm); }
+.tab.tab-cg.active  { border-bottom-color: var(--cg);  color: var(--cg); }
+
+/* ── CONTENT ── */
+.content { padding: 24px; max-width: 1100px; margin: 0 auto; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── SUMMARY CARDS ── */
+.summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.stat-card .s-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.stat-card .s-val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.stat-card .s-sub { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+/* ── INPUT SECTION ── */
+.input-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 22px; }
+.input-section h2 { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+.input-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.input-row .target-block { flex: 1; min-width: 160px; }
+.input-row .target-label { font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+.input-row .target-num { font-size: 1.6rem; font-weight: 800; }
+.actual-input-wrap { flex: 1; min-width: 200px; }
+.actual-input-wrap label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
+.actual-input { width: 100%; background: var(--card); border: 2px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 1.1rem; font-weight: 700; outline: none; transition: border-color 0.15s; }
+.actual-input:focus { border-color: var(--accent); }
+
+/* ── PROGRESS ── */
+.prog-section { margin-bottom: 22px; }
+.prog-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.prog-header .prog-title { font-size: 0.82rem; color: var(--muted); }
+.prog-header .prog-pct { font-size: 1.8rem; font-weight: 800; }
+.bar-outer { height: 12px; background: var(--card); border-radius: 6px; overflow: hidden; position: relative; margin-bottom: 8px; }
+.bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+.bar-time-marker { position: absolute; top: -2px; width: 2px; height: 16px; background: rgba(255,255,255,0.5); border-radius: 1px; }
+.prog-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
+.fill-good   { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.fill-ok     { background: linear-gradient(90deg, #6c63ff, #00d4aa); }
+.fill-warn   { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.fill-danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+/* ── SCENARIO TABLE ── */
+.sim-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 22px; }
+.sim-section h2 { font-size: 0.88rem; font-weight: 700; margin-bottom: 16px; }
+.sim-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.sim-table th { text-align: left; padding: 8px 14px; color: var(--muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.sim-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.sim-table tr:last-child td { border-bottom: none; }
+.sim-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+.s-name { font-weight: 700; font-size: 0.9rem; }
+.s-very-opt { color: #a78bfa; }
+.s-opt      { color: #00d4aa; }
+.s-mid      { color: #f59e0b; }
+.s-cons     { color: #64748b; }
+.pace-bar { display: flex; align-items: center; gap: 8px; }
+.pace-bg { width: 60px; height: 4px; background: var(--card); border-radius: 2px; overflow: hidden; }
+.pace-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.rate-chip { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+.chip-over   { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.chip-ok     { background: rgba(108,99,255,0.15); color: #a78bfa; }
+.chip-warn   { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.chip-danger { background: rgba(239,68,68,0.15);  color: #ef4444; }
+
+.need-row { margin-top: 16px; background: var(--card); border-radius: 10px; padding: 14px 16px; display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.82rem; }
+.need-item .n-label { color: var(--muted); font-size: 0.7rem; margin-bottom: 2px; }
+.need-item .n-val { font-weight: 700; font-size: 1rem; }
+
+/* ── ALL TAB BRAND ROWS ── */
+.all-brand-row { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+.all-brand-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.all-brand-name { font-size: 1rem; font-weight: 700; }
+.all-brand-stats { font-size: 0.78rem; color: var(--muted); display: flex; gap: 16px; }
+
+.c-good { color: var(--success) !important; }
+.c-warn { color: var(--warn) !important; }
+.c-danger { color: var(--danger) !important; }
+.c-text { color: var(--text) !important; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>📊 브랜드 매출 시뮬레이터</h1>
+  <div class="header-right">
+    <select class="date-select" id="datePicker"></select>
+    <span class="today-badge" id="todayBadge" style="display:none">TODAY</span>
+    <div id="clock">--:--:--</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('all')">전체</div>
+  <div class="tab tab-boh" onclick="switchTab('BOH')">BOH</div>
+  <div class="tab tab-wm"  onclick="switchTab('WM')">WM</div>
+  <div class="tab tab-cg"  onclick="switchTab('CG')">CG</div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- ── ALL TAB ── -->
+  <div class="tab-panel active" id="panel-all">
+    <div class="summary-row" id="all-summary"></div>
+    <div id="all-brands"></div>
+    <!-- 전체 시나리오 -->
+    <div class="sim-section">
+      <h2>📈 시나리오별 마감 예상 (전체 합산)</h2>
+      <table class="sim-table">
+        <thead><tr>
+          <th>시나리오</th>
+          <th>페이스 유지율</th>
+          <th>예상 마감 매출</th>
+          <th>달성률</th>
+          <th>목표 대비</th>
+        </tr></thead>
+        <tbody id="all-sim-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── BRAND TABS ── -->
+  <div class="tab-panel" id="panel-BOH"></div>
+  <div class="tab-panel" id="panel-WM"></div>
+  <div class="tab-panel" id="panel-CG"></div>
+
+</div>
+
+<script>
+// ───────── 데이터 ─────────
+const TARGET_DATA = {
+  BOH: {
+    "2026-05-29":110065773,"2026-05-30":119125048,"2026-05-31":75190821,
+    "2026-06-01":45091293,"2026-06-02":95109046,"2026-06-03":50119217,
+    "2026-06-04":30115987,"2026-06-05":25146833,"2026-06-06":36143750,
+    "2026-06-07":55163291,"2026-06-08":31149126,"2026-06-09":33143972,
+    "2026-06-10":76198181
+  },
+  WM: {
+    "2026-05-29":80262581,"2026-05-30":45131290,"2026-05-31":35060862,
+    "2026-06-01":15072697,"2026-06-02":12079478,"2026-06-03":17077324,
+    "2026-06-04":16097888,"2026-06-05":11095834,"2026-06-06":11108861,
+    "2026-06-07":10099417,"2026-06-08":7095982,"2026-06-09":7065645,
+    "2026-06-10":14065645
+  },
+  CG: {
+    "2026-05-29":10000000,"2026-05-30":7000000,"2026-05-31":4000000,
+    "2026-06-01":3000000,"2026-06-02":3000000,"2026-06-03":3000000,
+    "2026-06-04":2500000,"2026-06-05":2500000,"2026-06-06":2500000,
+    "2026-06-07":3000000,"2026-06-08":4000000,"2026-06-09":2000000,
+    "2026-06-10":3500000
+  }
+};
+
+const SCENARIOS = [
+  { name:"매우 낙관", cls:"s-very-opt", pace:1.5 },
+  { name:"낙관",     cls:"s-opt",      pace:1.0 },
+  { name:"중간",     cls:"s-mid",      pace:0.6 },
+  { name:"보수",     cls:"s-cons",     pace:0.3 },
+];
+
+const BRANDS = ["BOH","WM","CG"];
+const BRAND_COLOR = { BOH:"var(--boh)", WM:"var(--wm)", CG:"var(--cg)" };
+
+// 날짜별 저장: { "2026-05-31": { BOH:0, WM:0, CG:0 }, ... }
+let actualsByDate = {};
+let paceLogsByDate = {};
+let selectedDate = todayStr();
+let currentTab = "all";
+
+// 현재 날짜의 actuals/paceLogs에 접근하는 헬퍼
+function getActuals() {
+  if (!actualsByDate[selectedDate]) actualsByDate[selectedDate] = { BOH:0, WM:0, CG:0 };
+  return actualsByDate[selectedDate];
+}
+function getPaceLogs() {
+  if (!paceLogsByDate[selectedDate]) paceLogsByDate[selectedDate] = { BOH:[], WM:[], CG:[] };
+  return paceLogsByDate[selectedDate];
+}
+
+// ───────── 유틸 ─────────
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1e8) return sign+'¥'+(abs/1e8).toFixed(2)+'억';
+  if (abs >= 1e4) return sign+'¥'+(abs/1e4).toFixed(0)+'만';
+  return sign+'¥'+abs.toLocaleString();
+}
+
+function fmtNum(n) { return n ? Math.round(n).toLocaleString() : '0'; }
+function parseNum(s) { return parseInt(String(s).replace(/[,¥]/g,''))||0; }
+
+// 하루 전체(00:00 ~ 24:00) 기준
+function getDayProgress() {
+  const now = new Date();
+  const totalSec = 86400;
+  const nowSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+  const pct = nowSec / totalSec;
+  const remaining = totalSec - nowSec;
+  return { pct, elapsed: nowSec, remaining, total: totalSec };
+}
+
+function getBarClass(pct) {
+  if (pct >= 100) return 'fill-good';
+  if (pct >= 70)  return 'fill-ok';
+  if (pct >= 40)  return 'fill-warn';
+  return 'fill-danger';
+}
+
+function getRateChip(pct) {
+  const s = pct.toFixed(1)+'%';
+  if (pct >= 100) return `<span class="rate-chip chip-over">${s} ✓</span>`;
+  if (pct >= 70)  return `<span class="rate-chip chip-ok">${s}</span>`;
+  if (pct >= 40)  return `<span class="rate-chip chip-warn">${s}</span>`;
+  return `<span class="rate-chip chip-danger">${s}</span>`;
+}
+
+function calcProjected(actual, dp, paceFactor) {
+  if (dp.pct <= 0 || actual <= 0) return 0;
+  const hourlyRate = actual / (dp.elapsed / 3600);
+  const remainHours = dp.remaining / 3600;
+  return actual + remainHours * hourlyRate * paceFactor;
+}
+
+// ───────── 시간대별 매출 비중 분석 ─────────
+// paceLogsByDate 전체에서 브랜드별 시간대(0~23시) 매출 분포 계산
+function buildHourWeights(brand) {
+  const hourSales = new Array(24).fill(0);
+  const hourCount = new Array(24).fill(0);
+
+  Object.entries(paceLogsByDate).forEach(([date, logs]) => {
+    const log = logs[brand];
+    if (!log || log.length < 2) return;
+    for (let i = 1; i < log.length; i++) {
+      const prev = log[i-1], curr = log[i];
+      const delta = curr.val - prev.val;
+      if (delta <= 0) return; // 감소는 무시
+      const prevMs = prev.ts, currMs = curr.ts;
+      const totalMs = currMs - prevMs;
+      if (totalMs <= 0) return;
+      // delta를 구간 내 시간 비례로 각 시간에 배분
+      let t = prevMs;
+      while (t < currMs) {
+        const h = new Date(t).getHours();
+        const nextHourMs = new Date(new Date(t).setHours(h+1, 0, 0, 0)).getTime();
+        const sliceEnd = Math.min(nextHourMs, currMs);
+        const fraction = (sliceEnd - t) / totalMs;
+        hourSales[h] += delta * fraction;
+        hourCount[h]++;
+        t = sliceEnd;
+      }
+    }
+  });
+
+  const total = hourSales.reduce((s, v) => s + v, 0);
+  if (total === 0) return null;
+  return hourSales.map(v => v / total); // 24개 비중 합계=1
+}
+
+// 시간대 가중치 기반 정밀 예측
+function calcProjectedWeighted(brand, actual, dp, paceFactor) {
+  if (dp.pct <= 0 || actual <= 0) return null;
+  const weights = buildHourWeights(brand);
+  if (!weights) return null; // 데이터 부족 시 null 반환
+
+  const nowH = new Date().getHours();
+  const nowMin = new Date().getMinutes();
+
+  // 현재 시각까지의 가중치 합
+  let elapsedWeight = 0;
+  for (let h = 0; h < nowH; h++) elapsedWeight += weights[h];
+  elapsedWeight += weights[nowH] * (nowMin / 60);
+
+  if (elapsedWeight <= 0) return null;
+
+  // 현재 시점 기준 하루 전체 예상 = actual / 경과가중치
+  const impliedTotal = actual / elapsedWeight;
+
+  // 남은 시간대 가중치
+  let remainWeight = 0;
+  for (let h = nowH + 1; h < 24; h++) remainWeight += weights[h];
+  remainWeight += weights[nowH] * ((60 - nowMin) / 60);
+
+  // 시나리오 페이스 팩터 반영: 남은 구간을 paceFactor 배율로
+  const projected = actual + impliedTotal * remainWeight * paceFactor;
+  return projected;
+}
+
+// 시간대별 비중 데이터 가져오기 (UI용)
+function getHourProfileData(brand) {
+  const weights = buildHourWeights(brand);
+  if (!weights) return null;
+  // 데이터가 있는 날짜 수
+  const days = Object.values(paceLogsByDate).filter(logs => {
+    const log = logs[brand];
+    return log && log.length >= 2;
+  }).length;
+  return { weights, days };
+}
+
+// ───────── 탭 전환 ─────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((el,i) => {
+    const ids = ['all','BOH','WM','CG'];
+    el.classList.toggle('active', ids[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+// ───────── 날짜 드롭다운 ─────────
+function initDatePicker() {
+  const dates = Object.keys(TARGET_DATA.BOH).sort();
+  const sel = document.getElementById('datePicker');
+  sel.innerHTML = dates.map(d => `<option value="${d}"${d===selectedDate?' selected':''}>${d}</option>`).join('');
+  sel.addEventListener('change', () => {
+    selectedDate = sel.value;
+    save(); renderAll();
+  });
+}
+
+// ───────── 브랜드 탭 패널 렌더 ─────────
+function renderBrandPanel(brand) {
+  const dp = getDayProgress();
+  const target = TARGET_DATA[brand][selectedDate] || 0;
+  const actual = getActuals()[brand] || 0;
+  const pct = target > 0 ? actual/target*100 : 0;
+  const barW = Math.min(pct,100).toFixed(1);
+  const barCls = getBarClass(pct);
+  const timePct = (dp.pct*100).toFixed(1);
+  const gap = actual - target;
+  const gapColor = gap >= 0 ? 'var(--success)' : 'var(--danger)';
+  const gapStr = (gap>=0?'+':'')+fmt(gap);
+
+  // 남은 시간
+  const remH = Math.floor(dp.remaining/3600);
+  const remM = Math.floor((dp.remaining%3600)/60);
+  const elH  = Math.floor(dp.elapsed/3600);
+  const elM  = Math.floor((dp.elapsed%3600)/60);
+
+  // 시간대 가중치 프로필
+  const profile = getHourProfileData(brand);
+
+  // 시나리오 rows
+  const simRows = SCENARIOS.map(sc => {
+    const projLinear   = calcProjected(actual, dp, sc.pace);
+    const projWeighted = profile ? calcProjectedWeighted(brand, actual, dp, sc.pace) : null;
+    // 가중치 예측 있으면 사용, 없으면 선형
+    const proj = projWeighted !== null ? projWeighted : projLinear;
+    const rate = target > 0 ? proj/target*100 : 0;
+    const diff = proj - target;
+    const diffColor = diff>=0 ? 'var(--success)' : 'var(--danger)';
+    // 가중치 vs 선형 차이 표시
+    const wDiff = projWeighted !== null ? projWeighted - projLinear : null;
+    const wTag = wDiff !== null
+      ? `<span style="font-size:0.68rem;color:${wDiff>=0?'var(--success)':'var(--danger)'};margin-left:4px">${wDiff>=0?'↑':'↓'}${fmt(Math.abs(Math.round(wDiff)))}</span>`
+      : `<span style="font-size:0.65rem;color:var(--muted)"> (선형)</span>`;
+    return `<tr>
+      <td><span class="s-name ${sc.cls}">${sc.name}</span></td>
+      <td>
+        <div class="pace-bar">
+          <div class="pace-bg"><div class="pace-fill" style="width:${Math.min(sc.pace*66,100)}%;background:${sc.pace>=1?'var(--success)':sc.pace>=0.6?'var(--warn)':'var(--muted)'}"></div></div>
+          <span style="font-size:0.78rem;color:var(--muted)">${(sc.pace*100).toFixed(0)}%</span>
+        </div>
+      </td>
+      <td style="font-weight:700">${fmt(Math.round(proj))}${wTag}</td>
+      <td>${getRateChip(rate)}</td>
+      <td style="color:${diffColor};font-weight:600">${diff>=0?'+':''}${fmt(Math.round(diff))}</td>
+    </tr>`;
+  }).join('');
+
+  // 시간당 필요 매출
+  const needed = target - actual;
+  const needPerHour = dp.remaining > 0 ? needed / (dp.remaining/3600) : 0;
+
+  document.getElementById('panel-'+brand).innerHTML = `
+    <!-- 요약 -->
+    <div class="summary-row">
+      <div class="stat-card">
+        <div class="s-label">일 목표</div>
+        <div class="s-val" style="color:${BRAND_COLOR[brand]}">${fmt(target)}</div>
+        <div class="s-sub">${selectedDate}</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">현재 실적</div>
+        <div class="s-val">${fmt(actual)}</div>
+        <div class="s-sub" style="color:${gapColor}">${gapStr}</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">달성률</div>
+        <div class="s-val" style="color:${pct>=100?'var(--success)':pct>=70?'':pct>=40?'var(--warn)':'var(--danger)'}">${pct.toFixed(1)}%</div>
+        <div class="s-sub">목표 대비</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">마감까지</div>
+        <div class="s-val">${remH}h ${remM}m</div>
+        <div class="s-sub">경과 ${elH}h ${elM}m (${(dp.pct*100).toFixed(0)}%)</div>
+      </div>
+    </div>
+
+    <!-- 실적 입력 -->
+    <div class="input-section">
+      <h2>현재 실적 입력</h2>
+      <div class="input-row">
+        <div class="target-block">
+          <div class="target-label">오늘 목표</div>
+          <div class="target-num" style="color:${BRAND_COLOR[brand]}">${fmtNum(target)} <span style="font-size:0.8rem;font-weight:400;color:var(--muted)">엔</span></div>
+        </div>
+        <div class="actual-input-wrap">
+          <label>현재 실적 (엔)</label>
+          <input class="actual-input" id="inp_${brand}" type="text"
+            placeholder="0" value="${actual>0?fmtNum(actual):''}"
+            oninput="onInput('${brand}',this.value)"
+            onblur="onCommit('${brand}',this.value)"
+            onkeydown="if(event.key==='Enter'){onCommit('${brand}',this.value);this.blur()}"
+            style="border-color:${BRAND_COLOR[brand]}" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 진도율 바 -->
+    <div class="prog-section">
+      <div class="prog-header">
+        <span class="prog-title">진도율</span>
+        <span class="prog-pct" style="color:${pct>=100?'var(--success)':pct>=70?BRAND_COLOR[brand]:pct>=40?'var(--warn)':'var(--danger)'}">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="bar-outer">
+        <div class="bar-fill ${barCls}" style="width:${barW}%"></div>
+        <div class="bar-time-marker" style="left:${timePct}%" title="현재 시각 위치"></div>
+      </div>
+      <div class="prog-meta">
+        <span>0%</span>
+        <span style="color:var(--muted)">▲ 현재 시각 ${(dp.pct*100).toFixed(0)}%</span>
+        <span>100%</span>
+      </div>
+    </div>
+
+    <!-- 페이스 박스 -->
+    <div class="sim-section" style="margin-bottom:14px">
+      <h2>⚡ 구간 페이스 (입력 기록 기반)</h2>
+      <div class="pace-box"></div>
+    </div>
+
+    <!-- 시나리오 -->
+    <div class="sim-section">
+      <h2>📈 시나리오별 마감 예상</h2>
+      <table class="sim-table">
+        <thead><tr>
+          <th>시나리오</th><th>페이스 유지율</th><th>예상 마감</th><th>달성률</th><th>목표 대비</th>
+        </tr></thead>
+        <tbody>${simRows}</tbody>
+      </table>
+      ${needed > 0 && dp.remaining > 0 ? `
+      <div class="need-row">
+        <div class="need-item">
+          <div class="n-label">목표까지 남은 금액</div>
+          <div class="n-val" style="color:var(--danger)">${fmt(needed)}</div>
+        </div>
+        <div class="need-item">
+          <div class="n-label">시간당 필요 매출</div>
+          <div class="n-val" style="color:var(--warn)">${fmt(Math.round(needPerHour))}</div>
+        </div>
+        <div class="need-item">
+          <div class="n-label">분당 필요 매출</div>
+          <div class="n-val">${fmt(Math.round(needPerHour/60))}</div>
+        </div>
+      </div>` : needed <= 0 && actual > 0 ? `
+      <div class="need-row">
+        <div class="need-item">
+          <div class="n-label">초과 달성</div>
+          <div class="n-val" style="color:var(--success)">+${fmt(Math.abs(gap))} 🎉</div>
+        </div>
+      </div>` : ''}
+    </div>
+
+    <!-- 시간대별 매출 패턴 -->
+    <div class="sim-section">
+      <h2>🕐 시간대별 매출 패턴 ${profile ? `<span style="font-size:0.72rem;color:var(--accent2);font-weight:400">(${profile.days}일치 데이터 기반)</span>` : '<span style="font-size:0.72rem;color:var(--muted);font-weight:400">데이터 누적 중</span>'}</h2>
+      ${profile ? buildHourChart(profile.weights, brand) : `
+        <div style="color:var(--muted);font-size:0.82rem;padding:8px 0">
+          실적 입력을 누적하면 시간대별 패턴이 학습됩니다.<br>
+          <span style="font-size:0.75rem">5월 31일부터 기록 중 → 데이터가 쌓일수록 시뮬레이션 정확도가 높아집니다.</span>
+        </div>`}
+    </div>
+  `;
+}
+
+function buildHourChart(weights, brand) {
+  const nowH = new Date().getHours();
+  const maxW = Math.max(...weights);
+  // 시간대를 3구간으로 나눔: 오전(0-11), 오후(12-17), 저녁(18-23)
+  const periods = [
+    { label:'심야/새벽', range:[0,6],  color:'#4b5563' },
+    { label:'오전',      range:[6,12], color:'#6c63ff' },
+    { label:'오후',      range:[12,18],color:'#f59e0b' },
+    { label:'저녁/야간', range:[18,24],color:'#00d4aa' },
+  ];
+  const periodSums = periods.map(p => {
+    const sum = weights.slice(p.range[0], p.range[1]).reduce((s,v)=>s+v,0);
+    return { ...p, sum };
+  });
+
+  const bars = weights.map((w, h) => {
+    const barH = maxW > 0 ? Math.round(w / maxW * 60) : 0;
+    const period = periods.find(p => h >= p.range[0] && h < p.range[1]);
+    const color = period ? period.color : '#6c63ff';
+    const isNow = h === nowH;
+    const isPast = h < nowH;
+    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0">
+      <div style="font-size:0.58rem;color:${isNow?'#fff':'var(--muted)'};margin-bottom:2px;${isNow?'font-weight:700':''}">${(w*100).toFixed(0)}%</div>
+      <div style="width:100%;height:60px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${barH}px;background:${isNow?'#fff':isPast?color+'88':color};border-radius:2px 2px 0 0;transition:height 0.3s;${isNow?'box-shadow:0 0 6px #fff':''}"></div>
+      </div>
+      <div style="font-size:0.6rem;color:${isNow?'var(--accent2)':'var(--muted)'};margin-top:3px;${isNow?'font-weight:700':''}">${h}시</div>
+    </div>`;
+  }).join('');
+
+  const periodTags = periodSums.map(p =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;margin-right:10px">
+      <span style="width:8px;height:8px;border-radius:2px;background:${p.color};display:inline-block"></span>
+      ${p.label} <strong style="color:${p.color}">${(p.sum*100).toFixed(0)}%</strong>
+    </span>`
+  ).join('');
+
+  return `
+    <div style="display:flex;gap:2px;align-items:flex-end;padding:8px 0;overflow-x:auto">${bars}</div>
+    <div style="margin-top:8px">${periodTags}</div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:6px">
+      흰색 = 현재 시각 / 진한색 = 미래 / 연한색 = 과거 | 시뮬레이션은 이 패턴을 반영합니다
+    </div>
+  `;
+}
+
+// ───────── ALL 탭 ─────────
+function renderAllTab() {
+  const dp = getDayProgress();
+  const totalTarget = BRANDS.reduce((s,b)=>s+(TARGET_DATA[b][selectedDate]||0),0);
+  const totalActual = BRANDS.reduce((s,b)=>s+(getActuals()[b]||0),0);
+  const rate = totalTarget > 0 ? totalActual/totalTarget*100 : 0;
+  const gap = totalActual - totalTarget;
+  const remH = Math.floor(dp.remaining/3600);
+  const remM = Math.floor((dp.remaining%3600)/60);
+
+  // 요약
+  document.getElementById('all-summary').innerHTML = `
+    <div class="stat-card">
+      <div class="s-label">전체 목표</div>
+      <div class="s-val">${fmt(totalTarget)}</div>
+      <div class="s-sub">3개 브랜드</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">현재 실적</div>
+      <div class="s-val">${fmt(totalActual)}</div>
+      <div class="s-sub" style="color:${gap>=0?'var(--success)':'var(--danger)'}">${gap>=0?'+':''}${fmt(gap)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">달성률</div>
+      <div class="s-val" style="color:${rate>=100?'var(--success)':rate>=70?'':rate>=40?'var(--warn)':'var(--danger)'}">${rate.toFixed(1)}%</div>
+      <div class="s-sub">시간 소진 ${(dp.pct*100).toFixed(0)}%</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">마감까지</div>
+      <div class="s-val">${remH}h ${remM}m</div>
+      <div class="s-sub">${selectedDate}</div>
+    </div>
+  `;
+
+  // 브랜드 행
+  document.getElementById('all-brands').innerHTML = BRANDS.map(brand => {
+    const target = TARGET_DATA[brand][selectedDate]||0;
+    const actual = getActuals()[brand]||0;
+    const pct = target>0 ? actual/target*100 : 0;
+    const barW = Math.min(pct,100).toFixed(1);
+    const barCls = getBarClass(pct);
+    const timePct = (dp.pct*100).toFixed(1);
+    const g = actual - target;
+    return `
+    <div class="all-brand-row">
+      <div class="all-brand-header">
+        <span class="all-brand-name" style="color:${BRAND_COLOR[brand]}">${brand}</span>
+        <div class="all-brand-stats">
+          <span>목표 ${fmt(target)}</span>
+          <span>실적 <strong style="color:var(--text)">${fmt(actual)}</strong></span>
+          <span style="color:${g>=0?'var(--success)':'var(--danger)'}">${g>=0?'+':''}${fmt(g)}</span>
+          <span style="font-weight:700">${pct.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div class="bar-outer" style="height:8px">
+        <div class="bar-fill ${barCls}" style="width:${barW}%"></div>
+        <div class="bar-time-marker" style="left:${timePct}%;height:12px;top:-2px"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 전체 시나리오
+  document.getElementById('all-sim-body').innerHTML = SCENARIOS.map(sc => {
+    const proj = calcProjected(totalActual, dp, sc.pace);
+    const r = totalTarget>0 ? proj/totalTarget*100 : 0;
+    const d = proj - totalTarget;
+    return `<tr>
+      <td><span class="s-name ${sc.cls}">${sc.name}</span></td>
+      <td>
+        <div class="pace-bar">
+          <div class="pace-bg"><div class="pace-fill" style="width:${Math.min(sc.pace*66,100)}%;background:${sc.pace>=1?'var(--success)':sc.pace>=0.6?'var(--warn)':'var(--muted)'}"></div></div>
+          <span style="font-size:0.78rem;color:var(--muted)">${(sc.pace*100).toFixed(0)}%</span>
+        </div>
+      </td>
+      <td style="font-weight:700">${fmt(Math.round(proj))}</td>
+      <td>${getRateChip(r)}</td>
+      <td style="color:${d>=0?'var(--success)':'var(--danger)'};font-weight:600">${d>=0?'+':''}${fmt(Math.round(d))}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ───────── 저장/불러오기 ─────────
+function save() {
+  localStorage.setItem('smDash2', JSON.stringify({ actualsByDate, selectedDate, paceLogsByDate }));
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('smDash2')||'{}');
+    if (d.actualsByDate) actualsByDate = d.actualsByDate;
+    if (d.selectedDate) selectedDate = d.selectedDate;
+    if (d.paceLogsByDate) paceLogsByDate = d.paceLogsByDate;
+    // 구버전 호환
+    if (d.actuals && !d.actualsByDate) actualsByDate[selectedDate] = d.actuals;
+    if (d.paceLogs && !d.paceLogsByDate) paceLogsByDate[selectedDate] = d.paceLogs;
+  } catch(e) {}
+}
+
+// ───────── 페이스 로그 계산 ─────────
+function recordPace(brand, val) {
+  const v = parseNum(val);
+  if (v <= 0) return;
+  const log = getPaceLogs()[brand];
+  const now = Date.now();
+  // 마지막 기록과 값이 같으면 스킵
+  if (log.length && log[log.length-1].val === v) return;
+  log.push({ ts: now, val: v });
+  // 최대 20개 유지
+  if (log.length > 20) log.shift();
+}
+
+function getPaceInfo(brand) {
+  const log = getPaceLogs()[brand];
+  if (log.length < 2) return null;
+  const prev = log[log.length-2];
+  const curr = log[log.length-1];
+  const diffVal = curr.val - prev.val;
+  const diffMin = (curr.ts - prev.ts) / 60000;
+  if (diffMin < 0.1) return null; // 너무 짧은 간격 무시
+  const perHour = diffVal / (diffMin / 60);
+  const trend = diffVal > 0 ? 'up' : diffVal < 0 ? 'down' : 'flat';
+  return { diffVal, diffMin, perHour, trend, prevVal: prev.val, currVal: curr.val,
+    prevTime: new Date(prev.ts), currTime: new Date(curr.ts) };
+}
+
+function renderPaceBox(brand) {
+  const info = getPaceInfo(brand);
+  const log = getPaceLogs()[brand];
+  const panel = document.getElementById('panel-'+brand);
+  if (!panel) return;
+  const box = panel.querySelector('.pace-box');
+  if (!box) return;
+
+  const tFmt = t => new Date(t).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  const dtFmt = t => {
+    const d = new Date(t);
+    return d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' +
+           d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+  };
+
+  // ── 필요 페이스 계산 ──
+  const dp = getDayProgress();
+  const target = TARGET_DATA[brand][selectedDate] || 0;
+  const actual = getActuals()[brand] || 0;
+  const needed = target - actual;
+  const needPerHour = dp.remaining > 0 ? needed / (dp.remaining / 3600) : 0;
+  const needPerMin  = needPerHour / 60;
+
+  // 최신 구간 페이스 표시
+  let paceHtml = '';
+  if (info) {
+    const arrow = info.trend==='up'?'↑':info.trend==='down'?'↓':'→';
+    const curColor = info.trend==='up'?'var(--success)':info.trend==='down'?'var(--danger)':'var(--muted)';
+    const minStr = info.diffMin < 60 ? info.diffMin.toFixed(0)+'분' : (info.diffMin/60).toFixed(1)+'시간';
+
+    // 페이스 비교
+    const diff = info.perHour - needPerHour;
+    const diffPct = needPerHour > 0 ? (diff / needPerHour * 100) : 0;
+    const isOk = diff >= 0;
+    const statusColor = isOk ? 'var(--success)' : 'var(--danger)';
+    const statusIcon  = isOk ? '✅' : '⚠️';
+    const statusLabel = isOk
+      ? `목표 페이스 초과 +${fmt(Math.round(diff))}/h (${diffPct>=0?'+':''}${diffPct.toFixed(0)}%)`
+      : `목표 페이스 부족 ${fmt(Math.round(diff))}/h (${diffPct.toFixed(0)}%)`;
+
+    // 게이지 바: 현재/필요 페이스 비율
+    const maxPace = Math.max(info.perHour, needPerHour, 1);
+    const curW  = Math.min(info.perHour  / maxPace * 100, 100).toFixed(1);
+    const needW = Math.min(needPerHour   / maxPace * 100, 100).toFixed(1);
+
+    paceHtml = `
+    <!-- 페이스 비교 배너 -->
+    <div style="background:${isOk?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border:1px solid ${statusColor};border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:1.3rem">${statusIcon}</div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">페이스 판정</div>
+        <div style="font-size:0.95rem;font-weight:700;color:${statusColor}">${statusLabel}</div>
+      </div>
+      <div style="text-align:right;min-width:120px">
+        <div style="font-size:0.65rem;color:var(--muted)">필요 페이스</div>
+        <div style="font-size:1rem;font-weight:700;color:var(--warn)">${fmt(Math.round(needPerHour))}/h</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${fmt(Math.round(needPerMin))}/m</div>
+      </div>
+    </div>
+
+    <!-- 페이스 게이지 -->
+    <div style="background:var(--card);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--muted);margin-bottom:6px">
+        <span>현재 구간 페이스</span><span style="color:${curColor};font-weight:700">${fmt(Math.round(info.perHour))}/h</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px">
+        <div style="height:100%;width:${curW}%;background:${curColor};border-radius:4px;transition:width 0.4s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--muted);margin-bottom:6px">
+        <span>목표 달성 필요 페이스</span><span style="color:var(--warn);font-weight:700">${fmt(Math.round(needPerHour))}/h</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${needW}%;background:var(--warn);border-radius:4px;transition:width 0.4s"></div>
+      </div>
+    </div>
+
+    <!-- 구간 상세 -->
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 16px;background:var(--card);border-radius:10px;margin-bottom:14px">
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">구간 증감 (${minStr})</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${curColor}">${arrow} ${info.diffVal>=0?'+':''}${fmt(info.diffVal)}</div>
+      </div>
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">구간 페이스</div>
+        <div style="font-size:1rem;font-weight:700;color:${curColor}">${fmt(Math.round(info.perHour))}/h</div>
+      </div>
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">분당</div>
+        <div style="font-size:0.88rem;font-weight:600">${fmt(Math.round(info.perHour/60))}/m</div>
+      </div>
+      <div style="margin-left:auto;font-size:0.72rem;color:var(--muted);text-align:right">
+        <div>${tFmt(info.prevTime.getTime())} → ${tFmt(info.currTime.getTime())}</div>
+        <div style="margin-top:2px">${fmt(info.prevVal)} → ${fmt(info.currVal)}</div>
+      </div>
+    </div>`;
+  } else {
+    // 실적은 있지만 기록이 1개뿐인 경우 필요 페이스만 표시
+    const needHtml = needPerHour > 0 ? `
+    <div style="background:var(--card);border-radius:10px;padding:14px 16px;margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">목표 달성 필요 페이스</div>
+        <div style="font-size:1.2rem;font-weight:700;color:var(--warn)">${fmt(Math.round(needPerHour))}/h</div>
+      </div>
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">분당 필요</div>
+        <div style="font-size:1rem;font-weight:600">${fmt(Math.round(needPerMin))}/m</div>
+      </div>
+      <div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">잔여 목표</div>
+        <div style="font-size:1rem;font-weight:600;color:var(--danger)">${fmt(needed)}</div>
+      </div>
+    </div>` : '';
+    paceHtml = needHtml + `<div style="color:var(--muted);font-size:0.8rem;padding:4px 0">실적을 2회 이상 입력(엔터)하면 구간 페이스 비교가 표시됩니다</div>`;
+  }
+
+  // 전체 입력 히스토리 테이블
+  let histHtml = '';
+  if (log.length > 0) {
+    const rows = [...log].reverse().map((entry, i, arr) => {
+      const prev = arr[i+1];
+      const dv = prev ? entry.val - prev.val : null;
+      const dm = prev ? (entry.ts - prev.ts)/60000 : null;
+      const ph = (dv !== null && dm > 0) ? dv/(dm/60) : null;
+      const dvColor = dv > 0 ? 'var(--success)' : dv < 0 ? 'var(--danger)' : 'var(--muted)';
+      // 해당 시점의 필요 페이스
+      const remAtEntry = Math.max(86400 - entry.ts % 86400000 / 1000, 0); // 대략
+      const neededAtEntry = target - entry.val;
+      const needPhEntry = remAtEntry > 0 ? neededAtEntry / (remAtEntry/3600) : 0;
+      const paceStatus = ph !== null
+        ? (ph >= needPhEntry ? `<span style="color:var(--success);font-size:0.72rem">▲ 여유</span>`
+                             : `<span style="color:var(--danger);font-size:0.72rem">▼ 부족</span>`)
+        : '—';
+      return `<tr>
+        <td style="color:var(--muted);font-size:0.78rem">${log.length - i}</td>
+        <td style="font-weight:600;color:var(--accent2)">${dtFmt(entry.ts)}</td>
+        <td style="font-weight:700">${fmtNum(entry.val)} 엔</td>
+        <td style="color:${dvColor};font-weight:600">${dv!==null?(dv>=0?'+':'')+fmt(dv):'—'}</td>
+        <td style="color:var(--muted);font-size:0.75rem">${dm!==null?dm.toFixed(0)+'분':'—'}</td>
+        <td style="color:${dvColor}">${ph!==null?fmt(Math.round(ph))+'/h':'—'}</td>
+        <td>${paceStatus}</td>
+      </tr>`;
+    }).join('');
+
+    histHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">입력 기록 (총 ${log.length}회)</span>
+      <button onclick="clearLog('${brand}')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem">기록 초기화</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+      <thead><tr style="border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">#</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">기록 시각</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">실적</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">구간 증감</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">경과</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">구간 페이스</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--muted);font-size:0.68rem">판정</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  box.innerHTML = paceHtml + histHtml;
+}
+
+function clearLog(brand) {
+  if (!confirm(`${brand} ${selectedDate} 입력 기록을 초기화할까요?`)) return;
+  getPaceLogs()[brand] = [];
+  save();
+  renderPaceBox(brand);
+}
+
+// ───────── 입력 핸들러 ─────────
+function onInput(brand, val) {
+  getActuals()[brand] = parseNum(val);
+  save();
+  updateBrandResults(brand);
+  renderAllTab();
+}
+
+// 엔터 또는 포커스 아웃 시 페이스 기록
+function onCommit(brand, val) {
+  recordPace(brand, val);
+  save();
+  renderPaceBox(brand);
+}
+
+// 브랜드 패널에서 입력창 제외하고 결과만 업데이트
+function updateBrandResults(brand) {
+  const dp = getDayProgress();
+  const target = TARGET_DATA[brand][selectedDate] || 0;
+  const actual = getActuals()[brand] || 0;
+  const pct = target > 0 ? actual/target*100 : 0;
+  const barW = Math.min(pct,100).toFixed(1);
+  const barCls = getBarClass(pct);
+  const timePct = (dp.pct*100).toFixed(1);
+  const gap = actual - target;
+  const remH = Math.floor(dp.remaining/3600);
+  const remM = Math.floor((dp.remaining%3600)/60);
+  const elH  = Math.floor(dp.elapsed/3600);
+  const elM  = Math.floor((dp.elapsed%3600)/60);
+
+  // 요약 카드
+  const sc = document.querySelector(`#panel-${brand} .summary-row`);
+  if (sc) sc.innerHTML = `
+    <div class="stat-card">
+      <div class="s-label">일 목표</div>
+      <div class="s-val" style="color:${BRAND_COLOR[brand]}">${fmt(target)}</div>
+      <div class="s-sub">${selectedDate}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">현재 실적</div>
+      <div class="s-val">${fmt(actual)}</div>
+      <div class="s-sub" style="color:${gap>=0?'var(--success)':'var(--danger)'}">${gap>=0?'+':''}${fmt(gap)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">달성률</div>
+      <div class="s-val" style="color:${pct>=100?'var(--success)':pct>=70?'':pct>=40?'var(--warn)':'var(--danger)'}">${pct.toFixed(1)}%</div>
+      <div class="s-sub">목표 대비</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">마감까지</div>
+      <div class="s-val">${remH}h ${remM}m</div>
+      <div class="s-sub">경과 ${elH}h ${elM}m (${(dp.pct*100).toFixed(0)}%)</div>
+    </div>`;
+
+  // 진도율 바
+  const bf = document.querySelector(`#panel-${brand} .bar-fill`);
+  const bt = document.querySelector(`#panel-${brand} .bar-time-marker`);
+  const pp = document.querySelector(`#panel-${brand} .prog-pct`);
+  if (bf) { bf.style.width = barW+'%'; bf.className = 'bar-fill '+barCls; }
+  if (bt) bt.style.left = timePct+'%';
+  if (pp) { pp.textContent = pct.toFixed(1)+'%'; pp.style.color = pct>=100?'var(--success)':pct>=70?BRAND_COLOR[brand]:pct>=40?'var(--warn)':'var(--danger)'; }
+
+  // 시나리오 tbody
+  const tbody = document.querySelector(`#panel-${brand} .sim-table tbody`);
+  if (tbody) tbody.innerHTML = SCENARIOS.map(sc => {
+    const proj = calcProjected(actual, dp, sc.pace);
+    const rate = target > 0 ? proj/target*100 : 0;
+    const diff = proj - target;
+    return `<tr>
+      <td><span class="s-name ${sc.cls}">${sc.name}</span></td>
+      <td><div class="pace-bar">
+        <div class="pace-bg"><div class="pace-fill" style="width:${Math.min(sc.pace*66,100)}%;background:${sc.pace>=1?'var(--success)':sc.pace>=0.6?'var(--warn)':'var(--muted)'}"></div></div>
+        <span style="font-size:0.78rem;color:var(--muted)">${(sc.pace*100).toFixed(0)}%</span>
+      </div></td>
+      <td style="font-weight:700">${fmt(Math.round(proj))}</td>
+      <td>${getRateChip(rate)}</td>
+      <td style="color:${diff>=0?'var(--success)':'var(--danger)'};font-weight:600">${diff>=0?'+':''}${fmt(Math.round(diff))}</td>
+    </tr>`;
+  }).join('');
+
+  // 필요 매출 행
+  const needed = target - actual;
+  const needPerHour = dp.remaining > 0 ? needed/(dp.remaining/3600) : 0;
+  const needRow = document.querySelector(`#panel-${brand} .need-row`);
+  const simSec = document.querySelector(`#panel-${brand} .sim-section`);
+  if (simSec) {
+    let nr = simSec.querySelector('.need-row');
+    if (!nr) { nr = document.createElement('div'); nr.className='need-row'; simSec.appendChild(nr); }
+    if (needed > 0 && dp.remaining > 0) {
+      nr.style.display = 'flex';
+      nr.innerHTML = `
+        <div class="need-item"><div class="n-label">목표까지 남은 금액</div><div class="n-val" style="color:var(--danger)">${fmt(needed)}</div></div>
+        <div class="need-item"><div class="n-label">시간당 필요 매출</div><div class="n-val" style="color:var(--warn)">${fmt(Math.round(needPerHour))}</div></div>
+        <div class="need-item"><div class="n-label">분당 필요 매출</div><div class="n-val">${fmt(Math.round(needPerHour/60))}</div></div>`;
+    } else if (needed <= 0 && actual > 0) {
+      nr.style.display = 'flex';
+      nr.innerHTML = `<div class="need-item"><div class="n-label">초과 달성</div><div class="n-val" style="color:var(--success)">+${fmt(Math.abs(gap))} 🎉</div></div>`;
+    } else {
+      nr.style.display = 'none';
+    }
+  }
+}
+
+// ───────── 전체 렌더 ─────────
+function renderAll() {
+  document.getElementById('todayBadge').style.display = selectedDate===todayStr()?'inline-block':'none';
+  renderAllTab();
+  BRANDS.forEach(b => { renderBrandPanel(b); renderPaceBox(b); });
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+// ───────── 초기화 ─────────
+load();
+initDatePicker();
+renderAll();
+updateClock();
+
+setInterval(() => {
+  updateClock();
+  renderAll();
+}, 10000);
+</script>
+</body>
+</html>

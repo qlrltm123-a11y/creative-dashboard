@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>퍼널 전환율 대시보드</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:#f1f3f9;color:#1e293b;min-height:100vh}
+
+/* ── Header ── */
+header{background:rgba(255,255,255,.85);border-bottom:1px solid #e2e8f0;padding:13px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 4px 12px rgba(99,102,241,.3)}
+.logo h1{font-size:14px;font-weight:700;color:#0f172a}
+.logo p{font-size:11px;color:#94a3b8;margin-top:1px}
+.header-right{display:flex;align-items:center;gap:12px}
+.status-pill{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:6px 13px;font-size:11px;color:#64748b}
+.dot{width:6px;height:6px;border-radius:50%;background:#10b981;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.status-pill b{color:#334155;font-weight:700}
+.btn{padding:7px 15px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-reload{background:#6366f1;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.25)}
+.btn-reload:hover{background:#4f46e5}
+
+/* ── Brand nav ── */
+.brand-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 28px;display:flex;gap:0}
+.brand-tab{padding:13px 26px;font-size:13px;font-weight:700;cursor:pointer;color:#94a3b8;border:none;background:transparent;border-bottom:3px solid transparent;transition:all .2s;letter-spacing:.04em}
+.brand-tab:hover{color:#475569}
+.brand-tab.boh.active{color:#4f46e5;border-bottom-color:#6366f1}
+.brand-tab.wm.active{color:#059669;border-bottom-color:#10b981}
+.brand-tab.cg.active{color:#d97706;border-bottom-color:#f59e0b}
+
+/* ── URL banner ── */
+.url-banner{padding:9px 28px;display:flex;align-items:center;gap:8px;font-size:12px;border-bottom:1px solid #e2e8f0;background:#fafbfd}
+.url-label{font-weight:700;white-space:nowrap;font-size:11px;min-width:55px}
+.boh .url-label{color:#4f46e5}.wm .url-label{color:#059669}.cg .url-label{color:#d97706}
+.url-banner input{flex:1;padding:6px 11px;background:#fff;border:1px solid #d8dee9;border-radius:7px;color:#475569;font-size:11px;font-family:monospace}
+.url-banner input:focus{outline:none;border-color:#6366f1}
+.url-btn{padding:6px 13px;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer}
+.boh .url-btn{background:#6366f1}.wm .url-btn{background:#10b981}.cg .url-btn{background:#f59e0b}
+.url-hint{color:#94a3b8;font-size:10px;white-space:nowrap}
+
+/* ── Main ── */
+main{padding:22px 28px;max-width:1600px;margin:0 auto}
+
+/* ── Inner tabs ── */
+.inner-tabs{display:flex;gap:3px;margin-bottom:22px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:4px;width:fit-content;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.inner-tab{padding:7px 17px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:#64748b;transition:all .2s;border:none;background:transparent}
+.inner-tab:hover{color:#334155}
+.inner-tab.active{background:#6366f1;color:#fff}
+
+/* ── Section label ── */
+.sec-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:13px}
+
+/* ── Card base ── */
+.funnel-card,.delta-card,.trend-card,.cmp-card{background:#fff;border:1px solid #e8ecf3;border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.05);transition:box-shadow .2s,transform .2s}
+.funnel-card:hover,.delta-card:hover,.trend-card:hover,.cmp-card:hover{box-shadow:0 6px 20px rgba(15,23,42,.08);transform:translateY(-1px)}
+
+/* ═══ FUNNEL CARDS ═══ */
+.funnel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:28px}
+.funnel-card{padding:18px 20px}
+.fc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.fc-name{font-size:14px;font-weight:700;color:#4f46e5}
+.fc-date{font-size:10px;color:#94a3b8;margin-top:3px}
+.fc-inflow{font-size:11px;color:#94a3b8;font-weight:600;text-align:right}
+.funnel-stages{display:flex;flex-direction:column;gap:11px}
+.stage{display:grid;grid-template-columns:62px 1fr 92px;align-items:center;gap:12px}
+.stage-label{font-size:11px;color:#475569;font-weight:700;white-space:nowrap}
+.stage-mid{display:flex;flex-direction:column;gap:3px;min-width:0}
+.stage-bar-wrap{position:relative;height:8px;background:#eef1f6;border-radius:4px;overflow:hidden}
+.stage-bar{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.stage-count{font-size:11px;color:#64748b;font-weight:600;white-space:nowrap}
+.stage-right{text-align:right}
+.stage-rate{font-size:15px;font-weight:800;line-height:1.05}
+.stage-delta{font-size:10px;font-weight:700;margin-top:2px}
+.bar-inflow{background:linear-gradient(90deg,#cbd5e1,#94a3b8)}
+.bar-cart{background:linear-gradient(90deg,#818cf8,#6366f1)}
+.bar-buy{background:linear-gradient(90deg,#c4b5fd,#a78bfa)}
+.delta-pos{color:#059669}.delta-neg{color:#dc2626}.delta-neu{color:#94a3b8}
+
+/* ═══ DELTA CARDS ═══ */
+.delta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:28px}
+.delta-card{padding:18px 20px}
+.dc-name{font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:4px}
+.dc-dates{font-size:10px;color:#94a3b8;margin-bottom:14px}
+.dc-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dc-metric{background:#f8fafc;border:1px solid #eef1f6;border-radius:10px;padding:12px 14px}
+.dc-metric-label{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.dc-metric-val{font-size:22px;font-weight:800;line-height:1;margin-bottom:4px}
+.dc-metric-count{font-size:11px;color:#94a3b8;margin-bottom:6px}
+.dc-delta-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-pos{background:#dcfce7;color:#059669}
+.badge-neg{background:#fee2e2;color:#dc2626}
+.badge-neu{background:#f1f5f9;color:#94a3b8}
+.dc-prev{font-size:10px;color:#94a3b8;margin-top:4px}
+
+/* ═══ TREND CHARTS ═══ */
+.trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:14px;margin-bottom:28px}
+.trend-card{padding:18px 20px}
+.trend-card .tc-title{font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:14px}
+.chart-wrap{position:relative;height:250px}
+
+/* ═══ COMPARE ═══ */
+.cmp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:14px}
+.cmp-card{padding:18px 20px}
+.cmp-card .cc-title{font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:4px}
+.cmp-card .cc-sub{font-size:10px;color:#94a3b8;margin-bottom:8px}
+.cmp-chart-wrap{position:relative;height:220px}
+
+/* ═══ SUMMARY TAB ═══ */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.kpi-card{background:#fff;border:1px solid #e8ecf3;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,.05);position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:#6366f1}
+.kpi-card.green::before{background:#10b981}.kpi-card.purple::before{background:#a78bfa}.kpi-card.slate::before{background:#94a3b8}
+.kpi-label{font-size:11px;color:#64748b;font-weight:700;margin-bottom:8px}
+.kpi-val{font-size:28px;font-weight:800;color:#0f172a;line-height:1;margin-bottom:6px}
+.kpi-sub{font-size:11px;color:#94a3b8}
+.kpi-delta{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;margin-top:8px}
+
+.summary-cols{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:24px}
+@media(max-width:980px){.summary-cols{grid-template-columns:1fr}}
+.panel-box{background:#fff;border:1px solid #e8ecf3;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.panel-box h3{font-size:13px;font-weight:700;color:#334155;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+
+/* ranking */
+.rank-row{display:grid;grid-template-columns:20px 1fr auto auto;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9}
+.rank-row:last-child{border-bottom:none}
+.rank-num{font-size:11px;font-weight:700;color:#cbd5e1;text-align:center}
+.rank-name{font-size:12px;font-weight:600;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-bar-wrap{display:flex;flex-direction:column;gap:3px;min-width:90px}
+.rank-bar-track{height:6px;background:#eef1f6;border-radius:3px;overflow:hidden}
+.rank-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,#818cf8,#6366f1)}
+.rank-rate{font-size:13px;font-weight:800;color:#4f46e5;text-align:right;min-width:54px}
+.rank-delta{font-size:10px;font-weight:700;text-align:right;min-width:60px}
+
+/* highlight list */
+.hl-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9}
+.hl-item:last-child{border-bottom:none}
+.hl-name{font-size:12px;font-weight:600;color:#334155}
+.hl-detail{font-size:10px;color:#94a3b8;margin-top:1px}
+.hl-badge{font-size:12px;font-weight:800;padding:3px 9px;border-radius:20px}
+
+.brand-trend-box{background:#fff;border:1px solid #e8ecf3;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(15,23,42,.05);margin-bottom:24px}
+.brand-trend-box h3{font-size:13px;font-weight:700;color:#334155;margin-bottom:14px}
+.brand-trend-wrap{position:relative;height:280px}
+
+/* ═══ States ═══ */
+.brand-panel{display:none}.brand-panel.active{display:block}
+.loading-state{display:flex;align-items:center;gap:10px;padding:60px 0;color:#94a3b8;font-size:13px;justify-content:center}
+.spin{width:18px;height:18px;border:2px solid #e2e8f0;border-top-color:#6366f1;border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.error-state{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px 20px;color:#dc2626;font-size:13px;line-height:1.7;margin:20px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📈</div>
+    <div>
+      <h1>퍼널 전환율 대시보드</h1>
+      <p>261Q vs 262Q · 브랜드별 제품 모니터링</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>업데이트: <b id="last-updated">-</b></div>
+    <button class="btn btn-reload" onclick="reloadCurrent()">🔄 시트 갱신</button>
+  </div>
+</header>
+
+<nav class="brand-nav">
+  <button class="brand-tab boh active" onclick="switchBrand('BOH',this)">BOH</button>
+  <button class="brand-tab wm"  onclick="switchBrand('WM',this)">WM</button>
+  <button class="brand-tab cg"  onclick="switchBrand('CG',this)">CG</button>
+</nav>
+
+<div id="url-BOH" class="url-banner boh">
+  <span class="url-label">BOH</span>
+  <input id="url-input-BOH" placeholder="구글 시트 웹 게시 CSV URL">
+  <button class="url-btn" onclick="applyUrl('BOH')">적용</button>
+  <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
+</div>
+<div id="url-WM" class="url-banner wm" style="display:none">
+  <span class="url-label">WM</span>
+  <input id="url-input-WM" placeholder="구글 시트 웹 게시 CSV URL">
+  <button class="url-btn" onclick="applyUrl('WM')">적용</button>
+  <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
+</div>
+<div id="url-CG" class="url-banner cg" style="display:none">
+  <span class="url-label">CG</span>
+  <input id="url-input-CG" placeholder="구글 시트 웹 게시 CSV URL">
+  <button class="url-btn" onclick="applyUrl('CG')">적용</button>
+  <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
+</div>
+
+<main>
+  <!-- Panels generated per brand -->
+  <div id="panel-BOH" class="brand-panel active"></div>
+  <div id="panel-WM"  class="brand-panel"></div>
+  <div id="panel-CG"  class="brand-panel"></div>
+</main>
+
+<script>
+const BRANDS = ['BOH','WM','CG'];
+const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
+const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+const C262 = {cart:'#6366f1',buy:'#a78bfa'};
+const C261 = {cart:'#f97316',buy:'#fb923c'};
+
+let currentBrand = 'BOH';
+let brandData = {BOH:null,WM:null,CG:null};
+let charts = {};
+
+// ── 기본 시트 URL (링크 공유 시 자동 로드) ──────────────────────────────────────
+const DEFAULT_URLS = {
+  BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
+  WM: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
+  CG: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
+};
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
+const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
+
+// ── Brand switch ──────────────────────────────────────────────────────────────
+function switchBrand(brand, btn) {
+  currentBrand = brand;
+  BRANDS.forEach(b => {
+    document.getElementById(`panel-${b}`).classList.toggle('active', b===brand);
+    document.getElementById(`url-${b}`).style.display = b===brand ? '' : 'none';
+  });
+  document.querySelectorAll('.brand-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  if (!brandData[brand]) loadBrand(brand);
+}
+function reloadCurrent() { loadBrand(currentBrand, true); }
+function applyUrl(brand) {
+  const u = document.getElementById(`url-input-${brand}`).value.trim();
+  if (!u) return alert('URL을 입력해주세요');
+  saveUrl(brand, u);
+  loadBrand(brand, true);
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function loadBrand(brand, force=false) {
+  if (!force && brandData[brand]) return;
+  const url = getUrl(brand);
+  document.getElementById(`url-input-${brand}`).value = url;
+  setPanelState(brand,'loading');
+  if (!url) { setPanelState(brand,'error',`${brand} 시트 URL을 위에 입력해주세요.<br><small>파일 › 웹에 게시 › CSV › 게시 › URL 복사</small>`); return; }
+
+  let text;
+  try {
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{cache:'no-store'});
+    if (!r.ok) throw 0;
+    text = await r.text();
+  } catch {
+    try { const r2=await fetch(url,{cache:'no-store'}); text=await r2.text(); }
+    catch(e){ setPanelState(brand,'error',`로드 실패: 시트가 공개 게시되어 있는지 확인하세요.`); return; }
+  }
+
+  brandData[brand] = parseSheet(parseCSV(text));
+  render(brand);
+  const t=new Date();
+  document.getElementById('last-updated').textContent=
+    `${t.getMonth()+1}/${t.getDate()} ${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
+}
+
+// ── Parse ─────────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  return text.split(/\r?\n/).filter(l=>l.trim()).map(line=>{
+    const cols=[]; let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"'){inQ=!inQ;continue;}
+      if(c===','&&!inQ){cols.push(cur.trim());cur='';continue;}
+      cur+=c;
+    }
+    cols.push(cur.trim()); return cols;
+  });
+}
+const parsePct = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace('%','').replace(',','')); return isNaN(n)?null:n; };
+const parseNum = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace(/,/g,'')); return isNaN(n)?null:n; };
+
+function parseSheet(rows) {
+  function ext(cm) {
+    const d={};
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      if(!r||r.length<cm.buyRate+1) continue;
+      const prod=r[cm.product]?.trim(), date=r[cm.date]?.trim();
+      if(!prod||!date||prod==='제품'||date==='date'||date==='') continue;
+      if(!d[prod]) d[prod]=[];
+      const inflow=parseNum(r[cm.inflow]), cart=parseNum(r[cm.cart]), buy=parseNum(r[cm.buy]);
+      // 시트의 전환율 컬럼은 오류가 있어 신뢰하지 않고 건수에서 직접 계산
+      d[prod].push({
+        date, inflow, cart, buy,
+        cartRate: (inflow>0 && cart!=null) ? cart/inflow*100 : null,
+        buyRate:  (cart>0   && buy!=null)  ? buy/cart*100    : null,
+      });
+    }
+    const sk = d => { const[m,rest]=d.split('월'); return parseInt(m)*100+parseInt(rest?.replace('일','')||0); };
+    Object.values(d).forEach(a=>a.sort((a,b)=>sk(a.date)-sk(b.date)));
+    return d;
+  }
+  return {'262Q':ext(COL_262),'261Q':ext(COL_261)};
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(brand) {
+  const data = brandData[brand];
+  const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
+  const panel = document.getElementById(`panel-${brand}`);
+
+  panel.innerHTML = buildPanelHTML(brand);
+
+  // destroy old charts
+  Object.keys(charts).filter(k=>k.startsWith(brand+'_')).forEach(k=>{charts[k].destroy();delete charts[k];});
+
+  renderSummaryTab(brand, data, prods);
+  renderFunnelCards(brand, data, prods);
+  renderDeltaCards(brand, data, prods);
+  renderTrendCharts(brand, data, prods);
+  renderCmpCharts(brand, data, prods);
+}
+
+function buildPanelHTML(brand) {
+  const tabsFn = (b) => `
+    <div class="inner-tabs" id="itabs-${b}">
+      <button class="inner-tab active" onclick="switchInner('${b}','summary',this)">📋 현황 요약</button>
+      <button class="inner-tab" onclick="switchInner('${b}','snapshot',this)">⬡ 스냅샷</button>
+      <button class="inner-tab" onclick="switchInner('${b}','delta',this)">↕ 직전일 변동</button>
+      <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 트렌드</button>
+      <button class="inner-tab" onclick="switchInner('${b}','compare',this)">⊞ 261Q 비교</button>
+    </div>`;
+  return `
+    <div id="inner-${brand}-summary">
+      <div class="sec-label">${brand} 브랜드 현황 요약 · 262Q (vs 261Q 동기간)</div>
+      <div class="kpi-row" id="kpi-${brand}"></div>
+      <div class="brand-trend-box">
+        <h3>📈 브랜드 전체 일별 추이</h3>
+        <div class="brand-trend-wrap"><canvas id="btrend-${brand}"></canvas></div>
+      </div>
+      <div class="summary-cols">
+        <div class="panel-box">
+          <h3>🏆 제품별 구매 전환율 랭킹 <span style="font-size:10px;color:#94a3b8;font-weight:500">· 262Q 누적</span></h3>
+          <div id="rank-${brand}"></div>
+        </div>
+        <div class="panel-box">
+          <h3>⚡ 직전일 대비 하이라이트</h3>
+          <div id="hl-${brand}"></div>
+        </div>
+      </div>
+    </div>
+    <div id="inner-${brand}-snapshot" style="display:none">
+      <div class="sec-label">최신 실적 스냅샷 · 262Q (직전일 대비)</div>
+      <div class="funnel-grid" id="funnel-${brand}"></div>
+    </div>
+    <div id="inner-${brand}-delta" style="display:none">
+      <div class="sec-label">262Q 직전일 대비 변동</div>
+      <div class="delta-grid" id="dcards-${brand}"></div>
+    </div>
+    <div id="inner-${brand}-trend" style="display:none">
+      <div class="sec-label">일별 추이 · 막대=건수(우) 선=전환율(좌) · 실선 262Q 점선 261Q</div>
+      <div class="trend-grid" id="trend-${brand}"></div>
+    </div>
+    <div id="inner-${brand}-compare" style="display:none">
+      <div class="sec-label">동일 영업일 기준 · 262Q vs 261Q</div>
+      <div class="cmp-grid" id="cmp-${brand}"></div>
+    </div>
+    ${tabsFn(brand)}`;
+}
+
+// ── Summary Tab ───────────────────────────────────────────────────────────────
+const dateKey = d => { const[m,rest]=d.split('월'); return parseInt(m)*100+parseInt(rest?.replace('일','')||0); };
+
+function brandDailySeries(qData, prods) {
+  const map = {};
+  prods.forEach(p => (qData[p]||[]).forEach(r=>{
+    if(!map[r.date]) map[r.date]={inflow:0,cart:0,buy:0};
+    map[r.date].inflow+=r.inflow||0; map[r.date].cart+=r.cart||0; map[r.date].buy+=r.buy||0;
+  }));
+  return Object.keys(map).sort((a,b)=>dateKey(a)-dateKey(b)).map(d=>({
+    date:d, ...map[d],
+    cartRate: map[d].inflow>0 ? map[d].cart/map[d].inflow*100 : null,
+    buyRate:  map[d].cart>0   ? map[d].buy/map[d].cart*100    : null,
+  }));
+}
+
+function renderSummaryTab(brand, data, prods) {
+  const ser262 = brandDailySeries(data['262Q'], prods);
+  const ser261 = brandDailySeries(data['261Q'], prods);
+  if (!ser262.length) return;
+
+  // 브랜드 전체 누적 집계
+  const sum = ser => ser.reduce((a,r)=>({inflow:a.inflow+r.inflow,cart:a.cart+r.cart,buy:a.buy+r.buy}),{inflow:0,cart:0,buy:0});
+  const agg262 = sum(ser262);
+  const agg261 = sum(ser261.slice(0, ser262.length)); // 동일 영업일 수 기준
+  const rate = (n,d) => d>0 ? n/d*100 : null;
+  const cr262 = rate(agg262.cart, agg262.inflow), br262 = rate(agg262.buy, agg262.cart);
+  const cr261 = rate(agg261.cart, agg261.inflow), br261 = rate(agg261.buy, agg261.cart);
+  const inflowD = agg261.inflow>0 ? (agg262.inflow-agg261.inflow)/agg261.inflow*100 : null;
+  const days = ser262.length;
+  const lastDate = ser262[ser262.length-1].date;
+
+  // ── KPI 카드 ──
+  const badge = (v,suffix='%p') => {
+    if(v===null) return '';
+    const cls=v>0?'badge-pos':(v<0?'badge-neg':'badge-neu');
+    return `<span class="kpi-delta ${cls}">${arrow(v)} ${Math.abs(v).toFixed(suffix==='%'?1:2)}${suffix}</span>`;
+  };
+  document.getElementById(`kpi-${brand}`).innerHTML = `
+    <div class="kpi-card slate">
+      <div class="kpi-label">총 유입 (262Q 누적)</div>
+      <div class="kpi-val">${n(agg262.inflow)}</div>
+      <div class="kpi-sub">${days}일 · ~${lastDate}</div>
+      ${inflowD!==null?badge(inflowD,'%'):''}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.inflow)}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">🛒 전체 장바구니 전환율</div>
+      <div class="kpi-val" style="color:#4f46e5">${f(cr262)}</div>
+      <div class="kpi-sub">${n(agg262.cart)}건</div>
+      ${badge(dlt(cr262,cr261))}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${f(cr261)} · ${n(agg261.cart)}건</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">💳 전체 구매 전환율</div>
+      <div class="kpi-val" style="color:#7c3aed">${f(br262)}</div>
+      <div class="kpi-sub">${n(agg262.buy)}건</div>
+      ${badge(dlt(br262,br261))}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${f(br261)} · ${n(agg261.buy)}건</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">전체 구매 전환 (유입→구매)</div>
+      <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
+      <div class="kpi-sub">${prods.length}개 제품</div>
+      ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${f(rate(agg261.buy,agg261.inflow))}</div>
+    </div>`;
+
+  // ── 브랜드 전체 추이 차트 ──
+  const labels = ser262.map(r=>r.date);
+  const pad = (arr,len)=>{const a=[...arr];while(a.length<len)a.push(null);return a;};
+  const id = `${brand}_btrend`;
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(`btrend-${brand}`),{
+    data:{ labels, datasets:[
+      {type:'bar',label:'262Q 유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:3},
+      {type:'bar',label:'261Q 유입',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#fdba7488',yAxisID:'cnt',borderRadius:3,order:3},
+      {type:'line',label:'262Q 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
+      {type:'line',label:'262Q 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
+      {type:'line',label:'261Q 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
+      {type:'line',label:'261Q 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#64748b',font:{size:11},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:c=>{const v=c.parsed.y;if(v===null)return `${c.dataset.label}: -`;return c.dataset.yAxisID==='cnt'?`${c.dataset.label}: ${n(v)}`:`${c.dataset.label}: ${v.toFixed(2)}%`;}}}},
+      scales:{x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#f1f5f9'}},
+        rate:{position:'left',ticks:{color:'#6366f1',font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'},title:{display:true,text:'전환율',color:'#94a3b8',font:{size:9}}},
+        cnt:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'유입',color:'#94a3b8',font:{size:9}}}}}
+  });
+
+  // ── 제품별 구매 전환율 랭킹 (262Q 누적) ──
+  const ranking = prods.map(p=>{
+    const rows = data['262Q'][p]||[];
+    if(!rows.length) return null;
+    const a = aggregate(rows);
+    return {prod:p, buyRate:a.buyRate, buy:a.buy};
+  }).filter(Boolean).sort((a,b)=>(b.buyRate||0)-(a.buyRate||0));
+  const maxBuyRate = Math.max(...ranking.map(r=>r.buyRate||0),1);
+  document.getElementById(`rank-${brand}`).innerHTML = ranking.map((r,i)=>`
+    <div class="rank-row">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name" title="${r.prod}">${r.prod}</div>
+      <div class="rank-bar-wrap">
+        <div class="rank-bar-track"><div class="rank-bar" style="width:${((r.buyRate||0)/maxBuyRate*100).toFixed(0)}%"></div></div>
+        <div style="font-size:9px;color:#94a3b8">${n(r.buy)}건</div>
+      </div>
+      <div class="rank-rate">${f(r.buyRate)}</div>
+    </div>`).join('');
+
+  // ── 직전일 대비 하이라이트 ──
+  const movers = prods.map(p=>{
+    const rows = data['262Q'][p]||[];
+    if(rows.length<2) return null;
+    const last=rows[rows.length-1], prev=rows[rows.length-2];
+    return {prod:p, buyD:dlt(last.buyRate,prev.buyRate), cartD:dlt(last.cartRate,prev.cartRate), last, prev};
+  }).filter(m=>m&&m.buyD!==null);
+  const ups = [...movers].sort((a,b)=>b.buyD-a.buyD).filter(m=>m.buyD>0).slice(0,3);
+  const downs = [...movers].sort((a,b)=>a.buyD-b.buyD).filter(m=>m.buyD<0).slice(0,3);
+  const hlItem = (m,up) => `
+    <div class="hl-item">
+      <div>
+        <div class="hl-name">${m.prod}</div>
+        <div class="hl-detail">구매율 ${f(m.prev.buyRate)} → ${f(m.last.buyRate)} · ${m.last.date}</div>
+      </div>
+      <div class="hl-badge ${up?'badge-pos':'badge-neg'}">${arrow(m.buyD)} ${Math.abs(m.buyD).toFixed(2)}%p</div>
+    </div>`;
+  document.getElementById(`hl-${brand}`).innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:6px">📈 구매율 상승 TOP</div>
+    ${ups.length?ups.map(m=>hlItem(m,true)).join(''):'<div style="font-size:11px;color:#94a3b8;padding:6px 0">상승 제품 없음</div>'}
+    <div style="font-size:11px;font-weight:700;color:#dc2626;margin:14px 0 6px">📉 구매율 하락 TOP</div>
+    ${downs.length?downs.map(m=>hlItem(m,false)).join(''):'<div style="font-size:11px;color:#94a3b8;padding:6px 0">하락 제품 없음</div>'}`;
+}
+
+// ── Funnel Cards ──────────────────────────────────────────────────────────────
+function aggregate(rows) {
+  const totInflow = rows.reduce((s,r)=>s+(r.inflow||0),0);
+  const totCart   = rows.reduce((s,r)=>s+(r.cart||0),0);
+  const totBuy    = rows.reduce((s,r)=>s+(r.buy||0),0);
+  const cartRate  = totInflow>0 ? totCart/totInflow*100 : null;
+  const buyRate   = totCart>0   ? totBuy/totCart*100    : null;
+  return {inflow:totInflow, cart:totCart, buy:totBuy, cartRate, buyRate};
+}
+
+function renderFunnelCards(brand, data, prods) {
+  const grid = document.getElementById(`funnel-${brand}`);
+  prods.forEach(prod => {
+    const rows262 = data['262Q'][prod] || [];
+    const rows261 = data['261Q'][prod] || [];
+    if (!rows262.length) return;
+
+    const agg262 = aggregate(rows262);
+    const agg261 = rows261.length ? aggregate(rows261.slice(0, rows262.length)) : null;
+
+    const dateRange = rows262.length===1
+      ? rows262[0].date
+      : `${rows262[0].date} ~ ${rows262[rows262.length-1].date}`;
+
+    const inflow = agg262.inflow || 1;
+    const cartW  = Math.min(100, agg262.cart/inflow*100);
+    const buyW   = Math.min(100, agg262.buy/inflow*100);
+    const cD = dlt(agg262.cartRate, agg261?.cartRate);
+    const bD = dlt(agg262.buyRate,  agg261?.buyRate);
+    const cmpLabel = agg261 ? `vs 261Q ${rows262.length}일` : '';
+    // 유입 직전비 (261Q 동기간 대비 %)
+    const inflowD = (agg261 && agg261.inflow>0) ? (agg262.inflow-agg261.inflow)/agg261.inflow*100 : null;
+    const inflowBadge = inflowD!==null
+      ? `<div class="stage-delta ${dcls(inflowD)}">${inflowD>0?'+':''}${inflowD.toFixed(1)}%</div>`
+      : '<div class="stage-delta delta-neu">-</div>';
+
+    grid.insertAdjacentHTML('beforeend',`
+      <div class="funnel-card">
+        <div class="fc-header">
+          <div>
+            <div class="fc-name">${prod}</div>
+            <div class="fc-date">${dateRange} · ${rows262.length}일 누적</div>
+          </div>
+          <div class="fc-inflow" style="text-align:right">총 유입<br><span style="font-size:15px;font-weight:700;color:#888">${n(agg262.inflow)}</span></div>
+        </div>
+        <div class="funnel-stages">
+          <div class="stage">
+            <div class="stage-label" style="color:#94a3b8">유입</div>
+            <div class="stage-mid">
+              <div class="stage-bar-wrap"><div class="stage-bar bar-inflow" style="width:100%"></div></div>
+              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q ${n(agg261.inflow)}</span>`:''}</div>
+            </div>
+            <div class="stage-right">
+              <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
+              ${inflowBadge}
+            </div>
+          </div>
+          <div class="stage">
+            <div class="stage-label" style="color:#818cf8">장바구니</div>
+            <div class="stage-mid">
+              <div class="stage-bar-wrap"><div class="stage-bar bar-cart" style="width:${cartW.toFixed(1)}%"></div></div>
+              <div class="stage-count">${n(agg262.cart)}건</div>
+            </div>
+            <div class="stage-right">
+              <div class="stage-rate" style="color:#818cf8">${f(agg262.cartRate)}</div>
+              <div class="stage-delta ${dcls(cD)}" title="${cmpLabel}">${fD(cD)}</div>
+            </div>
+          </div>
+          <div class="stage">
+            <div class="stage-label" style="color:#a78bfa">구매</div>
+            <div class="stage-mid">
+              <div class="stage-bar-wrap"><div class="stage-bar bar-buy" style="width:${buyW.toFixed(1)}%"></div></div>
+              <div class="stage-count">${n(agg262.buy)}건</div>
+            </div>
+            <div class="stage-right">
+              <div class="stage-rate" style="color:#a78bfa">${f(agg262.buyRate)}</div>
+              <div class="stage-delta ${dcls(bD)}" title="${cmpLabel}">${fD(bD)}</div>
+            </div>
+          </div>
+        </div>
+        ${agg261?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e1e2e;display:flex;gap:16px;font-size:11px;color:#555">
+          <span>261Q 동기간</span>
+          <span style="color:#666">🛒 ${f(agg261.cartRate)} · ${n(agg261.cart)}건</span>
+          <span style="color:#666">💳 ${f(agg261.buyRate)} · ${n(agg261.buy)}건</span>
+        </div>`:''}
+      </div>`);
+  });
+}
+
+// ── Delta Cards ───────────────────────────────────────────────────────────────
+function renderDeltaCards(brand, data, prods) {
+  const grid = document.getElementById(`dcards-${brand}`);
+  prods.forEach(prod => {
+    const rows = data['262Q'][prod] || [];
+    if (rows.length < 2) return;
+    const last = rows[rows.length-1], prev = rows[rows.length-2];
+    const cD = dlt(last.cartRate, prev.cartRate);
+    const bD = dlt(last.buyRate,  prev.buyRate);
+
+    grid.insertAdjacentHTML('beforeend',`
+      <div class="delta-card">
+        <div class="dc-name">${prod}</div>
+        <div class="dc-dates">${prev.date} → <b style="color:#888">${last.date}</b></div>
+        <div class="dc-metrics">
+          <div class="dc-metric">
+            <div class="dc-metric-label">🛒 장바구니 전환율</div>
+            <div class="dc-metric-val" style="color:#818cf8">${f(last.cartRate)}</div>
+            <div class="dc-metric-count">${n(last.cart)}건</div>
+            <span class="dc-delta-badge ${bdgCls(cD)}">${arrow(cD)} ${cD!==null?Math.abs(cD).toFixed(2)+'%p':'-'}</span>
+            <div class="dc-prev">직전 ${f(prev.cartRate)} · ${n(prev.cart)}건</div>
+          </div>
+          <div class="dc-metric">
+            <div class="dc-metric-label">💳 구매 전환율</div>
+            <div class="dc-metric-val" style="color:#a78bfa">${f(last.buyRate)}</div>
+            <div class="dc-metric-count">${n(last.buy)}건</div>
+            <span class="dc-delta-badge ${bdgCls(bD)}">${arrow(bD)} ${bD!==null?Math.abs(bD).toFixed(2)+'%p':'-'}</span>
+            <div class="dc-prev">직전 ${f(prev.buyRate)} · ${n(prev.buy)}건</div>
+          </div>
+        </div>
+      </div>`);
+  });
+}
+
+// ── Trend Charts ──────────────────────────────────────────────────────────────
+function renderTrendCharts(brand, data, prods) {
+  const grid = document.getElementById(`trend-${brand}`);
+  prods.forEach(prod => {
+    const d262 = data['262Q'][prod]||[], d261 = data['261Q'][prod]||[];
+    if (!d262.length && !d261.length) return;
+    const id = `${brand}_t_${prod.replace(/\s+/g,'_')}`;
+    grid.insertAdjacentHTML('beforeend',`
+      <div class="trend-card">
+        <div class="tc-title">${prod}</div>
+        <div class="chart-wrap"><canvas id="${id}"></canvas></div>
+      </div>`);
+    const labels = (d262.length>=d261.length?d262:d261).map(r=>r.date);
+    const pad = (arr,len) => { const a=[...arr]; while(a.length<len) a.push(null); return a; };
+    charts[id] = new Chart(document.getElementById(id),{
+      data:{ labels, datasets:[
+        // 건수 막대 (우측 축)
+        {type:'bar',label:'262Q 장바구니수',data:pad(d262.map(r=>r.cart),labels.length),backgroundColor:C262.cart+'66',yAxisID:'count',borderRadius:3,order:3},
+        {type:'bar',label:'262Q 구매수',    data:pad(d262.map(r=>r.buy), labels.length),backgroundColor:C262.buy+'66',yAxisID:'count',borderRadius:3,order:3},
+        {type:'bar',label:'261Q 장바구니수',data:pad(d261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'55',yAxisID:'count',borderRadius:3,order:4},
+        {type:'bar',label:'261Q 구매수',    data:pad(d261.map(r=>r.buy), labels.length),backgroundColor:C261.buy+'55',yAxisID:'count',borderRadius:3,order:4},
+        // 전환율 선 (좌측 축)
+        {type:'line',label:'262Q 장바구니율',data:pad(d262.map(r=>r.cartRate),labels.length),borderColor:C262.cart,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
+        {type:'line',label:'262Q 구매율',    data:pad(d262.map(r=>r.buyRate), labels.length),borderColor:C262.buy, backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
+        {type:'line',label:'261Q 장바구니율',data:pad(d261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
+        {type:'line',label:'261Q 구매율',    data:pad(d261.map(r=>r.buyRate), labels.length),borderColor:C261.buy, backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
+      ]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{labels:{color:'#64748b',font:{size:10},boxWidth:12,padding:7}},
+          tooltip:{callbacks:{label:c=>{
+            const v=c.parsed.y;
+            if(v===null) return `${c.dataset.label}: -`;
+            return c.dataset.yAxisID==='count'
+              ? `${c.dataset.label}: ${Math.round(v).toLocaleString()}건`
+              : `${c.dataset.label}: ${v.toFixed(2)}%`;
+          }}}
+        },
+        scales:{
+          x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#f1f5f9'}},
+          rate:{position:'left',ticks:{color:'#6366f1',font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'},title:{display:true,text:'전환율',color:'#94a3b8',font:{size:9}}},
+          count:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'건수',color:'#94a3b8',font:{size:9}}}
+        }
+      }
+    });
+  });
+}
+
+// ── Compare Charts (grouped bar) ─────────────────────────────────────────────
+function renderCmpCharts(brand, data, prods) {
+  const grid = document.getElementById(`cmp-${brand}`);
+  prods.forEach(prod => {
+    const d262 = data['262Q'][prod]||[], d261 = data['261Q'][prod]||[];
+    const n = Math.min(d262.length, d261.length);
+    if (!n) return;
+
+    // Two canvases per product: 장바구니 & 구매
+    const idC = `${brand}_cc_${prod.replace(/\s+/g,'_')}`;
+    const idB = `${brand}_cb_${prod.replace(/\s+/g,'_')}`;
+    const labels = d262.slice(0,n).map(r=>r.date);
+
+    grid.insertAdjacentHTML('beforeend',`
+      <div class="cmp-card">
+        <div class="cc-title">${prod}</div>
+        <div class="cc-sub">🟣 262Q &nbsp; 🟠 261Q</div>
+        <div class="cc-sub" style="color:#818cf8;margin:6px 0 4px">🛒 장바구니 전환율</div>
+        <div class="cmp-chart-wrap"><canvas id="${idC}"></canvas></div>
+        <div class="cc-sub" style="color:#a78bfa;margin:14px 0 4px">💳 구매 전환율</div>
+        <div class="cmp-chart-wrap"><canvas id="${idB}"></canvas></div>
+      </div>`);
+
+    const mkBar = (id, label, data262vals, data261vals, color262, color261) => {
+      charts[id] = new Chart(document.getElementById(id),{
+        type:'bar',
+        data:{labels, datasets:[
+          {label:'262Q',data:data262vals,backgroundColor:color262+'cc',borderRadius:4,barPercentage:.7},
+          {label:'261Q',data:data261vals,backgroundColor:color261+'88',borderRadius:4,barPercentage:.7},
+        ]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{
+            legend:{labels:{color:'#64748b',font:{size:10},boxWidth:10,padding:8}},
+            tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y!==null?c.parsed.y.toFixed(2)+'%':'-'}`}}
+          },
+          scales:{
+            x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{display:false}},
+            y:{ticks:{color:'#94a3b8',font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'}}
+          }
+        }
+      });
+    };
+
+    mkBar(idC,'장바구니', d262.slice(0,n).map(r=>r.cartRate), d261.slice(0,n).map(r=>r.cartRate), C262.cart, C261.cart);
+    mkBar(idB,'구매',     d262.slice(0,n).map(r=>r.buyRate),  d261.slice(0,n).map(r=>r.buyRate),  C262.buy,  C261.buy);
+  });
+}
+
+// ── Inner tab switch ──────────────────────────────────────────────────────────
+function switchInner(brand, tab, btn) {
+  ['summary','snapshot','delta','trend','compare'].forEach(t=>{
+    const el=document.getElementById(`inner-${brand}-${t}`);
+    if(el) el.style.display=t===tab?'':'none';
+  });
+  document.querySelectorAll(`#itabs-${brand} .inner-tab`).forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Panel states ──────────────────────────────────────────────────────────────
+function setPanelState(brand, state, msg='') {
+  const panel = document.getElementById(`panel-${brand}`);
+  if (state==='loading') panel.innerHTML=`<div class="loading-state"><div class="spin"></div>데이터 로딩 중...</div>`;
+  else if (state==='error') panel.innerHTML=`<div class="error-state">${msg}</div>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const pad2 = v => String(v).padStart(2,'0');
+const dlt  = (a,b) => (a!=null&&b!=null) ? a-b : null;
+const f    = v => v!=null ? v.toFixed(2)+'%' : '-';
+const n    = v => v!=null ? Math.round(v).toLocaleString() : '-';
+const fD   = d => d===null?'':(d>0?'+':'')+d.toFixed(2)+'%p';
+const arrow= d => d===null?'—':(d>0?'▲':(d<0?'▼':'—'));
+const dcls = d => d===null?'delta-neu':(d>0?'delta-pos':(d<0?'delta-neg':'delta-neu'));
+const bdgCls=d => d===null?'badge-neu':(d>0?'badge-pos':(d<0?'badge-neg':'badge-neu'));
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  BRANDS.forEach(b=>{
+    document.getElementById(`url-input-${b}`).value=getUrl(b);
+    setPanelState(b,'loading');
+  });
+  loadBrand('BOH');
+  // 자동 새로고침 비활성화 - '시트 갱신' 버튼으로만 갱신
+});
+</script>
+</body>
+</html>

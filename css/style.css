@@ -5419,6 +5419,18 @@ body {
 .mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
 
+/* ── 통합 iframe 패널 (퍼널 / GMV) ── */
+.embed-frame {
+    width: 100%;
+    min-height: calc(100vh - 220px);
+    height: calc(100vh - 220px);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #f1f3f9;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    display: block;
+}
+
 /* ── 예산 재분배 플래그 ── */
 .mw-realloc {
     display: inline-block;

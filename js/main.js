@@ -401,7 +401,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, performance: false, ai: false, generate: false, megawari: false, weekly: false };
+let _renderedSections = { overview: true, performance: false, ai: false, generate: false, megawari: false, weekly: false, funnel: false, gmv: false };
 let _currentSection = 'overview';
 
 function switchSection(sectionName) {
@@ -438,6 +438,10 @@ function switchSection(sectionName) {
                 if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
             } else if (sectionName === 'weekly') {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
+            } else if (sectionName === 'funnel' || sectionName === 'gmv') {
+                // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드)
+                const frame = document.getElementById(sectionName + '-frame');
+                if (frame && !frame.src && frame.dataset.src) frame.src = frame.dataset.src;
             }
             if (panel) panel.classList.remove('section-loading');
         });
