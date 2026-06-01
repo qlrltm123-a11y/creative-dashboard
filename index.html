@@ -693,10 +693,10 @@
                 <div class="wr-filter-group">
                     <label class="wr-filter-label"><i class="fas fa-calendar mr-1"></i>기간</label>
                     <input type="date" id="wr-date-from" class="wr-date-input"
-                        onchange="window._wr.dateFrom=this.value; renderWeeklyReport()">
+                        onchange="window._wr.dateFrom=this.value; if(window._wrInvalidateCache)window._wrInvalidateCache(); renderWeeklyReport()">
                     <span class="wr-date-sep">~</span>
                     <input type="date" id="wr-date-to" class="wr-date-input"
-                        onchange="window._wr.dateTo=this.value; renderWeeklyReport()">
+                        onchange="window._wr.dateTo=this.value; if(window._wrInvalidateCache)window._wrInvalidateCache(); renderWeeklyReport()">
                     <button class="wr-quick-btn" onclick="window._wrSetWeek(0)">이번 주</button>
                     <button class="wr-quick-btn" onclick="window._wrSetWeek(-1)">저번 주</button>
                     <button class="wr-quick-btn wr-quick-btn-reset" onclick="window._wrClearDates()">전체</button>
@@ -705,7 +705,7 @@
                 <div class="wr-filter-group">
                     <label class="wr-filter-label"><i class="fas fa-box mr-1"></i>제품</label>
                     <select id="wr-product-sel" class="wr-select"
-                        onchange="window._wr.product=this.value; renderWeeklyReport()">
+                        onchange="window._wr.product=this.value; if(window._wrInvalidateCache)window._wrInvalidateCache(); renderWeeklyReport()">
                         <option value="">전체 제품</option>
                     </select>
                 </div>
@@ -713,7 +713,7 @@
                 <div class="wr-filter-group">
                     <label class="wr-filter-label"><i class="fas fa-calendar-star mr-1"></i>이벤트</label>
                     <select id="wr-event-sel" class="wr-select"
-                        onchange="window._wr.event=this.value; renderWeeklyReport()">
+                        onchange="window._wr.event=this.value; if(window._wrInvalidateCache)window._wrInvalidateCache(); renderWeeklyReport()">
                         <option value="">전체 이벤트</option>
                     </select>
                 </div>

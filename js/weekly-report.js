@@ -6,8 +6,31 @@
 window._wr = { product: '', event: '', dateFrom: '', dateTo: '' };
 let _wr = window._wr;
 
-/* ── 초기 로드 시 날짜 필터 없음으로 시작 (데이터 기간과 불일치 방지) ── */
-// 날짜 input은 비워두고 전체 기간 표시 → 사용자가 퀵버튼으로 좁혀가는 방식
+/* ── 필터 localStorage 저장/복원 ── */
+const _WR_LS_KEY = 'wr_filter_v1';
+
+function _wrSaveFilter() {
+    try { localStorage.setItem(_WR_LS_KEY, JSON.stringify({
+        product:  _wr.product,
+        event:    _wr.event,
+        dateFrom: _wr.dateFrom,
+        dateTo:   _wr.dateTo,
+    })); } catch(e) {}
+}
+
+function _wrLoadFilter() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(_WR_LS_KEY) || 'null');
+        if (!saved) return;
+        _wr.product  = saved.product  || '';
+        _wr.event    = saved.event    || '';
+        _wr.dateFrom = saved.dateFrom || '';
+        _wr.dateTo   = saved.dateTo   || '';
+    } catch(e) {}
+}
+
+// 초기 로드 시 저장된 필터 복원 (없으면 전체 기간)
+_wrLoadFilter();
 
 /* ── 날짜 퀵셋 (0=이번주, -1=저번주) ── */
 window._wrSetWeek = function(offset) {
@@ -549,8 +572,18 @@ function _wrProductInsightSectionHtml(productData) {
 /* ── 렌더 사이클 캐시 (복사 버튼 클릭 시 재계산 방지) ── */
 let _wrRenderCache = null;
 
+/* ── 필터 변경 시 캐시 무효화 (스테일 복사 방지) ── */
+function _wrInvalidateCache() { _wrRenderCache = null; }
+window._wrInvalidateCache = _wrInvalidateCache;
+
 /* ── 메인 렌더 ── */
 function renderWeeklyReport() {
+    // date input UI 동기화 (localStorage 복원값 반영)
+    const fe = document.getElementById('wr-date-from');
+    const te = document.getElementById('wr-date-to');
+    if (fe && fe.value !== (_wr.dateFrom||'')) fe.value = _wr.dateFrom || '';
+    if (te && te.value !== (_wr.dateTo||''))   te.value = _wr.dateTo   || '';
+
     _wrPopulateSelects();
 
     const list        = _wrGetList();
@@ -561,6 +594,7 @@ function renderWeeklyReport() {
 
     // 복사 시 재계산 방지용 캐시
     _wrRenderCache = { list, kpi, byPlatform, byCreative, byProduct };
+    _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
     const rangeEl = document.getElementById('wr-range-label');

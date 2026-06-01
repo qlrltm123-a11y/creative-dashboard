@@ -331,7 +331,7 @@ function _buildEventTotalBar(byDate, sortedDates) {
     const days = sortedDates.length;
 
     return `<div class="mw-event-total">
-        <span class="mw-event-total-lbl">이벤트 전체 (${days}일)</span>
+        <span class="mw-event-total-lbl">📊 이벤트 누계 (${days}일)</span>
         <span class="mw-event-kpi"><span>ROAS</span><strong class="${_roasClass(roas)}" style="font-size:13px">${_fmtRoas(roas)}</strong></span>
         <span class="mw-event-kpi"><span>광고비</span><strong>${_fmtKRW(spend)}</strong></span>
         <span class="mw-event-kpi"><span>매출</span><strong>${_fmtKRW(revenue)}</strong></span>
@@ -351,14 +351,25 @@ function _buildDateTabs(sortedDates, sel, byDate) {
             lastKey = info.period?.key || null;
             if (info.period) html += `<span class="mw-period-chip" style="color:${info.period.color};border-color:${info.period.color}20;background:${info.period.color}0d">${info.badge} ${info.period.label}</span>`;
         }
-        const isActive = iso === sel;
-        const dayRoas  = byDate[iso]?.roas || 0;
-        const roasCls  = _roasClass(dayRoas);
+        const isActive  = iso === sel;
+        const dayRoas   = byDate[iso]?.roas || 0;
+        const roasCls   = _roasClass(dayRoas);
+        // 전일 대비 ROAS 델타
+        const prevIdx   = sortedDates.indexOf(iso) - 1;
+        const prevRoas  = prevIdx >= 0 ? (byDate[sortedDates[prevIdx]]?.roas || 0) : null;
+        let deltaHtml   = '';
+        if (prevRoas !== null && prevRoas > 0 && dayRoas > 0) {
+            const dp = Math.round((dayRoas - prevRoas) / prevRoas * 100);
+            if (Math.abs(dp) >= 3) {
+                deltaHtml = `<span class="mw-dtab-delta ${dp>0?'up':'dn'}">${dp>0?'▲':'▼'}${Math.abs(dp)}%</span>`;
+            }
+        }
         html += `<button class="mw-date-tab${isActive?' active':''}" onclick="_mwSelectDate('${iso}')"
             style="${isActive?`border-color:${info.color};box-shadow:0 0 0 3px ${info.color}22`:''}" >
             <span class="mw-dtab-d" style="color:${info.color}">${info.label}</span>
             <span class="mw-dtab-date">${info.sub}</span>
             <span class="mw-dtab-roas ${roasCls}">${dayRoas > 0 ? _fmtRoas(dayRoas) : '-'}</span>
+            ${deltaHtml}
         </button>`;
     });
     return html;
@@ -377,7 +388,8 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
     const useAtc   = isTeaser && hasAtc;
 
     // ── KPI 바 ───────────────────────────────────────────────
-    const kpiHtml = `<div class="mw-kpi-bar">
+    const kpiHtml = `<div class="mw-kpi-day-lbl">📅 선택일 실적 — ${sel}</div>
+    <div class="mw-kpi-bar">
         <div class="mw-kpi-item">
             <div class="mw-kpi-lbl">ROAS</div>
             <div class="mw-kpi-val ${_roasClass(today.roas)}">${_fmtRoas(today.roas)}</div>
