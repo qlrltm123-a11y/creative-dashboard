@@ -6264,9 +6264,9 @@ img.mw-cr-thumb {
     flex-shrink: 0;
 }
 .wr-pi-thumb-wrap {
-    width: 44px;
-    height: 34px;
-    border-radius: 6px;
+    width: 88px;
+    height: 66px;
+    border-radius: 8px;
     overflow: hidden;
     flex-shrink: 0;
     background: #e2e8f0;
