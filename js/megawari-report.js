@@ -475,13 +475,8 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
         const metricHtml = useAtc
             ? `<span class="mw-cr-roas ${_atcClass(cnt)}">${_fmtAtc(cnt, rate)}</span>`
             : `<span class="mw-cr-roas ${_roasClass(c.roas||0)}">${_fmtRoas(c.roas||0)}</span>`;
-        const raw = c.thumbnail_url || c.media_url || '';
-        let thumbSrc = raw;
-        const m = raw.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || raw.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        if (m) thumbSrc = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120`;
-        const thumbHtml = thumbSrc
-            ? `<img class="mw-cr-thumb" src="${thumbSrc}" alt="" loading="lazy" onerror="this.style.display='none'">`
-            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
+        const thumbHtml = _mwThumbHtml(
+            c.thumbnail_url || c.media_url || '', 'mw-cr-thumb');
         return `<div class="mw-creative-item top">${thumbHtml}
             <div class="mw-cr-info">
                 <span class="mw-cr-prod-badge">${(c.product||'기타').slice(0,10)}</span>
@@ -498,7 +493,7 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
             ? `<span class="mw-cr-roas roas-bad">${_fmtAtc(cnt, rate)}</span>`
             : `<span class="mw-cr-roas roas-bad">${_fmtRoas(c.roas||0)}</span>`;
         return `<div class="mw-creative-item bot">
-            <div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>
+            ${_mwThumbHtml(c.thumbnail_url || c.media_url || '', 'mw-cr-thumb')}
             <div class="mw-cr-info">
                 <span class="mw-cr-prod-badge" style="background:#fee2e2;color:#991b1b">${(c.product||'기타').slice(0,8)}</span>
                 <span class="mw-cr-name">${(c.ad_name||c.creative_name||'-').slice(0,26)}</span>
@@ -740,15 +735,9 @@ function _buildEventBestCreativesHtml(byDate, sortedDates) {
     if (!top.length) return '';
 
     const items = top.map((c, i) => {
-        const raw = c.thumb || '';
-        const m = raw.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || raw.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-        const thumbSrc = m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120` : raw;
-        const thumbHtml = thumbSrc
-            ? `<img class="mw-cr-thumb" src="${thumbSrc}" loading="lazy" onerror="this.style.display='none'">`
-            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
         return `<div class="mw-evt-best-item">
             <div style="position:relative;flex-shrink:0">
-                ${thumbHtml}
+                ${_mwThumbHtml(c.thumb || '', 'mw-cr-thumb')}
                 <span class="mw-evt-best-rank" style="background:${i===0?'#f97316':i<=2?'#6366f1':'rgba(0,0,0,0.45)'}">${i+1}</span>
             </div>
             <div class="mw-evt-best-info">
@@ -951,15 +940,26 @@ function _mwSelectDate(iso) {
 }
 window._mwSelectDate = _mwSelectDate;
 
-// ── Drive URL → 공개 썸네일 URL 변환 ─────────────────────────
+// ── Drive URL → img HTML (fallback 체인) ─────────────────────
+function _mwThumbHtml(url, className, fallbackHtml) {
+    const fb = fallbackHtml || `<div class="${className} ${className}-empty"><i class="fas fa-image"></i></div>`;
+    if (!url) return fb;
+    if (typeof window.buildDriveImgHtml === 'function') {
+        return window.buildDriveImgHtml(url, { className, loading: 'lazy', finalFallbackHtml: fb });
+    }
+    // 폴백: Drive ID 추출 후 thumbnail API
+    const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    const src = m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w240` : url;
+    return `<img class="${className}" src="${src}" loading="lazy" onerror="this.outerHTML='${fb.replace(/'/g, "\\'")}'">`;
+}
+
+// ── Drive URL → 공개 썸네일 URL 변환 (카카오 리포트용) ──────
 function _toPublicThumb(url) {
     if (!url) return null;
-    // Drive file ID 추출
     const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
               url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
               url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w480`;
-    // 이미 https URL이면 그대로
     if (/^https?:\/\//.test(url)) return url;
     return null;
 }
@@ -1157,14 +1157,8 @@ function _buildShiftAlert(shifts) {
     }
     function renderCard(item, type) {
         var isUp = type === 'up';
-        // 썸네일
-        var thumbHtml = '';
-        if (item.thumb) {
-            var thumbSrc = item.thumb;
-            var m = thumbSrc.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || thumbSrc.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-            if (m) thumbSrc = 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w120';
-            thumbHtml = '<img class="mw-shift-thumb" src="' + thumbSrc + '" alt="" onerror="this.style.display=\'none\'">';
-        }
+        // 썸네일 (fallback 체인 사용)
+        var thumbHtml = item.thumb ? _mwThumbHtml(item.thumb, 'mw-shift-thumb') : '';
         // 지표 문자열
         var roasStr = item.roasPct !== null
             ? 'ROAS ' + (item.currRoas > 0 ? Math.round(item.currRoas * 100) + '%' : '-')
