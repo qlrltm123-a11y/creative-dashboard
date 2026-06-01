@@ -524,6 +524,9 @@ function _wrProductInsightSectionHtml(productData) {
     </div>`;
 }
 
+/* ── 렌더 사이클 캐시 (복사 버튼 클릭 시 재계산 방지) ── */
+let _wrRenderCache = null;
+
 /* ── 메인 렌더 ── */
 function renderWeeklyReport() {
     _wrPopulateSelects();
@@ -533,6 +536,9 @@ function renderWeeklyReport() {
     const byPlatform  = _wrByPlatform(list);
     const byCreative  = _wrByCreative(list);
     const byProduct   = _wrByProductInsight(list);
+
+    // 복사 시 재계산 방지용 캐시
+    _wrRenderCache = { list, kpi, byPlatform, byCreative, byProduct };
 
     // 날짜 범위 라벨
     const rangeEl = document.getElementById('wr-range-label');
@@ -573,11 +579,13 @@ window.renderWeeklyReport = renderWeeklyReport;
 // imgMap: { originalUrl: base64DataUrl } — 없으면 원본 URL 폴백
 function _wrBuildConfluenceHtml(sections, imgMap) {
     imgMap = imgMap || {};
-    const list       = _wrGetList();
-    const kpi        = _wrSum(list);
-    const byPlatform = _wrByPlatform(list);
-    const byCreative = _wrByCreative(list);
-    const byProduct  = _wrByProductInsight(list);
+    // 렌더 캐시 사용 (복사 직전 renderWeeklyReport 결과 재활용)
+    const cache      = _wrRenderCache;
+    const list       = cache ? cache.list       : _wrGetList();
+    const kpi        = cache ? cache.kpi        : _wrSum(list);
+    const byPlatform = cache ? cache.byPlatform : _wrByPlatform(list);
+    const byCreative = cache ? cache.byCreative : _wrByCreative(list);
+    const byProduct  = cache ? cache.byProduct  : _wrByProductInsight(list);
 
     const rangeText  = (_wr.dateFrom || _wr.dateTo)
         ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'}`
@@ -795,15 +803,15 @@ async function _wrFetchAllBase64(urls) {
     return Object.fromEntries(pairs);
 }
 
-/* 현재 보고서에 등장하는 썸네일 URL 전체 수집 */
+/* 현재 보고서에 등장하는 썸네일 URL 전체 수집 (캐시 활용) */
 function _wrCollectThumbUrls() {
-    const list       = _wrGetList();
-    const byCreative = _wrByCreative(list);
-    const byProduct  = _wrByProductInsight(list);
-    const toThumb    = u => { if (!u) return ''; return typeof window.convertDriveUrl === 'function' ? window.convertDriveUrl(u) : u; };
+    const cache      = _wrRenderCache;
+    const list       = cache ? cache.list       : _wrGetList();
+    const byCreative = cache ? cache.byCreative : _wrByCreative(list);
+    const byProduct  = cache ? cache.byProduct  : _wrByProductInsight(list);
 
     const urls = new Set();
-    byCreative.forEach(c => { if (c.thumb) urls.add(toThumb(c.thumb)); });
+    byCreative.forEach(c => { if (c.thumb) urls.add(c.thumb); });
     byProduct.forEach(pd => pd.top5.forEach(c => { if (c.thumb) urls.add(c.thumb); }));
     return [...urls];
 }

@@ -431,8 +431,6 @@ function csvToObjects(csvText) {
         }
     });
 
-    console.log(`[Sheets] 파싱 완료: ${filtered.length}개 / 총 ${result.length}개`);
-    console.log(`[Sheets] 브랜드 분포:`, brandCount, `· 기본 브랜드: ${dominantBrand}` + (inferredCount ? ` (빈 brand ${inferredCount}개 자동 보정)` : ''));
     if (filtered.length === 0 && result.length > 0) {
         console.warn('[Sheets] ⚠️ 모든 행이 빈 값으로 판별됨. 첫 행 샘플:', result[0]);
     }
@@ -569,10 +567,8 @@ async function tryLoadSavedSheet() {
     // 2순위: 코드에 박아둔 DEFAULT_SHEET_URL (배포 환경용)
     const url = getSavedSheetUrl() || DEFAULT_SHEET_URL;
     if (!url) return null;
-    console.log('[Sheets] 시트 로드 시도:', url.substring(0, 80) + '...');
     try {
         const data = await fetchGoogleSheet(url);
-        console.log(`[Sheets] ✅ 로드 성공: ${data.length}개 데이터`);
         updateDataSourceLabel(true);
         return data;
     } catch (e) {

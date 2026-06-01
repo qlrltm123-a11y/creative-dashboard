@@ -5419,6 +5419,42 @@ body {
 .mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
 
+/* ── 이벤트 전체 베스트 소재 ── */
+.mw-evt-best-wrap { margin-bottom: 12px; }
+.mw-evt-best-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.mw-evt-best-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 10px;
+    transition: border-color 0.14s;
+}
+.mw-evt-best-item:hover { border-color: #a5b4fc; }
+.mw-evt-best-rank {
+    position: absolute;
+    top: 4px; left: 4px;
+    font-size: 9px; font-weight: 700; color: #fff;
+    border-radius: 4px; padding: 1px 4px;
+}
+.mw-evt-best-info { flex: 1; min-width: 0; }
+.mw-evt-best-name {
+    font-size: 11px; font-weight: 600; color: #1e293b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 4px;
+}
+.mw-evt-best-meta { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.mw-evt-best-roas { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+.mw-evt-best-ctr  { font-size: 10px; color: #2563eb; }
+.mw-evt-best-spend { font-size: 10px; color: #64748b; }
+
 /* ── 이벤트 전체 누적 KPI 바 ── */
 .mw-event-total {
     display: flex;

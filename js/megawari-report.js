@@ -706,6 +706,70 @@ function _buildMwCreativeInsightHtml(creatives) {
     </div>`;
 }
 
+// ── 전체 기간 베스트 소재 ─────────────────────────────────────
+function _buildEventBestCreativesHtml(byDate, sortedDates) {
+    const creMap = {};
+    sortedDates.forEach(iso => {
+        const d = byDate[iso]; if (!d) return;
+        d.creatives.forEach(c => {
+            const key = (c.ad_name || c.creative_name || String(c.id||'')).trim().toLowerCase();
+            if (!key) return;
+            if (!creMap[key]) creMap[key] = {
+                name: c.ad_name || c.creative_name || key,
+                thumb: '', product: c.product||'', platform: c.platform||'',
+                spend:0, revenue:0, clicks:0, impr:0,
+            };
+            if (!creMap[key].thumb && (c.thumbnail_url || c.media_url))
+                creMap[key].thumb = c.thumbnail_url || c.media_url;
+            creMap[key].spend   += c.spend       || 0;
+            creMap[key].revenue += c.revenue     || 0;
+            creMap[key].clicks  += c.clicks      || 0;
+            creMap[key].impr    += c.impressions || 0;
+        });
+    });
+
+    const top = Object.values(creMap)
+        .map(d => ({ ...d,
+            roas: d.spend > 0 ? d.revenue / d.spend : 0,
+            ctr:  d.impr  > 0 ? d.clicks  / d.impr  : 0,
+        }))
+        .filter(d => d.spend > 0)
+        .sort((a, b) => b.roas - a.roas)
+        .slice(0, 8);
+
+    if (!top.length) return '';
+
+    const items = top.map((c, i) => {
+        const raw = c.thumb || '';
+        const m = raw.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || raw.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        const thumbSrc = m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w120` : raw;
+        const thumbHtml = thumbSrc
+            ? `<img class="mw-cr-thumb" src="${thumbSrc}" loading="lazy" onerror="this.style.display='none'">`
+            : `<div class="mw-cr-thumb mw-cr-thumb-empty"><i class="fas fa-image"></i></div>`;
+        return `<div class="mw-evt-best-item">
+            <div style="position:relative;flex-shrink:0">
+                ${thumbHtml}
+                <span class="mw-evt-best-rank" style="background:${i===0?'#f97316':i<=2?'#6366f1':'rgba(0,0,0,0.45)'}">${i+1}</span>
+            </div>
+            <div class="mw-evt-best-info">
+                <div class="mw-evt-best-name" title="${c.name}">${c.name.slice(0,28)}</div>
+                <div class="mw-evt-best-meta">
+                    <span class="mw-cr-prod-badge">${(c.product||'기타').slice(0,10)}</span>
+                    <span class="mw-evt-best-roas ${_roasClass(c.roas)}">${_fmtRoas(c.roas)}</span>
+                    <span class="mw-evt-best-ctr">CTR ${_fmtCtr(c.ctr)}</span>
+                    <span class="mw-evt-best-spend">${_fmtKRW(c.spend)}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="mw-section-hd" style="margin-top:16px">🏅 이벤트 전체 베스트 소재
+        <span style="font-size:10px;color:#94a3b8;font-weight:400">전체 기간 합산 ROAS 순 · Meta·TikTok·X 포함</span>
+    </div>
+    <div class="mw-evt-best-grid">${items}</div>`;
+}
+
 // ── 패널 렌더 (초기 / 전체 재렌더) ──────────────────────────
 function renderMegawariPanel() {
     const container = document.getElementById('megawari-panel-body');
@@ -753,15 +817,17 @@ function renderMegawariPanel() {
         ? `<span class="mw-kakao-ok">✅ 연결됨 — 매일 ${kakaoTime} 자동발송${kakaoEnabled?' 켜짐':' 꺼짐'}</span>`
         : `<span class="mw-kakao-warn">⚙️ 카카오 설정 필요</span>`;
 
-    // ── 날짜 탭 + 누적 KPI 바 + 본문(캐시) ──────────────────
+    // ── 날짜 탭 + 누적 KPI 바 + 본문(캐시) + 전체 베스트 소재 ──
     const dateTabs    = _buildDateTabs(sortedDates, sel, byDate);
     const eventTotBar = _buildEventTotalBar(byDate, sortedDates);
     const bodyHtml    = _buildMwBodyHtml(sel, byDate, sortedDates);
+    const eventBest   = _buildEventBestCreativesHtml(byDate, sortedDates);
 
     container.innerHTML = `
     <div class="mw-date-tabs">${dateTabs}</div>
     ${eventTotBar}
     ${bodyHtml}
+    <div class="mw-evt-best-wrap">${eventBest}</div>
     <details class="mw-kakao-wrap" ${!kakaoKey&&!kakaoToken?'open':''}>
         <summary class="mw-kakao-summary">
             <i class="fas fa-comment" style="color:#3b1f1f"></i>
@@ -858,23 +924,25 @@ function _mwSelectDate(iso) {
     // 2. 본문은 캐시 or 새로 빌드 후 교체 (날짜탭 제외한 영역)
     const bodyHtml = _buildMwBodyHtml(iso, byDate, sortedDates);
 
-    // 날짜탭 다음 형제부터 카카오/버튼 직전까지 교체
-    const tabsEl  = container.querySelector('.mw-date-tabs');
-    const kakaoEl = container.querySelector('.mw-kakao-wrap');
-    const shareEl = container.querySelector('.mw-share-bar');
+    // 날짜탭 다음 형제부터 전체베스트(mw-evt-best-wrap) 직전까지 교체
+    // eventTotBar + bodyHtml 영역만 교체, mw-evt-best-wrap·카카오는 유지
+    const tabsEl    = container.querySelector('.mw-date-tabs');
+    const kakaoEl   = container.querySelector('.mw-kakao-wrap');
+    const bestWrap  = container.querySelector('.mw-evt-best-wrap');
+    const stopEl    = bestWrap || kakaoEl; // 교체 종료 경계
 
-    // 날짜탭과 카카오/버튼 사이의 기존 노드 제거
-    if (tabsEl && kakaoEl) {
+    if (tabsEl && stopEl) {
         let node = tabsEl.nextSibling;
-        while (node && node !== kakaoEl) {
+        while (node && node !== stopEl) {
             const next = node.nextSibling;
             container.removeChild(node);
             node = next;
         }
-        // 새 본문 삽입
+        // 이벤트 누적바 + 새 본문 삽입
+        const eventTotBar = _buildEventTotalBar(byDate, sortedDates);
         const tmp = document.createElement('div');
-        tmp.innerHTML = bodyHtml;
-        while (tmp.firstChild) container.insertBefore(tmp.firstChild, kakaoEl);
+        tmp.innerHTML = eventTotBar + bodyHtml;
+        while (tmp.firstChild) container.insertBefore(tmp.firstChild, stopEl);
     } else {
         renderMegawariPanel(); return;
     }
