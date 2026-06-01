@@ -703,15 +703,21 @@ function _buildMwCreativeInsightHtml(creatives) {
 
 // ── 전체 기간 베스트 소재 ─────────────────────────────────────
 function _buildEventBestCreativesHtml(byDate, sortedDates) {
+    // Single One 매체만 (Single One Meta / Single One TikTok 등)
+    const isSingleOne = c => /single/i.test(c.platform || '');
+
     const creMap = {};
     sortedDates.forEach(iso => {
         const d = byDate[iso]; if (!d) return;
         d.creatives.forEach(c => {
-            const key = (c.ad_name || c.creative_name || String(c.id||'')).trim().toLowerCase();
+            if (!isSingleOne(c)) return; // Single One 이외 제외
+            // 광고명 기준 집계 (대소문자·공백 무시 → 같은 소재 하나로)
+            const key = (c.ad_name || c.creative_name || String(c.id||''))
+                .trim().toLowerCase().replace(/\s+/g, ' ');
             if (!key) return;
             if (!creMap[key]) creMap[key] = {
                 name: c.ad_name || c.creative_name || key,
-                thumb: '', product: c.product||'', platform: c.platform||'',
+                thumb: '', product: c.product||'',
                 spend:0, revenue:0, clicks:0, impr:0,
             };
             if (!creMap[key].thumb && (c.thumbnail_url || c.media_url))
@@ -754,7 +760,7 @@ function _buildEventBestCreativesHtml(byDate, sortedDates) {
 
     return `
     <div class="mw-section-hd" style="margin-top:16px">🏅 이벤트 전체 베스트 소재
-        <span style="font-size:10px;color:#94a3b8;font-weight:400">전체 기간 합산 ROAS 순 · Meta·TikTok·X 포함</span>
+        <span style="font-size:10px;color:#94a3b8;font-weight:400">전체 기간 합산 ROAS 순 · Single One</span>
     </div>
     <div class="mw-evt-best-grid">${items}</div>`;
 }
