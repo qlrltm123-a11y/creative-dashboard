@@ -575,11 +575,26 @@ function _buildMwCreativeInsightHtml(creatives) {
 
     if (!appeals.length && !hooks.length) return '';
 
+    // ── 전체 평균 ROAS (해당 날짜 소재 기준) ──
+    // 소구포인트/후킹이 있는 소재만으로 기준 계산 (공정 비교)
+    const validCreatives = creatives.filter(c => (c.roas || 0) > 0);
+    const overallAvgRoas = validCreatives.length > 0
+        ? validCreatives.reduce((s, c) => s + (c.roas || 0), 0) / validCreatives.length
+        : 1;
+
+    // 상대 티어 함수: 전체 평균 대비 상대적 위치로 색상 결정
+    const _roasTier = (avgRoas) => {
+        const ratio = overallAvgRoas > 0 ? avgRoas / overallAvgRoas : 0;
+        if (ratio >= 1.25) return { color: '#059669', bg: '#f0fdf4' }; // 평균 대비 +25% 이상 → 초록
+        if (ratio >= 0.85) return { color: '#6366f1', bg: '#eef2ff' }; // ±15% 이내 → 보라(양호)
+        if (ratio >= 0.55) return { color: '#f59e0b', bg: '#fffbeb' }; // -15~45% → 노랑(미달)
+        return { color: '#94a3b8', bg: '#f8fafc' };                     // -45% 이하 → 회색
+    };
+
     // ── 소구포인트 태그 HTML ──
     const appealHtml = appeals.length ? appeals.slice(0, 14).map(a => {
-        const tier = a.avgRoas >= 3 ? '#059669' : a.avgRoas >= 1.5 ? '#6366f1' : a.avgRoas >= 1 ? '#f59e0b' : '#94a3b8';
-        const bg   = a.avgRoas >= 3 ? '#f0fdf4' : a.avgRoas >= 1.5 ? '#eef2ff' : a.avgRoas >= 1 ? '#fffbeb' : '#f8fafc';
-        return `<span class="mw-ins-tag" style="background:${bg};color:${tier};border-color:${tier}40">
+        const { color, bg } = _roasTier(a.avgRoas);
+        return `<span class="mw-ins-tag" style="background:${bg};color:${color};border-color:${color}40">
             <span class="mw-ins-tag-name">${a.tag}</span>
             <span class="mw-ins-tag-cnt">×${a.count}</span>
             <span class="mw-ins-tag-roas">${_fmtRoas(a.avgRoas)}</span>
@@ -589,8 +604,8 @@ function _buildMwCreativeInsightHtml(creatives) {
     // ── 후킹유형 바 HTML ──
     const maxHookRoas = hooks.length ? Math.max(...hooks.map(h => h.avgRoas), 0.01) : 1;
     const hookHtml = hooks.length ? hooks.slice(0, 7).map((h, i) => {
-        const pct   = Math.round(h.avgRoas / maxHookRoas * 100);
-        const color = h.avgRoas >= 3 ? '#059669' : h.avgRoas >= 1.5 ? '#6366f1' : h.avgRoas >= 1 ? '#f59e0b' : '#94a3b8';
+        const pct = Math.round(h.avgRoas / maxHookRoas * 100);
+        const { color } = _roasTier(h.avgRoas);
         return `<div class="mw-ins-hook-row">
             <span class="mw-ins-hook-rank">${i+1}</span>
             <span class="mw-ins-hook-label" title="${h.tag}">${h.tag}</span>
@@ -624,7 +639,7 @@ function _buildMwCreativeInsightHtml(creatives) {
         <div class="mw-insight-grid">
             <div class="mw-insight-col">
                 <div class="mw-section-hd">💡 소구포인트 효율 분석
-                    <span class="mw-ins-legend">평균 ROAS 높은 순 · 색상: <span style="color:#059669">◆</span>고효율 <span style="color:#6366f1">◆</span>양호 <span style="color:#f59e0b">◆</span>저효율</span>
+                    <span class="mw-ins-legend">전체 평균 ROAS 대비 · <span style="color:#059669">◆</span>+25% <span style="color:#6366f1">◆</span>±15% <span style="color:#f59e0b">◆</span>미달 <span style="color:#94a3b8">◆</span>저효율</span>
                 </div>
                 <div class="mw-ins-tags">${appealHtml}</div>
             </div>
