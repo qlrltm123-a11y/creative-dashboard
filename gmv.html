@@ -6,20 +6,20 @@
 <title>브랜드 매출 시뮬레이터</title>
 <style>
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --card: #20243a;
-  --border: #2e3250;
-  --accent: #6c63ff;
-  --accent2: #00d4aa;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --card: #f8fafc;
+  --border: #e2e8f0;
+  --accent: #6366f1;
+  --accent2: #10b981;
   --warn: #f59e0b;
   --danger: #ef4444;
   --success: #22c55e;
-  --text: #e2e8f0;
-  --muted: #64748b;
-  --boh: #a78bfa;
-  --wm: #00d4aa;
-  --cg: #f59e0b;
+  --text: #1e293b;
+  --muted: #94a3b8;
+  --boh: #7c3aed;
+  --wm: #059669;
+  --cg: #d97706;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
@@ -41,6 +41,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 #clock { font-size: 0.82rem; color: var(--muted); }
 
 /* date selector */
+.io-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); padding: 6px 11px; font-size: 0.76rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.io-btn:hover { border-color: var(--accent); color: var(--accent); }
 .date-select { background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 6px 12px; font-size: 0.82rem; outline: none; cursor: pointer; }
 .today-badge { background: var(--accent); color: #fff; font-size: 0.68rem; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
 
@@ -69,7 +71,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 /* ── SUMMARY CARDS ── */
 .summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 22px; }
-.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
 .stat-card .s-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
 .stat-card .s-val { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
 .stat-card .s-sub { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
@@ -93,7 +95,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .prog-header .prog-pct { font-size: 1.8rem; font-weight: 800; }
 .bar-outer { height: 12px; background: var(--card); border-radius: 6px; overflow: hidden; position: relative; margin-bottom: 8px; }
 .bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
-.bar-time-marker { position: absolute; top: -2px; width: 2px; height: 16px; background: rgba(255,255,255,0.5); border-radius: 1px; }
+.bar-time-marker { position: absolute; top: -2px; width: 2px; height: 16px; background: rgba(15,23,42,0.45); border-radius: 1px; }
 .prog-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
 .fill-good   { background: linear-gradient(90deg, #22c55e, #16a34a); }
 .fill-ok     { background: linear-gradient(90deg, #6c63ff, #00d4aa); }
@@ -107,7 +109,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .sim-table th { text-align: left; padding: 8px 14px; color: var(--muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
 .sim-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .sim-table tr:last-child td { border-bottom: none; }
-.sim-table tbody tr:hover td { background: rgba(255,255,255,0.02); }
+.sim-table tbody tr:hover td { background: rgba(15,23,42,0.025); }
 .s-name { font-weight: 700; font-size: 0.9rem; }
 .s-very-opt { color: #a78bfa; }
 .s-opt      { color: #00d4aa; }
@@ -144,6 +146,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 <div class="header">
   <h1>📊 브랜드 매출 시뮬레이터</h1>
   <div class="header-right">
+    <button class="io-btn" onclick="exportData()" title="현재 기록을 JSON 파일로 저장">⬇ 내보내기</button>
+    <button class="io-btn" onclick="document.getElementById('importFile').click()" title="기존 배포본에서 내보낸 JSON 불러오기">⬆ 불러오기</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
     <select class="date-select" id="datePicker"></select>
     <span class="today-badge" id="todayBadge" style="display:none">TODAY</span>
     <div id="clock">--:--:--</div>
@@ -695,6 +700,44 @@ function load() {
     if (d.actuals && !d.actualsByDate) actualsByDate[selectedDate] = d.actuals;
     if (d.paceLogs && !d.paceLogsByDate) paceLogsByDate[selectedDate] = d.paceLogs;
   } catch(e) {}
+}
+
+// ───────── 데이터 내보내기 / 불러오기 (배포본 간 마이그레이션) ─────────
+function exportData() {
+  const payload = { actualsByDate, selectedDate, paceLogsByDate, _exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gmv-data-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      // 병합: 기존 기록 유지하면서 가져온 날짜 데이터 덮어쓰기
+      if (d.actualsByDate) actualsByDate = { ...actualsByDate, ...d.actualsByDate };
+      if (d.paceLogsByDate) paceLogsByDate = { ...paceLogsByDate, ...d.paceLogsByDate };
+      // 구버전 단일 구조 호환
+      if (d.actuals && !d.actualsByDate) actualsByDate[d.selectedDate||selectedDate] = d.actuals;
+      if (d.paceLogs && !d.paceLogsByDate) paceLogsByDate[d.selectedDate||selectedDate] = d.paceLogs;
+      save();
+      initDatePicker();
+      renderAll();
+      const cnt = Object.keys(d.actualsByDate||{}).length;
+      alert(`✅ 기존 기록을 불러왔습니다. (${cnt}일치 데이터 병합)`);
+    } catch(err) {
+      alert('❌ 불러오기 실패: 올바른 JSON 파일이 아닙니다.');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 // ───────── 페이스 로그 계산 ─────────
