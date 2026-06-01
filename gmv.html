@@ -1055,11 +1055,24 @@ function updateClock() {
     now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 
+// ───────── 부모(creative-dashboard) 전역 브랜드 필터 동기화 ─────────
+// 전역 ALL → GMV의 '전체' 탭, 특정 브랜드 → 해당 브랜드 탭
+function _gmvBrandToTab(brand) { return (!brand || brand === 'ALL') ? 'all' : brand; }
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (d && d.type === 'setBrand') switchTab(_gmvBrandToTab(d.brand));
+});
+
 // ───────── 초기화 ─────────
 load();
 initDatePicker();
 renderAll();
 updateClock();
+// URL ?brand= 초기 탭 반영
+(function(){
+  const p = new URLSearchParams(location.search).get('brand');
+  if (p) switchTab(_gmvBrandToTab(p));
+})();
 
 setInterval(() => {
   updateClock();

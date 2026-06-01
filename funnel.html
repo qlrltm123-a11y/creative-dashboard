@@ -758,13 +758,41 @@ const arrow= d => d===null?'—':(d>0?'▲':(d<0?'▼':'—'));
 const dcls = d => d===null?'delta-neu':(d>0?'delta-pos':(d<0?'delta-neg':'delta-neu'));
 const bdgCls=d => d===null?'badge-neu':(d>0?'badge-pos':(d<0?'badge-neg':'badge-neu'));
 
+// ── 부모(creative-dashboard) 전역 브랜드 필터 동기화 ──────────────────────────
+function _switchBrandByName(brand) {
+  if (!BRANDS.includes(brand)) return;
+  const btn = document.querySelector(`.brand-tab.${brand.toLowerCase()}`);
+  if (btn) switchBrand(brand, btn);
+}
+// URL ?brand= 파라미터로 초기 브랜드 결정 (ALL이면 BOH 기본)
+function _initialBrand() {
+  const p = new URLSearchParams(location.search).get('brand');
+  return (p && BRANDS.includes(p)) ? p : 'BOH';
+}
+// 부모에서 brand 변경 시 postMessage 수신
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (d && d.type === 'setBrand' && d.brand) {
+    _switchBrandByName(d.brand === 'ALL' ? 'BOH' : d.brand);
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
   BRANDS.forEach(b=>{
     document.getElementById(`url-input-${b}`).value=getUrl(b);
     setPanelState(b,'loading');
   });
-  loadBrand('BOH');
+  const init = _initialBrand();
+  // 초기 브랜드 탭 활성화
+  document.querySelectorAll('.brand-tab').forEach(t=>t.classList.remove('active'));
+  const initBtn = document.querySelector(`.brand-tab.${init.toLowerCase()}`);
+  if (initBtn) initBtn.classList.add('active');
+  BRANDS.forEach(b => {
+    document.getElementById(`panel-${b}`).classList.toggle('active', b===init);
+    document.getElementById(`url-${b}`).style.display = b===init ? '' : 'none';
+  });
+  loadBrand(init);
   // 자동 새로고침 비활성화 - '시트 갱신' 버튼으로만 갱신
 });
 </script>

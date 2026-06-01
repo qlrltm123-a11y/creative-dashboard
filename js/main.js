@@ -79,6 +79,15 @@ window.updateDashboard = function() {
     if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache();
     if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache();
 
+    // 통합 iframe(퍼널/GMV)에 전역 브랜드 변경 전파 (이미 로드된 경우만)
+    const _brand = (typeof currentBrand !== 'undefined') ? currentBrand : 'ALL';
+    ['funnel-frame', 'gmv-frame'].forEach(id => {
+        const fr = document.getElementById(id);
+        if (fr && fr.src && fr.contentWindow) {
+            try { fr.contentWindow.postMessage({ type: 'setBrand', brand: _brand }, '*'); } catch(e) {}
+        }
+    });
+
     // ① 피로도 감지는 백그라운드로 (메인 스레드 비차단)
     setTimeout(() => { window._creativeFatigue = detectCreativeFatigue(allCreatives); }, 0);
 
@@ -439,9 +448,12 @@ function switchSection(sectionName) {
             } else if (sectionName === 'weekly') {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
             } else if (sectionName === 'funnel' || sectionName === 'gmv') {
-                // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드)
+                // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드) + 전역 브랜드 전달
                 const frame = document.getElementById(sectionName + '-frame');
-                if (frame && !frame.src && frame.dataset.src) frame.src = frame.dataset.src;
+                if (frame && !frame.src && frame.dataset.src) {
+                    const b = (typeof currentBrand !== 'undefined') ? currentBrand : 'ALL';
+                    frame.src = frame.dataset.src + '?brand=' + encodeURIComponent(b);
+                }
             }
             if (panel) panel.classList.remove('section-loading');
         });
