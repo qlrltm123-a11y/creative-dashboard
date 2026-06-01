@@ -365,25 +365,62 @@ function _wrByProductInsight(list) {
             .sort((a, b) => b.spend - a.spend)
             .slice(0, 5);
 
-        // 소구포인트 빈도
+        // ── ROAS 가중 집계 헬퍼 ──
+        const _aggMap = (entries) => Object.entries(entries)
+            .map(([k, d]) => ({ k, count: d.c, avgRoas: d.c>0 ? d.r/d.c : 0 }))
+            .sort((a,b) => b.avgRoas-a.avgRoas || b.count-a.count);
+
+        // 소구포인트
         const appealMap = {};
         items.forEach(c => {
+            const roas = c.roas||0;
             const aps = Array.isArray(c.appeal_points) ? c.appeal_points
-                : (c.appeal_points ? String(c.appeal_points).split(',').map(s=>s.trim()) : []);
-            aps.filter(Boolean).forEach(ap => { appealMap[ap] = (appealMap[ap]||0) + 1; });
+                : (c.appeal_points ? String(c.appeal_points).split(/[,、，·・]/).map(s=>s.trim()) : []);
+            aps.filter(Boolean).forEach(ap => {
+                if (!appealMap[ap]) appealMap[ap] = {c:0,r:0};
+                appealMap[ap].c++; appealMap[ap].r+=roas;
+            });
         });
-        const topAppeals = Object.entries(appealMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+        const topAppeals = _aggMap(appealMap).slice(0,6);
 
-        // 후킹포인트 빈도
+        // 후킹유형
         const hookMap = {};
         items.forEach(c => {
+            const roas = c.roas||0;
             const hooks = Array.isArray(c.hook_type) ? c.hook_type
-                : (c.hook_type ? [c.hook_type] : []);
-            hooks.filter(Boolean).forEach(h => { hookMap[h] = (hookMap[h]||0) + 1; });
+                : (c.hook_type ? String(c.hook_type).split(/[,、，·・]/).map(s=>s.trim()) : []);
+            hooks.filter(Boolean).forEach(h => {
+                if (!hookMap[h]) hookMap[h] = {c:0,r:0};
+                hookMap[h].c++; hookMap[h].r+=roas;
+            });
         });
-        const topHooks = Object.entries(hookMap).sort((a,b)=>b[1]-a[1]).slice(0,4);
+        const topHooks = _aggMap(hookMap).slice(0,4);
 
-        return { product, top5, topAppeals, topHooks, kpi: _wrSum(items) };
+        // 고효율 캐치카피 (key_message_kr 우선, 없으면 key_message_jp)
+        const copyMap = {};
+        items.forEach(c => {
+            const roas = c.roas||0;
+            const msg = (c.key_message_kr || c.key_message_jp || '').trim();
+            if (!msg) return;
+            if (!copyMap[msg]) copyMap[msg] = {c:0,r:0};
+            copyMap[msg].c++; copyMap[msg].r+=roas;
+        });
+        const topCopies = _aggMap(copyMap).slice(0,5);
+
+        // 키워드
+        const kwMap = {};
+        items.forEach(c => {
+            const roas = c.roas||0;
+            const kws = Array.isArray(c.keywords) ? c.keywords
+                : (c.keywords ? String(c.keywords).split(/[,、，·・\s]+/).map(s=>s.trim()).filter(s=>s.length>1) : []);
+            kws.filter(Boolean).forEach(kw => {
+                if (!kwMap[kw]) kwMap[kw] = {c:0,r:0};
+                kwMap[kw].c++; kwMap[kw].r+=roas;
+            });
+        });
+        const topKeywords = _aggMap(kwMap).slice(0,8);
+
+        return { product, top5, topAppeals, topHooks, topCopies, topKeywords, kpi: _wrSum(items) };
     }).sort((a,b) => b.kpi.spend - a.kpi.spend);
 }
 
@@ -415,17 +452,34 @@ function _wrProductInsightSectionHtml(productData) {
 
         // 소구포인트 태그
         const appealTags = pd.topAppeals.length
-            ? pd.topAppeals.map(([ap, cnt]) =>
-                `<span class="wr-insight-tag" style="background:${color}18;color:${color};border-color:${color}40">${ap}<em>${cnt}</em></span>`
+            ? pd.topAppeals.map(d =>
+                `<span class="wr-insight-tag" style="background:${color}18;color:${color};border-color:${color}40">${d.k}<em>×${d.count}</em></span>`
             ).join('')
             : '<span class="wr-no-data">데이터 없음</span>';
 
-        // 후킹포인트 태그
+        // 후킹유형 태그
         const hookTags = pd.topHooks.length
-            ? pd.topHooks.map(([h, cnt]) =>
-                `<span class="wr-insight-tag wr-hook-tag">${h}<em>${cnt}</em></span>`
+            ? pd.topHooks.map(d =>
+                `<span class="wr-insight-tag wr-hook-tag">${d.k}<em>×${d.count}</em></span>`
             ).join('')
             : '<span class="wr-no-data">데이터 없음</span>';
+
+        // 고효율 캐치카피
+        const copyRows = pd.topCopies.length
+            ? pd.topCopies.map((d, i) => `
+                <div class="wr-copy-row">
+                    <span class="wr-copy-rank" style="background:${i===0?color+'22':'#f1f5f9'};color:${i===0?color:'#64748b'}">${i+1}</span>
+                    <span class="wr-copy-text">${d.k}</span>
+                    <span class="wr-copy-roas" style="color:${color}">${_wrR(d.avgRoas)}</span>
+                </div>`).join('')
+            : '';
+
+        // 키워드 태그
+        const kwTags = pd.topKeywords.length
+            ? pd.topKeywords.map(d =>
+                `<span class="wr-insight-tag wr-kw-tag">${d.k}<em>×${d.count}</em></span>`
+            ).join('')
+            : '';
 
         return `
         <div class="wr-pi-card">
@@ -443,10 +497,16 @@ function _wrProductInsightSectionHtml(productData) {
                     <div class="wr-pi-rows">${top5Rows}</div>
                 </div>
                 <div class="wr-pi-col wr-pi-col-side">
-                    <div class="wr-pi-sub-hd">💡 소구포인트 (상위)</div>
+                    <div class="wr-pi-sub-hd">💡 소구포인트</div>
                     <div class="wr-insight-tags">${appealTags}</div>
-                    <div class="wr-pi-sub-hd" style="margin-top:12px">⚡ 후킹 유형 (상위)</div>
+                    <div class="wr-pi-sub-hd" style="margin-top:10px">⚡ 후킹 유형</div>
                     <div class="wr-insight-tags">${hookTags}</div>
+                    ${copyRows ? `
+                    <div class="wr-pi-sub-hd" style="margin-top:10px">✍️ 고효율 캐치카피 <span style="font-size:9px;color:#94a3b8">ROAS 높은 순</span></div>
+                    <div class="wr-copy-list">${copyRows}</div>` : ''}
+                    ${kwTags ? `
+                    <div class="wr-pi-sub-hd" style="margin-top:10px">🔑 키워드</div>
+                    <div class="wr-insight-tags">${kwTags}</div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -621,19 +681,42 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 </tr>`;
             });
             html += `</tbody></table>`;
-            // 소구/후킹 인사이트
-            if (pd.topAppeals.length || pd.topHooks.length) {
-                html += `<table style="margin-top:6px"><tr>`;
-                html += `<td style="width:50%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">💡 소구포인트 (빈도순)</strong><br><br>`;
-                pd.topAppeals.forEach(([ap, cnt]) => {
-                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:11px">${ap} (${cnt})</span>`;
+            // 소구/후킹/캐치카피/키워드 인사이트
+            const hasInsight = pd.topAppeals.length || pd.topHooks.length || pd.topCopies.length || pd.topKeywords.length;
+            if (hasInsight) {
+                html += `<table style="margin-top:6px;width:100%"><tr>`;
+                // 소구포인트
+                html += `<td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">💡 소구포인트</strong><br><br>`;
+                pd.topAppeals.forEach(d => {
+                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
                 });
-                html += `</td><td style="width:50%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">⚡ 후킹 유형 (빈도순)</strong><br><br>`;
-                pd.topHooks.forEach(([h, cnt]) => {
-                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">${h} (${cnt})</span>`;
+                // 후킹유형
+                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">⚡ 후킹 유형</strong><br><br>`;
+                pd.topHooks.forEach(d => {
+                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
                 });
+                // 캐치카피
+                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">✍️ 고효율 캐치카피</strong><br><br>`;
+                if (pd.topCopies.length) {
+                    pd.topCopies.forEach((d, i) => {
+                        html += `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px">
+                            <span style="font-size:10px;font-weight:700;color:#6366f1;min-width:14px">${i+1}</span>
+                            <span style="font-size:11px;color:#334155;flex:1">${d.k}</span>
+                            <span style="font-size:10px;font-weight:700;color:#6366f1;white-space:nowrap">${_wrR(d.avgRoas)}</span>
+                        </div>`;
+                    });
+                } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
+                // 키워드
+                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
+                    <strong style="font-size:12px">🔑 키워드</strong><br><br>`;
+                if (pd.topKeywords.length) {
+                    pd.topKeywords.forEach(d => {
+                        html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#f0fdf4;color:#166534;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
+                    });
+                } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
                 html += `</td></tr></table>`;
             }
         });

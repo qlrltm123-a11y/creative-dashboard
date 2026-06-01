@@ -6539,6 +6539,53 @@ img.mw-cr-thumb {
     color: #92400e;
     border-color: #fcd34d60;
 }
+.wr-kw-tag {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #bbf7d060;
+}
+
+/* ── 캐치카피 리스트 ── */
+.wr-copy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.wr-copy-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 7px;
+    padding: 5px 8px;
+}
+.wr-copy-rank {
+    font-size: 9.5px;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.wr-copy-text {
+    font-size: 11px;
+    color: #334155;
+    line-height: 1.5;
+    flex: 1;
+    word-break: break-word;
+}
+.wr-copy-roas {
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
 .wr-no-data {
     font-size: 11px;
     color: #94a3b8;
