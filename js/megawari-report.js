@@ -35,6 +35,16 @@ function _fmtMoney(v, unit) {
     if (Math.abs(v) >= 10_000)    return `${Math.round(v / 1_000)}K${unit||''}`;
     return `${Math.round(v).toLocaleString()}${unit||''}`;
 }
+// KPI 바 전용: ₩ + 한국식 억/만 단위
+function _fmtKRW(v) {
+    if (!v || v === 0) return '-';
+    const abs = Math.abs(v);
+    if (abs >= 100_000_000) return `₩${(v / 100_000_000).toFixed(2)}억`;
+    if (abs >= 10_000_000)  return `₩${(v / 10_000_000).toFixed(1)}천만`;
+    if (abs >= 1_000_000)   return `₩${(v / 1_000_000).toFixed(1)}백만`;
+    if (abs >= 10_000)      return `₩${Math.round(v / 10_000)}만`;
+    return `₩${Math.round(v).toLocaleString()}`;
+}
 function _roasClass(roas) {
     if (roas >= 3)   return 'roas-high';
     if (roas >= 1.5) return 'roas-mid';
@@ -340,9 +350,19 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
     // ── KPI 바 ───────────────────────────────────────────────
     const kpiHtml = `<div class="mw-kpi-bar">
         <div class="mw-kpi-item">
-            <div class="mw-kpi-lbl">전체 ROAS</div>
+            <div class="mw-kpi-lbl">ROAS</div>
             <div class="mw-kpi-val ${_roasClass(today.roas)}">${_fmtRoas(today.roas)}</div>
             <div>${_diffBadge(today.roas, prev?.roas)}</div>
+        </div>
+        <div class="mw-kpi-item">
+            <div class="mw-kpi-lbl">광고비</div>
+            <div class="mw-kpi-val">${_fmtKRW(today.spend)}</div>
+            <div>${_diffBadge(today.spend, prev?.spend)}</div>
+        </div>
+        <div class="mw-kpi-item">
+            <div class="mw-kpi-lbl">매출</div>
+            <div class="mw-kpi-val">${_fmtKRW(today.revenue)}</div>
+            <div>${_diffBadge(today.revenue, prev?.revenue)}</div>
         </div>
         <div class="mw-kpi-item">
             <div class="mw-kpi-lbl">CTR</div>
@@ -350,15 +370,20 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
             <div>${_diffBadge(today.ctr, prev?.ctr)}</div>
         </div>
         <div class="mw-kpi-item">
-            <div class="mw-kpi-lbl">매출</div>
-            <div class="mw-kpi-val">${_fmtMoney(today.revenue)}</div>
-            <div class="mw-kpi-unit">원</div>
+            <div class="mw-kpi-lbl">노출</div>
+            <div class="mw-kpi-val">${today.impressions >= 10000 ? (today.impressions/10000).toFixed(1)+'만' : (today.impressions||0).toLocaleString()}</div>
+            <div>${_diffBadge(today.impressions, prev?.impressions)}</div>
         </div>
         <div class="mw-kpi-item">
-            <div class="mw-kpi-lbl">지출</div>
-            <div class="mw-kpi-val">${_fmtMoney(today.spend)}</div>
-            <div class="mw-kpi-unit">원</div>
+            <div class="mw-kpi-lbl">클릭</div>
+            <div class="mw-kpi-val">${(today.clicks||0).toLocaleString()}</div>
+            <div>${_diffBadge(today.clicks, prev?.clicks)}</div>
         </div>
+        ${useAtc ? `<div class="mw-kpi-item">
+            <div class="mw-kpi-lbl">장바구니</div>
+            <div class="mw-kpi-val">${(today.add_to_cart||0)}건</div>
+            <div class="mw-kpi-unit">${_fmtAtcRate(today.atc_rate)}</div>
+        </div>` : ''}
     </div>`;
 
     // ── AI 코멘트 ───────────────────────────────────────────
