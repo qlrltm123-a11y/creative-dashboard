@@ -120,19 +120,26 @@ function _wrThumbHtml(url, className, fallbackHtml) {
     return `<img class="${className}" src="${url}" loading="lazy" onerror="this.outerHTML='${fb.replace(/'/g, "\\'")}'">`;
 }
 
+/* ── 소재명 정규화 키 (대소문자·공백·특수공백 무시) ── */
+function _wrCreativeKey(c) {
+    return (c.ad_name || c.creative_name || String(c.id || ''))
+        .trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 /* ── 소재별 집계 ── */
 function _wrByCreative(list) {
     const m = {};
     list.forEach(c => {
-        const key = (c.ad_name || c.creative_name || String(c.id || '')).trim();
+        const key = _wrCreativeKey(c);
         if (!key) return;
         if (!m[key]) m[key] = {
             name:     c.ad_name || c.creative_name || key,
             thumb:    c.thumbnail_url || c.media_url || '',
-            platform: c.platform || '',
+            platforms: new Set(),       // 매체 복수 대응
             product:  c.product  || '',
             spend:0, impr:0, clicks:0, rev:0, conv:0,
         };
+        if (c.platform) m[key].platforms.add(c.platform);
         // 썸네일 있으면 덮어씌우기 (집계 중 첫 번째 있는 것 사용)
         if (!m[key].thumb && (c.thumbnail_url || c.media_url)) {
             m[key].thumb = c.thumbnail_url || c.media_url;
@@ -145,6 +152,7 @@ function _wrByCreative(list) {
     });
     return Object.values(m).map(d => ({
         ...d,
+        platform: [...d.platforms].join(' · '), // 매체 여러 개면 "Meta · X" 형태
         ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
         roas: d.spend > 0 ? d.rev    / d.spend  : 0,
     })).sort((a, b) => b.spend - a.spend).slice(0, 30);
@@ -329,17 +337,18 @@ function _wrByProductInsight(list) {
     });
 
     return Object.entries(prodMap).map(([product, items]) => {
-        // 소재별 집계 (thumb은 원본 URL 그대로 보관 → 렌더 시 buildDriveImgHtml 사용)
+        // 소재별 집계 — 동일 소재명(대소문자·공백 무시)은 하나로 합산
         const creMap = {};
         items.forEach(c => {
-            const key = (c.ad_name || c.creative_name || String(c.id || '')).trim();
+            const key = _wrCreativeKey(c);
             if (!key) return;
             if (!creMap[key]) creMap[key] = {
                 name: c.ad_name || c.creative_name || key,
                 thumb: c.thumbnail_url || c.media_url || '',
-                platform: c.platform || '',
+                platforms: new Set(),
                 spend:0, impr:0, clicks:0, rev:0, conv:0,
             };
+            if (c.platform) creMap[key].platforms.add(c.platform);
             if (!creMap[key].thumb && (c.thumbnail_url || c.media_url))
                 creMap[key].thumb = c.thumbnail_url || c.media_url;
             creMap[key].spend  += c.spend       || 0;
@@ -349,7 +358,10 @@ function _wrByProductInsight(list) {
             creMap[key].conv   += c.conversions || 0;
         });
         const top5 = Object.values(creMap)
-            .map(d => ({ ...d, ctr: d.impr>0 ? d.clicks/d.impr : 0, roas: d.spend>0 ? d.rev/d.spend : 0 }))
+            .map(d => ({ ...d,
+                platform: [...d.platforms].join(' · '),
+                ctr: d.impr>0 ? d.clicks/d.impr : 0,
+                roas: d.spend>0 ? d.rev/d.spend : 0 }))
             .sort((a, b) => b.spend - a.spend)
             .slice(0, 5);
 
