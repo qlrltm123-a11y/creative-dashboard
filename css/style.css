@@ -5866,9 +5866,156 @@ img.mw-cr-thumb {
 /* 소재 변동 감지 — 2열 카드 */
 .mw-shift-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
+/* ── 소재 인사이트 섹션 ── */
+.mw-insight-wrap {
+    margin-bottom: 16px;
+}
+.mw-insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.mw-insight-col {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px 16px 16px;
+    min-width: 0;
+}
+.mw-ins-legend {
+    font-size: 9.5px;
+    color: #94a3b8;
+    font-weight: 400;
+    margin-left: 4px;
+}
+
+/* 소구포인트 태그 */
+.mw-ins-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+.mw-ins-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px 4px 10px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid;
+    cursor: default;
+    transition: transform 0.12s;
+}
+.mw-ins-tag:hover { transform: translateY(-1px); }
+.mw-ins-tag-name { }
+.mw-ins-tag-cnt {
+    font-size: 9px;
+    opacity: 0.65;
+    font-weight: 500;
+}
+.mw-ins-tag-roas {
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(0,0,0,0.07);
+    border-radius: 4px;
+    padding: 0 5px;
+    line-height: 1.6;
+}
+
+/* 후킹유형 바 */
+.mw-ins-hooks { margin-top: 4px; }
+.mw-ins-hook-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+}
+.mw-ins-hook-rank {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    min-width: 14px;
+    text-align: center;
+}
+.mw-ins-hook-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #334155;
+    min-width: 80px;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mw-ins-hook-bar-wrap {
+    flex: 1;
+    height: 10px;
+    background: #f1f5f9;
+    border-radius: 5px;
+    overflow: hidden;
+}
+.mw-ins-hook-bar {
+    height: 100%;
+    border-radius: 5px;
+    min-width: 4px;
+}
+.mw-ins-hook-roas {
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 44px;
+    text-align: right;
+}
+.mw-ins-hook-cnt {
+    font-size: 10px;
+    color: #94a3b8;
+    min-width: 26px;
+    text-align: right;
+}
+
+/* 소재 타입 */
+.mw-ins-types {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.mw-ins-type-card {
+    flex: 1;
+    min-width: 130px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.mw-ins-type-lbl {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+.mw-ins-type-cnt {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-bottom: 7px;
+}
+.mw-ins-type-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #64748b;
+    padding: 3px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.mw-ins-type-row:last-child { border: none; }
+.mw-ins-type-row strong { font-weight: 700; }
+
 @media (max-width: 900px) {
     .mw-row-ab, .mw-row-cd { grid-template-columns: 1fr; }
     .mw-shift-cols { grid-template-columns: 1fr; }
+    .mw-insight-grid { grid-template-columns: 1fr; }
 }
 
 /* ══════════════════════════════════════════════

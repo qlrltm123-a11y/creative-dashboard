@@ -498,10 +498,143 @@ function _buildMwBodyHtml(sel, byDate, sortedDates) {
             </div>
             <div class="mw-creative-list">${botRows||'<p class="mw-no-data">없음 👍</p>'}</div>
         </div>
-    </div>`;
+    </div>
+    <!-- ROW 5: 소재 인사이트 (소구포인트 / 후킹유형 / 타입) -->
+    ${_buildMwCreativeInsightHtml(today.creatives)}`;
 
     _mwHtmlCache[sel] = html;
     return html;
+}
+
+// ── 소재 인사이트 (소구포인트 / 후킹유형 / 소재타입) ──────────
+function _buildMwCreativeInsightHtml(creatives) {
+    if (!creatives || creatives.length < 2) return '';
+
+    // ── 소구포인트 집계 (ROAS 가중 평균) ──
+    const appealMap = {};
+    creatives.forEach(c => {
+        const roas  = c.roas  || 0;
+        const spend = c.spend || 0;
+        const aps = Array.isArray(c.appeal_points)
+            ? c.appeal_points
+            : (c.appeal_points
+                ? String(c.appeal_points).split(/[,、，·・]/).map(s => s.trim()).filter(Boolean)
+                : []);
+        aps.forEach(ap => {
+            if (!ap || ap.startsWith('❌')) return;
+            if (!appealMap[ap]) appealMap[ap] = { count: 0, roasSum: 0, spendSum: 0 };
+            appealMap[ap].count++;
+            appealMap[ap].roasSum  += roas;
+            appealMap[ap].spendSum += spend;
+        });
+    });
+    const appeals = Object.entries(appealMap)
+        .map(([tag, d]) => ({ tag, count: d.count, avgRoas: d.count > 0 ? d.roasSum / d.count : 0 }))
+        .sort((a, b) => b.avgRoas - a.avgRoas || b.count - a.count);
+
+    // ── 후킹유형 집계 ──
+    const hookMap = {};
+    creatives.forEach(c => {
+        const roas  = c.roas  || 0;
+        const hooks = Array.isArray(c.hook_type)
+            ? c.hook_type
+            : (c.hook_type
+                ? String(c.hook_type).split(/[,、，·・]/).map(s => s.trim()).filter(Boolean)
+                : []);
+        hooks.forEach(h => {
+            if (!h || h.startsWith('❌')) return;
+            if (!hookMap[h]) hookMap[h] = { count: 0, roasSum: 0 };
+            hookMap[h].count++;
+            hookMap[h].roasSum += roas;
+        });
+    });
+    const hooks = Object.entries(hookMap)
+        .map(([tag, d]) => ({ tag, count: d.count, avgRoas: d.count > 0 ? d.roasSum / d.count : 0 }))
+        .sort((a, b) => b.avgRoas - a.avgRoas || b.count - a.count);
+
+    // ── 소재 타입별 성과 (이미지 vs 영상) ──
+    const typeMap = {};
+    creatives.forEach(c => {
+        const url   = c.media_url || c.thumbnail_url || '';
+        const isVid = c.media_type === 'video' || /\.(mp4|mov|webm|m4v)/i.test(url);
+        const t = isVid ? 'video' : 'image';
+        if (!typeMap[t]) typeMap[t] = { count: 0, spend: 0, revenue: 0, clicks: 0, impr: 0 };
+        typeMap[t].count++;
+        typeMap[t].spend   += c.spend       || 0;
+        typeMap[t].revenue += c.revenue     || 0;
+        typeMap[t].clicks  += c.clicks      || 0;
+        typeMap[t].impr    += c.impressions || 0;
+    });
+    const types = Object.entries(typeMap).map(([t, d]) => ({
+        type: t,
+        count: d.count,
+        spend: d.spend,
+        roas:  d.spend > 0 ? d.revenue / d.spend : 0,
+        ctr:   d.impr  > 0 ? d.clicks  / d.impr  : 0,
+    })).sort((a, b) => b.roas - a.roas);
+
+    if (!appeals.length && !hooks.length) return '';
+
+    // ── 소구포인트 태그 HTML ──
+    const appealHtml = appeals.length ? appeals.slice(0, 14).map(a => {
+        const tier = a.avgRoas >= 3 ? '#059669' : a.avgRoas >= 1.5 ? '#6366f1' : a.avgRoas >= 1 ? '#f59e0b' : '#94a3b8';
+        const bg   = a.avgRoas >= 3 ? '#f0fdf4' : a.avgRoas >= 1.5 ? '#eef2ff' : a.avgRoas >= 1 ? '#fffbeb' : '#f8fafc';
+        return `<span class="mw-ins-tag" style="background:${bg};color:${tier};border-color:${tier}40">
+            <span class="mw-ins-tag-name">${a.tag}</span>
+            <span class="mw-ins-tag-cnt">×${a.count}</span>
+            <span class="mw-ins-tag-roas">${_fmtRoas(a.avgRoas)}</span>
+        </span>`;
+    }).join('') : '<span class="mw-no-data">소구포인트 데이터 없음</span>';
+
+    // ── 후킹유형 바 HTML ──
+    const maxHookRoas = hooks.length ? Math.max(...hooks.map(h => h.avgRoas), 0.01) : 1;
+    const hookHtml = hooks.length ? hooks.slice(0, 7).map((h, i) => {
+        const pct   = Math.round(h.avgRoas / maxHookRoas * 100);
+        const color = h.avgRoas >= 3 ? '#059669' : h.avgRoas >= 1.5 ? '#6366f1' : h.avgRoas >= 1 ? '#f59e0b' : '#94a3b8';
+        return `<div class="mw-ins-hook-row">
+            <span class="mw-ins-hook-rank">${i+1}</span>
+            <span class="mw-ins-hook-label" title="${h.tag}">${h.tag}</span>
+            <div class="mw-ins-hook-bar-wrap">
+                <div class="mw-ins-hook-bar" style="width:${pct}%;background:${color}20;border-right:3px solid ${color}"></div>
+            </div>
+            <span class="mw-ins-hook-roas" style="color:${color}">${_fmtRoas(h.avgRoas)}</span>
+            <span class="mw-ins-hook-cnt">×${h.count}</span>
+        </div>`;
+    }).join('') : '<span class="mw-no-data">후킹유형 데이터 없음</span>';
+
+    // ── 소재 타입 카드 HTML ──
+    const typeIcons = { image: '🖼️', video: '🎬' };
+    const typeLabel = { image: '이미지', video: '영상' };
+    const typeHtml = types.length >= 2 ? `
+        <div class="mw-section-hd" style="margin-top:14px">📽️ 소재 타입별 성과</div>
+        <div class="mw-ins-types">
+            ${types.map(t => `
+            <div class="mw-ins-type-card">
+                <div class="mw-ins-type-lbl">${typeIcons[t.type]||'📄'} ${typeLabel[t.type]||t.type}</div>
+                <div class="mw-ins-type-cnt">${t.count}개 소재</div>
+                <div class="mw-ins-type-row"><span>ROAS</span>
+                    <strong style="color:${t.roas>=2?'#059669':t.roas>=1?'#6366f1':'#ef4444'}">${_fmtRoas(t.roas)}</strong></div>
+                <div class="mw-ins-type-row"><span>CTR</span><strong>${_fmtCtr(t.ctr)}</strong></div>
+                <div class="mw-ins-type-row"><span>집행비</span><strong>${_fmtMoney(t.spend,'원')}</strong></div>
+            </div>`).join('')}
+        </div>` : '';
+
+    return `
+    <div class="mw-insight-wrap">
+        <div class="mw-insight-grid">
+            <div class="mw-insight-col">
+                <div class="mw-section-hd">💡 소구포인트 효율 분석
+                    <span class="mw-ins-legend">평균 ROAS 높은 순 · 색상: <span style="color:#059669">◆</span>고효율 <span style="color:#6366f1">◆</span>양호 <span style="color:#f59e0b">◆</span>저효율</span>
+                </div>
+                <div class="mw-ins-tags">${appealHtml}</div>
+            </div>
+            <div class="mw-insight-col">
+                <div class="mw-section-hd">⚡ 후킹유형 효율 분석 <span style="font-size:10px;color:#94a3b8">평균 ROAS 기준</span></div>
+                <div class="mw-ins-hooks">${hookHtml}</div>
+                ${typeHtml}
+            </div>
+        </div>
+    </div>`;
 }
 
 // ── 패널 렌더 (초기 / 전체 재렌더) ──────────────────────────
