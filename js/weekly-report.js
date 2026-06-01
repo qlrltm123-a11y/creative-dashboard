@@ -126,6 +126,20 @@ function _wrCreativeKey(c) {
         .trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+/* ── 캐치카피 정규화 키 (구두점·전각/반각·공백 제거 → 유사 문구 통합) ──
+   예) "綺麗な肌へ！" ≡ "綺麗な肌へ"  /  "SALE 50%OFF" ≡ "sale 50% off"  */
+function _wrCopyKey(text) {
+    return text
+        .toLowerCase()
+        // 전각→반각 숫자·알파벳
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        // 구두점·기호·특수문자 제거 (일본어 포함)
+        .replace(/[！!？?。、，,・\.…‥「」『』【】〜~＊*◆▶→←↑↓【】《》〈〉#＃@＠\/／\\｜|]/g, '')
+        // 공백 정규화
+        .replace(/[\s　　]+/g, ' ')
+        .trim();
+}
+
 /* ── 소재별 집계 ── */
 function _wrByCreative(list) {
     const m = {};
@@ -396,16 +410,29 @@ function _wrByProductInsight(list) {
         });
         const topHooks = _aggMap(hookMap).slice(0,4);
 
-        // 고효율 캐치카피 (key_message_kr 우선, 없으면 key_message_jp)
+        // 고효율 캐치카피 — 정규화 키로 유사 문구 통합, 대표 원본 표시
         const copyMap = {};
         items.forEach(c => {
-            const roas = c.roas||0;
-            const msg = (c.key_message_kr || c.key_message_jp || '').trim();
-            if (!msg) return;
-            if (!copyMap[msg]) copyMap[msg] = {c:0,r:0};
-            copyMap[msg].c++; copyMap[msg].r+=roas;
+            const roas = c.roas || 0;
+            const raw  = (c.key_message_kr || c.key_message_jp || '').trim();
+            if (!raw) return;
+            const key = _wrCopyKey(raw);
+            if (!key) return;
+            if (!copyMap[key]) copyMap[key] = { c:0, r:0, origCnt:{} };
+            copyMap[key].c++;
+            copyMap[key].r += roas;
+            // 원본 문구별 등장 횟수 추적 → 가장 많이 쓰인 원본을 대표로
+            copyMap[key].origCnt[raw] = (copyMap[key].origCnt[raw] || 0) + 1;
         });
-        const topCopies = _aggMap(copyMap).slice(0,5);
+        // k = 가장 많이 등장한 원본 문구
+        const topCopies = Object.entries(copyMap)
+            .map(([, d]) => {
+                const bestOrig = Object.entries(d.origCnt)
+                    .sort((a, b) => b[1] - a[1])[0][0];
+                return { k: bestOrig, count: d.c, avgRoas: d.c > 0 ? d.r / d.c : 0 };
+            })
+            .sort((a, b) => b.avgRoas - a.avgRoas || b.count - a.count)
+            .slice(0, 5);
 
         // 키워드
         const kwMap = {};
