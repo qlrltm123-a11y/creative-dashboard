@@ -6,18 +6,8 @@
 window._wr = { product: '', event: '', dateFrom: '', dateTo: '' };
 let _wr = window._wr;
 
-/* ── 초기 로드 시 이번 주 날짜 자동 설정 ── */
-(function _wrInitDates() {
-    const now = new Date();
-    const day = now.getDay();
-    const mon = new Date(now);
-    mon.setDate(now.getDate() - ((day + 6) % 7));
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
-    const fmt = d => d.toISOString().slice(0, 10);
-    _wr.dateFrom = fmt(mon);
-    _wr.dateTo   = fmt(sun);
-})();
+/* ── 초기 로드 시 날짜 필터 없음으로 시작 (데이터 기간과 불일치 방지) ── */
+// 날짜 input은 비워두고 전체 기간 표시 → 사용자가 퀵버튼으로 좁혀가는 방식
 
 /* ── 날짜 퀵셋 (0=이번주, -1=저번주) ── */
 window._wrSetWeek = function(offset) {
@@ -164,12 +154,14 @@ function _wrByCreative(list) {
         m[key].rev    += c.revenue     || 0;
         m[key].conv   += c.conversions || 0;
     });
+    // 복합 스코어: ROAS × log(주문수+1) — 효율 + 볼륨 동시 반영
+    const _effScore = d => (d.roas||0) * (1 + Math.log1p(d.conv||0) * 0.5);
     return Object.values(m).map(d => ({
         ...d,
-        platform: [...d.platforms].join(' · '), // 매체 여러 개면 "Meta · X" 형태
+        platform: [...d.platforms].join(' · '),
         ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
         roas: d.spend > 0 ? d.rev    / d.spend  : 0,
-    })).sort((a, b) => b.spend - a.spend).slice(0, 30);
+    })).sort((a, b) => _effScore(b) - _effScore(a)).slice(0, 30);
 }
 
 /* ── 포맷 헬퍼 ── */
@@ -371,12 +363,14 @@ function _wrByProductInsight(list) {
             creMap[key].rev    += c.revenue     || 0;
             creMap[key].conv   += c.conversions || 0;
         });
+        // 복합 스코어: ROAS × log(주문수+1) — 효율 + 볼륨 동시 반영
+        const _effScore = d => (d.roas||0) * (1 + Math.log1p(d.conv||0) * 0.5);
         const top5 = Object.values(creMap)
             .map(d => ({ ...d,
                 platform: [...d.platforms].join(' · '),
-                ctr: d.impr>0 ? d.clicks/d.impr : 0,
-                roas: d.spend>0 ? d.rev/d.spend : 0 }))
-            .sort((a, b) => b.spend - a.spend)
+                ctr:  d.impr>0  ? d.clicks/d.impr : 0,
+                roas: d.spend>0 ? d.rev/d.spend    : 0 }))
+            .sort((a, b) => _effScore(b) - _effScore(a))
             .slice(0, 5);
 
         // ── ROAS 가중 집계 헬퍼 ──
@@ -470,9 +464,10 @@ function _wrProductInsightSectionHtml(productData) {
                     <div class="wr-pi-cre-name" title="${c.name.replace(/"/g,'&quot;')}">${c.name}</div>
                     <div class="wr-pi-cre-meta">
                         ${c.platform ? `<span class="wr-pi-plat">${c.platform}</span>` : ''}
-                        <span class="wr-pi-spend">${_wrW(c.spend)}</span>
-                        <span class="wr-pi-ctr">CTR ${_wrP(c.ctr)}</span>
                         <span class="wr-pi-roas" style="color:${color}">ROAS ${_wrR(c.roas)}</span>
+                        ${c.conv > 0 ? `<span class="wr-pi-conv">주문 ${_wrN(c.conv)}건</span>` : ''}
+                        <span class="wr-pi-ctr">CTR ${_wrP(c.ctr)}</span>
+                        <span class="wr-pi-spend">${_wrW(c.spend)}</span>
                     </div>
                 </div>
             </div>`).join('');
@@ -520,7 +515,7 @@ function _wrProductInsightSectionHtml(productData) {
             </div>
             <div class="wr-pi-body">
                 <div class="wr-pi-col wr-pi-col-main">
-                    <div class="wr-pi-sub-hd">🏆 집행비 TOP 5 소재</div>
+                    <div class="wr-pi-sub-hd">🏆 고효율 TOP 5 소재 <span style="font-size:9px;color:#94a3b8;font-weight:400">ROAS×주문수 기준</span></div>
                     <div class="wr-pi-rows">${top5Rows}</div>
                 </div>
                 <div class="wr-pi-col wr-pi-col-side">
@@ -582,7 +577,15 @@ function renderWeeklyReport() {
     if (!list.length) {
         body.innerHTML = `<div class="wr-empty">
             <i class="fas fa-inbox fa-2x mb-3 block opacity-30"></i>
-            <p>해당 조건의 데이터가 없습니다.<br>시트를 연동하거나 필터를 조정해주세요.</p>
+            <p>해당 기간·조건의 데이터가 없습니다.</p>
+            ${(() => {
+                // 실제 데이터 날짜 범위 감지
+                const allDates = (_wrBrandList()).map(c=>(c.start_date||'').slice(0,10)).filter(Boolean).sort();
+                if (!allDates.length) return '<p class="text-xs text-slate-400">시트를 연동해주세요.</p>';
+                const min = allDates[0], max = allDates[allDates.length-1];
+                return `<p class="text-xs text-slate-400">데이터 기간: <strong>${min} ~ ${max}</strong></p>
+                <button onclick="window._wrClearDates()" style="margin-top:8px;padding:6px 16px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">전체 기간으로 보기</button>`;
+            })()}
         </div>`;
         return;
     }

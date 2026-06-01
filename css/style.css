@@ -6547,6 +6547,7 @@ img.mw-cr-thumb {
 .wr-pi-spend { color: #334155; font-weight: 600; }
 .wr-pi-ctr   { color: #2563eb; }
 .wr-pi-roas  { font-weight: 700; }
+.wr-pi-conv  { font-size: 10px; font-weight: 600; color: #059669; }
 
 /* 소구/후킹 인사이트 태그 */
 .wr-insight-tags {
