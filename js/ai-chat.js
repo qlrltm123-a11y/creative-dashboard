@@ -102,12 +102,8 @@ function _acBuildContext() {
     return ctx;
 }
 
-/* ── Gemini 호출 ── */
+/* ── Gemini 호출 (서버 프록시 /api/ai-chat — 키는 서버 env에서 관리) ── */
 async function _acAsk(question) {
-    const apiKey = localStorage.getItem(_AC_KEY);
-    if (!apiKey) {
-        return { error: 'Google AI API 키가 없습니다. "광고 생성" 탭에서 API 키를 먼저 저장해주세요.' };
-    }
     const ctx = _acBuildContext();
     const hasData = ctx.데이터 && Object.keys(ctx.데이터).length;
     if (!hasData) {
@@ -133,22 +129,18 @@ ${JSON.stringify(ctx, null, 1)}`;
     contents.push({ role: 'user', parts: [{ text: question }] });
 
     try {
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${_AC_MODEL}:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents,
-                    generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
-                }),
-            }
-        );
+        const res = await fetch('/api/ai-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents,
+                generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
+            }),
+        });
         const data = await res.json();
-        if (!res.ok) return { error: `API 오류: ${data.error?.message || res.status}` };
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) return { error: '응답이 비어 있습니다. 다시 시도해주세요.' };
-        return { text };
+        if (!res.ok) return { error: data.error || `서버 오류 (${res.status})` };
+        if (!data.text) return { error: '응답이 비어 있습니다. 다시 시도해주세요.' };
+        return { text: data.text };
     } catch (e) {
         return { error: `네트워크 오류: ${e.message}` };
     }

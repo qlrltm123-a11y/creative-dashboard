@@ -412,7 +412,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, unified: false, performance: false, ai: false, generate: false, megawari: false, weekly: false, funnel: false, gmv: false };
+let _renderedSections = { overview: true, unified: false, performance: false, ai: false, megawari: false, weekly: false, funnel: false, gmv: false };
 let _currentSection = 'overview';
 
 function switchSection(sectionName) {
@@ -445,8 +445,6 @@ function switchSection(sectionName) {
                 renderPlatformCreativeMatrix();
             } else if (sectionName === 'ai') {
                 if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
-            } else if (sectionName === 'generate') {
-                if (typeof window.renderGeneratePanel === 'function') window.renderGeneratePanel();
             } else if (sectionName === 'megawari') {
                 if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
             } else if (sectionName === 'weekly') {
@@ -865,11 +863,6 @@ function updateDashboard() {
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
-    }
-    // 생성 패널: 한 번이라도 열린 적 있으면 항상 갱신 (현재 섹션 무관)
-    // → 브랜드/매체/이벤트 바꾸면 generate 탭이 열려있든 아니든 패턴이 최신화됨
-    if (_renderedSections.generate && typeof window.renderGeneratePanel === 'function') {
-        window.renderGeneratePanel();
     }
     if (_renderedSections.megawari && typeof window.renderMegawariPanel === 'function') {
         window._mwSelectedDate = null; // 브랜드 바뀌면 날짜 초기화
