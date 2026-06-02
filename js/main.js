@@ -1859,8 +1859,8 @@ function renderCartLeakRanking() {
     const rows = Object.entries(m).map(([prod, d]) => {
         const aov = d.conv > 0 ? d.revenue / d.conv : 0;          // 객단가
         const lost = Math.max(0, (d.atc - d.conv)) * aov;         // 이탈 손실액
-        const buyRate = d.atc > 0 ? d.conv / d.atc : 0;           // 장바구니→구매율
-        return { prod, atc: d.atc, conv: d.conv, aov, lost, buyRate };
+        const dropRate = d.atc > 0 ? (d.atc - d.conv) / d.atc : 0; // 장바구니→구매 이탈률(안 산 비율)
+        return { prod, atc: d.atc, conv: d.conv, aov, lost, dropRate };
     }).filter(r => r.atc > 0 && r.lost > 0)
       .sort((a, b) => b.lost - a.lost)
       .slice(0, 10);
@@ -1876,7 +1876,8 @@ function renderCartLeakRanking() {
 
     wrap.innerHTML = rows.map((r, i) => {
         const w = Math.round(r.lost / max * 100);
-        const brCls = r.buyRate >= 0.5 ? '#059669' : r.buyRate >= 0.3 ? '#d97706' : '#dc2626';
+        // 이탈률은 높을수록 나쁨 (많이 샘)
+        const drCls = r.dropRate <= 0.5 ? '#059669' : r.dropRate <= 0.7 ? '#d97706' : '#dc2626';
         return `
         <div class="leak-row">
             <div class="leak-rank">${i+1}</div>
@@ -1886,7 +1887,7 @@ function renderCartLeakRanking() {
             </div>
             <div class="leak-stats">
                 <div class="leak-lost">−₩${formatNumber(Math.round(r.lost))}</div>
-                <div class="leak-meta">이탈 ${formatNumber(r.atc - r.conv)}건 · 구매율 <b style="color:${brCls}">${(r.buyRate*100).toFixed(0)}%</b> · 객단가 ₩${formatNumber(Math.round(r.aov))}</div>
+                <div class="leak-meta">이탈 ${formatNumber(r.atc - r.conv)}건 · 이탈률 <b style="color:${drCls}">${(r.dropRate*100).toFixed(0)}%</b> · 객단가 ₩${formatNumber(Math.round(r.aov))}</div>
             </div>
         </div>`;
     }).join('');
