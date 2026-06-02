@@ -6758,6 +6758,12 @@ img.mw-cr-thumb {
     border-color: #bbf7d060;
 }
 
+/* 대표 카피 예시 (접힘) */
+.wr-copy-sample { margin-top: 8px; }
+.wr-copy-sample summary { font-size: 10.5px; color: #94a3b8; cursor: pointer; font-weight: 600; outline: none; }
+.wr-copy-sample summary:hover { color: #6366f1; }
+.wr-copy-sample-text { font-size: 11px; color: #475569; line-height: 1.6; margin-top: 6px; padding: 8px 10px; background: #f8fafc; border-radius: 8px; border: 1px solid #f1f5f9; }
+
 /* ── 캐치카피 리스트 ── */
 .wr-copy-list {
     display: flex;

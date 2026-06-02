@@ -427,29 +427,25 @@ function _wrByProductInsight(list) {
         });
         const topHooks = _aggMap(hookMap).slice(0,4);
 
-        // 고효율 캐치카피 — 정규화 키로 유사 문구 통합, 대표 원본 표시
-        const copyMap = {};
+        // 고효율 메시지 요소 — 캐치카피 전문에서 반복 구절(키워드/바이그램) 추출 → ROAS 가중
+        const phraseMap = {};       // phrase -> {c, r}
+        let copySampleBest = null;  // 대표 예시 1개 (최고 ROAS 원문)
         items.forEach(c => {
             const roas = c.roas || 0;
             const raw  = (c.key_message_kr || c.key_message_jp || '').trim();
             if (!raw) return;
-            const key = _wrCopyKey(raw);
-            if (!key) return;
-            if (!copyMap[key]) copyMap[key] = { c:0, r:0, origCnt:{} };
-            copyMap[key].c++;
-            copyMap[key].r += roas;
-            // 원본 문구별 등장 횟수 추적 → 가장 많이 쓰인 원본을 대표로
-            copyMap[key].origCnt[raw] = (copyMap[key].origCnt[raw] || 0) + 1;
+            if (!copySampleBest || roas > copySampleBest.roas) copySampleBest = { raw, roas };
+            _wrExtractPhrases(raw).forEach(ph => {
+                if (!phraseMap[ph]) phraseMap[ph] = { c:0, r:0 };
+                phraseMap[ph].c++; phraseMap[ph].r += roas;
+            });
         });
-        // k = 가장 많이 등장한 원본 문구
-        const topCopies = Object.entries(copyMap)
-            .map(([, d]) => {
-                const bestOrig = Object.entries(d.origCnt)
-                    .sort((a, b) => b[1] - a[1])[0][0];
-                return { k: bestOrig, count: d.c, avgRoas: d.c > 0 ? d.r / d.c : 0 };
-            })
-            .sort((a, b) => b.avgRoas - a.avgRoas || b.count - a.count)
-            .slice(0, 5);
+        // 2회 이상 등장한 구절만(노이즈 제거), ROAS 가중 정렬
+        const topPhrases = Object.entries(phraseMap)
+            .filter(([,d]) => d.c >= 2)
+            .map(([k,d]) => ({ k, count: d.c, avgRoas: d.c>0 ? d.r/d.c : 0 }))
+            .sort((a,b) => b.avgRoas - a.avgRoas || b.count - a.count)
+            .slice(0, 12);
 
         // 키워드
         const kwMap = {};
@@ -464,8 +460,34 @@ function _wrByProductInsight(list) {
         });
         const topKeywords = _aggMap(kwMap).slice(0,8);
 
-        return { product, top5, topAppeals, topHooks, topCopies, topKeywords, kpi: _wrSum(items) };
+        return { product, top5, topAppeals, topHooks, topPhrases, copySampleBest, topKeywords, kpi: _wrSum(items) };
     }).sort((a,b) => b.kpi.spend - a.kpi.spend);
+}
+
+/* ── 캐치카피 문구에서 메시지 요소(키워드·바이그램) 추출 ──
+   한국어 형태소 분석기 없이도 의미 단위를 잡기 위해:
+   - 조사/접미사/불용어 제거, 2글자 이상 토큰
+   - 인접 토큰 바이그램까지 포함("고밀착 처방", "콜라겐 보습") */
+const _WR_STOP = new Set(['그리고','하지만','으로','에서','까지','부터','보다','처럼','같은','같이','위해','때문','통해','대한','관한','이런','저런','그런','어떤','모든','매우','정말','너무','바로','이제','지금','오늘','우리','당신','여러분','입니다','습니다','합니다','됩니다','있는','없는','하는','되는','이는','그는','전','후','및','또는','또','더','덜','잘','못','안','수','것','때','이','그','저','를','을','은','는','가','의','에','와','과','도','만','뿐','채','한','두','세','네']);
+function _wrExtractPhrases(text) {
+    // 구두점/숫자/통화/괄호 → 공백, 한글·영문만 남김
+    const cleaned = String(text)
+        .replace(/[0-9%¥₩$£€,.\/()\[\]{}「」『』【】〜~!！?？·・…‥+\-*=:;"'`|]/g, ' ')
+        .replace(/[　\s]+/g, ' ')
+        .trim();
+    if (!cleaned) return [];
+    const tokens = cleaned.split(' ')
+        .map(t => t.trim())
+        .filter(t => t.length >= 2 && !_WR_STOP.has(t) && /[가-힣A-Za-z]/.test(t));
+    const out = new Set();
+    tokens.forEach((t, i) => {
+        out.add(t);                                   // 유니그램
+        if (i < tokens.length - 1) {                  // 바이그램
+            const bi = t + ' ' + tokens[i+1];
+            if (bi.length <= 14) out.add(bi);
+        }
+    });
+    return [...out];
 }
 
 function _wrProductInsightSectionHtml(productData) {
@@ -509,14 +531,17 @@ function _wrProductInsightSectionHtml(productData) {
             ).join('')
             : '<span class="wr-no-data">데이터 없음</span>';
 
-        // 고효율 캐치카피
-        const copyRows = pd.topCopies.length
-            ? pd.topCopies.map((d, i) => `
-                <div class="wr-copy-row">
-                    <span class="wr-copy-rank" style="background:${i===0?color+'22':'#f1f5f9'};color:${i===0?color:'#64748b'}">${i+1}</span>
-                    <span class="wr-copy-text">${d.k}</span>
-                    <span class="wr-copy-roas" style="color:${color}">${_wrR(d.avgRoas)}</span>
-                </div>`).join('')
+        // 고효율 메시지 요소 (캐치카피에서 추출한 반복 구절, ROAS 가중)
+        const phraseTags = (pd.topPhrases && pd.topPhrases.length)
+            ? pd.topPhrases.map(d => {
+                const r = d.avgRoas;
+                const tier = r >= 10 ? '#059669' : r >= 5 ? color : '#94a3b8';
+                return `<span class="wr-insight-tag" style="background:${tier}14;color:${tier};border-color:${tier}40" title="${d.count}개 소재 · 평균 ROAS ${_wrR(r)}">${d.k}<em>${_wrR(r)}</em></span>`;
+            }).join('')
+            : '';
+        // 대표 카피 예시 1개 (접힘)
+        const copySample = (pd.copySampleBest && pd.copySampleBest.raw)
+            ? `<details class="wr-copy-sample"><summary>대표 카피 예시 (ROAS ${_wrR(pd.copySampleBest.roas)})</summary><div class="wr-copy-sample-text">${pd.copySampleBest.raw.replace(/</g,'&lt;')}</div></details>`
             : '';
 
         // 키워드 태그
@@ -546,9 +571,10 @@ function _wrProductInsightSectionHtml(productData) {
                     <div class="wr-insight-tags">${appealTags}</div>
                     <div class="wr-pi-sub-hd" style="margin-top:10px">⚡ 후킹 유형</div>
                     <div class="wr-insight-tags">${hookTags}</div>
-                    ${copyRows ? `
-                    <div class="wr-pi-sub-hd" style="margin-top:10px">✍️ 고효율 캐치카피 <span style="font-size:9px;color:#94a3b8">ROAS 높은 순</span></div>
-                    <div class="wr-copy-list">${copyRows}</div>` : ''}
+                    ${phraseTags ? `
+                    <div class="wr-pi-sub-hd" style="margin-top:10px">✍️ 고효율 메시지 요소 <span style="font-size:9px;color:#94a3b8">카피 반복구절 · ROAS 가중</span></div>
+                    <div class="wr-insight-tags">${phraseTags}</div>
+                    ${copySample}` : ''}
                     ${kwTags ? `
                     <div class="wr-pi-sub-hd" style="margin-top:10px">🔑 키워드</div>
                     <div class="wr-insight-tags">${kwTags}</div>` : ''}
@@ -753,8 +779,8 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 </tr>`;
             });
             html += `</tbody></table>`;
-            // 소구/후킹/캐치카피/키워드 인사이트
-            const hasInsight = pd.topAppeals.length || pd.topHooks.length || pd.topCopies.length || pd.topKeywords.length;
+            // 소구/후킹/메시지요소/키워드 인사이트
+            const hasInsight = pd.topAppeals.length || pd.topHooks.length || (pd.topPhrases&&pd.topPhrases.length) || pd.topKeywords.length;
             if (hasInsight) {
                 html += `<table style="margin-top:6px;width:100%"><tr>`;
                 // 소구포인트
@@ -769,16 +795,12 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 pd.topHooks.forEach(d => {
                     html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
                 });
-                // 캐치카피
+                // 메시지 요소 (카피 반복구절)
                 html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">✍️ 고효율 캐치카피</strong><br><br>`;
-                if (pd.topCopies.length) {
-                    pd.topCopies.forEach((d, i) => {
-                        html += `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:5px">
-                            <span style="font-size:10px;font-weight:700;color:#6366f1;min-width:14px">${i+1}</span>
-                            <span style="font-size:11px;color:#334155;flex:1">${d.k}</span>
-                            <span style="font-size:10px;font-weight:700;color:#6366f1;white-space:nowrap">${_wrR(d.avgRoas)}</span>
-                        </div>`;
+                    <strong style="font-size:12px">✍️ 고효율 메시지 요소</strong><br><br>`;
+                if (pd.topPhrases && pd.topPhrases.length) {
+                    pd.topPhrases.forEach(d => {
+                        html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#4f46e5;border-radius:4px;font-size:11px">${d.k} ${_wrR(d.avgRoas)}</span>`;
                     });
                 } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
                 // 키워드
