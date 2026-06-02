@@ -268,9 +268,32 @@ function applyUrl(brand) {
   loadBrand(brand, true);
 }
 
+// ── 캐시 (localStorage) — 새로고침 시 재fetch 없이 즉시 로드, '시트 갱신'만 재fetch ──
+const fcacheKey = b => `fdata_${b}`;
+function _fSaveCache(brand) {
+  try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
+}
+function _fLoadCache(brand) {
+  try {
+    const c = JSON.parse(localStorage.getItem(fcacheKey(brand)) || 'null');
+    if (c && c.data) { brandData[brand] = c.data; return c.ts || null; }
+  } catch(e){}
+  return null;
+}
+function _fStampUpdated(ts) {
+  const t = ts ? new Date(ts) : new Date();
+  const el = document.getElementById('last-updated');
+  if (el) el.textContent = `${t.getMonth()+1}/${t.getDate()} ${pad2(t.getHours())}:${pad2(t.getMinutes())}${ts?' (캐시)':''}`;
+}
+
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadBrand(brand, force=false) {
-  if (!force && brandData[brand]) return;
+  if (!force && brandData[brand]) { render(brand); return; }
+  // 강제 아니면 캐시 우선 (네트워크 호출 안 함)
+  if (!force) {
+    const ts = _fLoadCache(brand);
+    if (brandData[brand]) { render(brand); _fStampUpdated(ts); return; }
+  }
   const url = getUrl(brand);
   document.getElementById(`url-input-${brand}`).value = url;
   setPanelState(brand,'loading');
@@ -287,10 +310,9 @@ async function loadBrand(brand, force=false) {
   }
 
   brandData[brand] = parseSheet(parseCSV(text));
+  _fSaveCache(brand);
   render(brand);
-  const t=new Date();
-  document.getElementById('last-updated').textContent=
-    `${t.getMonth()+1}/${t.getDate()} ${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
+  _fStampUpdated();
 }
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
