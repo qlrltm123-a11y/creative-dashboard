@@ -118,6 +118,7 @@ window.updateDashboard = function() {
     } else if (_currentSection === 'performance') {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
+        renderSpendScatterChart();
         renderProductPerformance();
     } else if (_currentSection === 'ai') {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
@@ -297,6 +298,12 @@ function bindEvents() {
         platformMatrixSel.addEventListener('change', renderPlatformCreativeMatrix);
     }
 
+    // 광고비 × 성과 분포도 지표 변경
+    const spendScatterSel = document.getElementById('spend-scatter-metric');
+    if (spendScatterSel) {
+        spendScatterSel.addEventListener('change', renderSpendScatterChart);
+    }
+
     // ★ 디바운스된 섹션 갱신 함수 (빠른 연속 클릭/변경 시 마지막 호출만)
     const debouncedRefreshPerf = debounce(refreshPerformanceSection, 120);
     const debouncedRefreshAi = debounce(refreshAiSection, 120);
@@ -440,6 +447,7 @@ function switchSection(sectionName) {
             } else if (sectionName === 'performance') {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
+                renderSpendScatterChart();
                 renderAppealInsight();
                 renderProductPerformance();
                 renderPlatformCreativeMatrix();
@@ -818,6 +826,7 @@ function syncHiddenAiSelect() {
 function refreshPerformanceSection() {
     renderPerformanceCriteriaBadge();
     renderScatterChart();
+    renderSpendScatterChart();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
@@ -859,6 +868,7 @@ function updateDashboard() {
     if (_renderedSections.performance) {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
+        renderSpendScatterChart();
         renderProductPerformance();
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
@@ -1533,6 +1543,108 @@ function renderScatterChart() {
         ctx.onmouseleave = () => hideScatterPreview();
     }
 }
+
+// ============================
+// 광고비 × 성과(장바구니/주문/매출) 분포도
+// ============================
+let spendScatterMap = {}; // brand -> creatives[]
+const _SPEND_METRICS = {
+    revenue:     { label: '매출',          fmt: v => '₩' + formatNumber(Math.round(v)) },
+    conversions: { label: '주문수',        fmt: v => formatNumber(Math.round(v)) + '건' },
+    add_to_cart: { label: '장바구니 담기수', fmt: v => formatNumber(Math.round(v)) + '건' },
+};
+
+function renderSpendScatterChart() {
+    destroyChart('spendScatter');
+    const ctx = document.getElementById('spendScatterChart');
+    if (!ctx) return;
+
+    const metricKey = document.getElementById('spend-scatter-metric')?.value || 'revenue';
+    const metric = _SPEND_METRICS[metricKey] || _SPEND_METRICS.revenue;
+
+    // 제목/라벨 갱신
+    const lblEl = document.getElementById('spend-scatter-metric-label');
+    if (lblEl) lblEl.textContent = metric.label;
+
+    // 성과 분석 풀과 동일 (ad_name 집계)
+    const baseList = (typeof aggregateByAdName === 'function')
+        ? aggregateByAdName(getBrandCreatives('performance'))
+        : getBrandCreatives('performance');
+
+    // 광고비 > 0 이고 선택 지표 > 0 인 소재만
+    const pool = baseList.filter(c => (c.spend || 0) > 0 && (Number(c[metricKey]) || 0) > 0);
+
+    spendScatterMap = {};
+    let totalCount = 0;
+    const maxRoas = Math.max(...pool.map(c => c.roas || 0), 0.01);
+
+    const datasets = ['BOH', 'WM', 'CG'].map(brand => {
+        const brandList = pool
+            .filter(c => c.brand === brand)
+            .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+            .slice(0, SCATTER_TOP_N);
+        totalCount += brandList.length;
+        spendScatterMap[brand] = brandList;
+
+        return {
+            label: brand,
+            data: brandList.map((c, idx) => ({
+                x: c.spend || 0,
+                y: Number(c[metricKey]) || 0,
+                // 버블 크기 = ROAS 상대값 (5~26px)
+                r: Math.max(5, Math.min(26, ((c.roas || 0) / maxRoas) * 26)),
+                name: c.creative_name || c.ad_name || '-',
+                _idx: idx, _brand: brand, _id: c.id,
+                roas: c.roas, ctr: c.ctr, spend: c.spend, metricVal: Number(c[metricKey]) || 0,
+            })),
+            backgroundColor: BRAND_COLORS[brand] + 'aa',
+            borderColor: BRAND_COLORS[brand],
+            borderWidth: 1.5, hoverBorderWidth: 3, hoverBorderColor: '#0f172a'
+        };
+    });
+
+    const countEl = document.getElementById('spend-scatter-count-info');
+    if (countEl) countEl.textContent = `총 ${totalCount}개 표시`;
+
+    charts.spendScatter = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => {
+                            const p = item.raw;
+                            return [
+                                p.name,
+                                `광고비 ₩${formatNumber(Math.round(p.spend))}`,
+                                `${metric.label} ${metric.fmt(p.metricVal)}`,
+                                `ROAS ${Math.round((p.roas||0)*100)}% · CTR ${((p.ctr||0)*100).toFixed(2)}%`,
+                            ];
+                        }
+                    }
+                }
+            },
+            onClick: (evt, els, chart) => {
+                if (!els.length) return;
+                const p = chart.data.datasets[els[0].datasetIndex].data[els[0].index];
+                if (p._id && typeof window.openModal === 'function') window.openModal(p._id);
+            },
+            onHover: (evt, els, chart) => { chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
+            scales: {
+                x: { title: { display: true, text: '광고비 (₩)', font: { size: 11 } },
+                     ticks: { font: { size: 10 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? Math.round(v/1000)+'K' : v } },
+                y: { title: { display: true, text: metric.label, font: { size: 11 } },
+                     ticks: { font: { size: 10 }, callback: v => metricKey==='revenue' ? (v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?Math.round(v/1000)+'K':v) : formatNumber(v) },
+                     beginAtZero: true }
+            }
+        }
+    });
+}
+window.renderSpendScatterChart = renderSpendScatterChart;
 
 // ============================
 // 스캐터 차트 hover 미리보기 카드

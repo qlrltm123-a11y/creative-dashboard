@@ -325,6 +325,27 @@
             </div>
         </section>
 
+        <!-- ★ 광고비 × 성과(장바구니/주문/매출) 분포도 -->
+        <section class="chart-card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-emerald-500"></i>소재별 광고비 × <span id="spend-scatter-metric-label">매출</span> 분포</h3>
+                    <p class="text-xs text-slate-500 mt-1">X = 광고비 · Y = 선택 지표 · 버블 크기 = ROAS · 점 위에 마우스를 올리면 소재 정보가 표시됩니다</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="spend-scatter-metric" class="filter-select text-sm">
+                        <option value="revenue">매출</option>
+                        <option value="conversions">주문수</option>
+                        <option value="add_to_cart">장바구니 담기수</option>
+                    </select>
+                    <span id="spend-scatter-count-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
+                </div>
+            </div>
+            <div style="height: 380px;">
+                <canvas id="spendScatterChart"></canvas>
+            </div>
+        </section>
+
         <!-- 제품별 소구포인트 인사이트 (이 소구는 좋았다 → 다음에 이렇게) -->
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
