@@ -114,6 +114,21 @@ function _ubPaceToFinish(brand, actualsByDate) {
     };
 }
 
+/* ── 광고측 퍼널 (브랜드 누적: clicks→장바구니담기→구매) ── */
+function _ubAdFunnel(brand) {
+    let clicks=0, atc=0, conv=0;
+    (window.allCreatives || []).forEach(c => {
+        if (brand && c.brand !== brand) return;
+        clicks += c.clicks||0; atc += c.add_to_cart||0; conv += c.conversions||0;
+    });
+    if (clicks===0 && atc===0) return null;
+    return {
+        clicks, atc, conv,
+        cartRate: clicks>0 ? atc/clicks*100 : null,   // 클릭→담기
+        buyRate:  atc>0 ? conv/atc*100 : null,        // 담기→구매
+    };
+}
+
 /* ── 소재 성과 (allCreatives, 특정 날짜·브랜드) ── */
 function _ubCreativeForDate(date, brand) {
     const list = (window.allCreatives || []).filter(c => {
@@ -378,6 +393,47 @@ function _ubBuildVerdict(brands, date, actualsByDate, totRate) {
     return { tone, text: `${overall} — ${risk}${okTxt}. → ${action}` };
 }
 
+/* ── 광고 vs 실제(QSM) 전환 비교 카드 ── */
+function _ubAdVsActualCard(brands) {
+    const rows = brands.map(b => {
+        const ad = _ubAdFunnel(b);
+        const qsm = _ubFunnelForBrand(b);
+        if (!ad || !qsm || ad.buyRate==null || qsm.buyRate==null) return null;
+        const gap = ad.buyRate - qsm.buyRate; // 광고 - 실제 (담기→구매)
+        return { b, ad, qsm, gap };
+    }).filter(Boolean);
+
+    if (!rows.length) {
+        return `<div class="ub-cmp-card"><div class="ub-cmp-hd">🔍 광고 vs 실제(QSM) 전환 비교</div>
+            <div class="ub-empty-s">${_ubFunnelLoading?'퍼널 데이터 로딩 중…':'광고·퍼널 데이터가 모두 있어야 비교됩니다'}</div></div>`;
+    }
+
+    const fmtP = v => v!=null ? v.toFixed(1)+'%' : '-';
+    const body = rows.map(r => {
+        const gapAbs = Math.abs(r.gap).toFixed(1);
+        let verdict, vcls;
+        if (r.gap >= 5)      { verdict = `광고 트래픽이 +${gapAbs}%p 더 잘 삼 → 증액 여력`; vcls='ub-good'; }
+        else if (r.gap <= -5){ verdict = `광고 트래픽 구매전환 -${gapAbs}%p 약함 → 타겟·소재 점검`; vcls='ub-bad'; }
+        else                 { verdict = `스토어 평균과 유사 (±${gapAbs}%p)`; vcls='ub-warn'; }
+        return `<div class="ub-cmp-row">
+            <div class="ub-cmp-brand" style="color:${_UB_COLOR[r.b]}">${r.b}</div>
+            <div class="ub-cmp-metrics">
+                <div class="ub-cmp-m"><span>광고 담기→구매${_ubTip('구매율')}</span><b style="color:#6366f1">${fmtP(r.ad.buyRate)}</b></div>
+                <div class="ub-cmp-vs">vs</div>
+                <div class="ub-cmp-m"><span>실제 담기→구매</span><b style="color:#7c3aed">${fmtP(r.qsm.buyRate)}</b></div>
+                <div class="ub-cmp-gap" style="color:${r.gap>=0?'#059669':'#dc2626'}">${r.gap>=0?'▲':'▼'} ${gapAbs}%p</div>
+            </div>
+            <div class="ub-cmp-verdict ${vcls}">${verdict}</div>
+        </div>`;
+    }).join('');
+
+    return `<div class="ub-cmp-card">
+        <div class="ub-cmp-hd">🔍 광고 vs 실제(QSM) 전환 비교 <span class="info-tip" tabindex="0" data-tip="광고가 담게 한 장바구니의 구매율 vs 스토어 전체 장바구니 구매율. 광고가 데려온 트래픽이 평균보다 잘 사는지/덜 사는지 비교해요.">ⓘ</span></div>
+        <div class="ub-cmp-sub">장바구니→구매 전환율 기준 · 광고(담기/구매는 소재 데이터) vs 실제(퍼널 262Q 누적)</div>
+        ${body}
+    </div>`;
+}
+
 /* ── 분석 코멘트 카드 (룰 기반 종합 + AI 버튼) ── */
 function _ubAnalysisCard(brands, date, actualsByDate, totRate) {
     const lines = [];
@@ -536,6 +592,8 @@ function renderUnifiedBriefing() {
         ${brands.map(b => _ubBrandCard(b, date, actualsByDate)).join('')}
         ${_ubAnalysisCard(brands, date, actualsByDate, totRate)}
     </div>
+
+    ${_ubAdVsActualCard(brands)}
 
     <div class="ub-note">
         💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 자동 동기화됩니다.

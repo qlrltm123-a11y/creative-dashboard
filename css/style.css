@@ -5611,6 +5611,24 @@ body {
 .ub-hl-right { display: flex; gap: 22px; flex-wrap: wrap; }
 .ub-hl-right > div { display: flex; flex-direction: column; gap: 2px; }
 
+/* 광고 vs 실제(QSM) 비교 카드 */
+.ub-cmp-card { margin-top: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.ub-cmp-hd { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 2px; }
+.ub-cmp-sub { font-size: 11px; color: #94a3b8; margin-bottom: 12px; }
+.ub-cmp-row { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.ub-cmp-row:last-child { border-bottom: none; }
+.ub-cmp-brand { font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+.ub-cmp-metrics { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ub-cmp-m { display: flex; flex-direction: column; }
+.ub-cmp-m span { font-size: 10px; color: #94a3b8; font-weight: 600; }
+.ub-cmp-m b { font-size: 16px; font-weight: 800; }
+.ub-cmp-vs { font-size: 11px; color: #cbd5e1; font-weight: 700; }
+.ub-cmp-gap { font-size: 13px; font-weight: 800; margin-left: auto; }
+.ub-cmp-verdict { font-size: 11.5px; font-weight: 600; margin-top: 6px; padding: 5px 9px; border-radius: 7px; display: inline-block; }
+.ub-cmp-verdict.ub-good { background: #f0fdf4; color: #15803d; }
+.ub-cmp-verdict.ub-warn { background: #fffbeb; color: #b45309; }
+.ub-cmp-verdict.ub-bad  { background: #fef2f2; color: #b91c1c; }
+
 /* 자동 1줄 진단 */
 .ub-verdict { font-size: 13.5px; font-weight: 700; line-height: 1.6; padding: 12px 16px; border-radius: 12px; border: 1px solid; }
 .ub-verdict-good { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
