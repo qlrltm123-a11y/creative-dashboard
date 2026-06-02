@@ -146,12 +146,12 @@
                 <button class="section-tab active" data-section="overview">
                     <i class="fas fa-chart-pie"></i>
                     <span class="label">개요</span>
-                    <span class="sub">KPI · 핵심 지표</span>
+                    <span class="sub">한눈에 요약</span>
                 </button>
                 <button class="section-tab" data-section="performance">
                     <i class="fas fa-trophy"></i>
                     <span class="label">성과 분석</span>
-                    <span class="sub">TOP 소재 · 갤러리</span>
+                    <span class="sub">어떤 광고가 잘됐나</span>
                 </button>
                 <button class="section-tab" data-section="funnel">
                     <i class="fas fa-filter"></i>
@@ -164,7 +164,7 @@
                 <button class="section-tab" data-section="ai">
                     <i class="fas fa-magic-wand-sparkles"></i>
                     <span class="label">AI 인사이트</span>
-                    <span class="sub">소구점 · 후킹 · 감정</span>
+                    <span class="sub">잘 먹힌 강조·표현</span>
                 </button>
             </div>
             <div class="tab-group" data-group="운영">
@@ -180,7 +180,7 @@
                 <button class="section-tab" data-section="unified">
                     <i class="fas fa-bullseye"></i>
                     <span class="label">통합 브리핑</span>
-                    <span class="sub">목표갭 · 마감전망</span>
+                    <span class="sub">오늘 종합 + 할 일</span>
                 </button>
                 <button class="section-tab" data-section="weekly">
                     <i class="fas fa-clipboard-list"></i>
@@ -192,6 +192,18 @@
 
         <!-- ============ SECTION: OVERVIEW ============ -->
         <div class="section-panel active" data-panel="overview">
+        <!-- 첫 방문 안내 배너 (1회) -->
+        <div id="intro-banner" class="intro-banner" style="display:none">
+            <div class="intro-banner-body">
+                <div class="intro-banner-title">👋 처음이신가요? 30초 사용법</div>
+                <div class="intro-banner-text">
+                    상단 <b>브랜드(BOH·WM·CG)</b>를 고르면 모든 화면이 그 브랜드로 바뀝니다 ·
+                    탭별로 <b>한눈에 요약 / 어떤 광고가 잘됐나 / 구매까지 단계 / 오늘 할 일</b>을 봅니다 ·
+                    모르는 용어는 우측 상단 <b>「용어」</b> 버튼 또는 항목 옆 <b>ⓘ</b>에 마우스를 올리세요.
+                </div>
+            </div>
+            <button class="intro-banner-x" onclick="window._dismissIntro && window._dismissIntro()">알겠어요 ✕</button>
+        </div>
         <!-- KPI Cards -->
         <section id="kpi-section" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="kpi-card">

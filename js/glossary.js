@@ -57,3 +57,14 @@ window._glClose = _glClose;
 window.infoTip = function(text) {
     return `<span class="info-tip" tabindex="0" data-tip="${String(text).replace(/"/g,'&quot;')}">ⓘ</span>`;
 };
+
+// 첫 방문 안내 배너 (1회만)
+window._dismissIntro = function() {
+    try { localStorage.setItem('intro_seen', '1'); } catch(e) {}
+    const b = document.getElementById('intro-banner'); if (b) b.style.display = 'none';
+};
+document.addEventListener('DOMContentLoaded', () => {
+    let seen = false;
+    try { seen = localStorage.getItem('intro_seen') === '1'; } catch(e) {}
+    if (!seen) { const b = document.getElementById('intro-banner'); if (b) b.style.display = 'flex'; }
+});
