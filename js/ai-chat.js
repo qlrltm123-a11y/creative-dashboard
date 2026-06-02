@@ -134,7 +134,7 @@ ${JSON.stringify(ctx, null, 1)}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents,
-                generationConfig: { temperature: 0.4, maxOutputTokens: 1200 },
+                generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
             }),
         });
         const data = await res.json();
@@ -158,11 +158,14 @@ function _acRenderMessages() {
 }
 function _acEsc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _acFormat(s) {
-    // 간단 마크다운: **bold**, 줄바꿈, - 리스트
-    return _acEsc(s)
-        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-        .replace(/^- (.+)$/gm, '• $1')
-        .replace(/\n/g, '<br>');
+    // 간단 마크다운: 제목(#/##/###), **bold**, 리스트(-, *, 1.), 줄바꿈
+    let t = _acEsc(s);
+    t = t
+        .replace(/^#{1,6}\s*(.+)$/gm, '<div class="ac-h">$1</div>')   // 제목 → 강조 라인
+        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')                        // 볼드
+        .replace(/^\s*[-*]\s+(.+)$/gm, '<div class="ac-li">$1</div>')  // 불릿
+        .replace(/^\s*(\d+)\.\s+(.+)$/gm, '<div class="ac-li"><span class="ac-num">$1.</span> $2</div>'); // 번호
+    return t.replace(/\n/g, '<br>');
 }
 
 window.toggleAiChat = function() {

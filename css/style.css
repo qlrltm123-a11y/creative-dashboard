@@ -5471,6 +5471,12 @@ body {
 .ac-user .ac-bubble { background: #6366f1; color: #fff; border-bottom-right-radius: 4px; }
 .ac-model .ac-bubble { background: #fff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
 .ac-model .ac-bubble b { color: #4f46e5; }
+.ac-model .ac-bubble .ac-h { font-weight: 800; color: #312e81; margin: 8px 0 4px; font-size: 13px; }
+.ac-model .ac-bubble .ac-h:first-child { margin-top: 0; }
+.ac-model .ac-bubble .ac-li { margin: 2px 0 2px 6px; padding-left: 12px; position: relative; }
+.ac-model .ac-bubble .ac-li::before { content: '•'; position: absolute; left: 0; color: #a5b4fc; }
+.ac-model .ac-bubble .ac-li .ac-num { font-weight: 700; color: #6366f1; }
+.ac-model .ac-bubble .ac-li:has(.ac-num)::before { content: none; }
 
 .ac-loading { display: flex; gap: 4px; align-items: center; }
 .ac-loading span { width: 7px; height: 7px; border-radius: 50%; background: #c7d2fe; animation: ac-bounce 1.2s infinite; }

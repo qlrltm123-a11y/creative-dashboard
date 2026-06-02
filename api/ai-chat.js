@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
 
   const payload = JSON.stringify({
     contents: body.contents,
-    generationConfig: body.generationConfig || { temperature: 0.4, maxOutputTokens: 1200 },
+    generationConfig: body.generationConfig || { temperature: 0.4, maxOutputTokens: 4096 },
   });
 
   const callModel = async (model) => {
