@@ -451,6 +451,20 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.inflow)}</div>
     </div>
     <div class="kpi-card">
+      <div class="kpi-label">🛒 장바구니수 (262Q 누적)</div>
+      <div class="kpi-val" style="color:#6366f1">${n(agg262.cart)}</div>
+      <div class="kpi-sub">건</div>
+      ${(()=>{const d=agg261.cart>0?(agg262.cart-agg261.cart)/agg261.cart*100:null;return d!==null?badge(d,'%'):'';})()}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.cart)}건</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">💳 구매수 (262Q 누적)</div>
+      <div class="kpi-val" style="color:#7c3aed">${n(agg262.buy)}</div>
+      <div class="kpi-sub">건</div>
+      ${(()=>{const d=agg261.buy>0?(agg262.buy-agg261.buy)/agg261.buy*100:null;return d!==null?badge(d,'%'):'';})()}
+      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.buy)}건</div>
+    </div>
+    <div class="kpi-card">
       <div class="kpi-label">🛒 전체 장바구니 전환율</div>
       <div class="kpi-val" style="color:#4f46e5">${f(cr262)}</div>
       <div class="kpi-sub">${n(agg262.cart)}건</div>
