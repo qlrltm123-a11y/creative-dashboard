@@ -76,10 +76,7 @@
         <!-- Brand Tabs -->
         <section id="brand-tabs" class="mb-5 brand-tabs-sticky">
             <div class="flex gap-2 flex-wrap items-center">
-                <button class="brand-tab active" data-brand="ALL">
-                    <i class="fas fa-layer-group mr-2"></i>전체
-                </button>
-                <button class="brand-tab brand-boh" data-brand="BOH">
+                <button class="brand-tab brand-boh active" data-brand="BOH">
                     <span class="brand-dot bg-rose-500"></span>BOH
                 </button>
                 <button class="brand-tab brand-wm" data-brand="WM">
@@ -143,12 +140,7 @@
         <nav id="section-tabs" class="section-tabs mb-5">
             <div class="tab-group" data-group="분석">
                 <span class="group-label">📊 분석</span>
-                <button class="section-tab active" data-section="overview">
-                    <i class="fas fa-chart-pie"></i>
-                    <span class="label">개요</span>
-                    <span class="sub">한눈에 요약</span>
-                </button>
-                <button class="section-tab" data-section="performance">
+                <button class="section-tab active" data-section="performance">
                     <i class="fas fa-trophy"></i>
                     <span class="label">성과 분석</span>
                     <span class="sub">어떤 광고가 잘됐나</span>
@@ -190,8 +182,8 @@
             </div>
         </nav>
 
-        <!-- ============ SECTION: OVERVIEW ============ -->
-        <div class="section-panel active" data-panel="overview">
+        <!-- ============ SECTION: OVERVIEW (탭 제거됨 · DOM은 호환 유지, 숨김) ============ -->
+        <div class="section-panel" data-panel="overview">
         <!-- 첫 방문 안내 배너 (1회) -->
         <div id="intro-banner" class="intro-banner" style="display:none">
             <div class="intro-banner-body">
@@ -303,7 +295,7 @@
         <!-- ============ /SECTION: OVERVIEW ============ -->
 
         <!-- ============ SECTION: PERFORMANCE ============ -->
-        <div class="section-panel" data-panel="performance">
+        <div class="section-panel active" data-panel="performance">
 
         <!-- ★ 성과 분석 섹션 통합 필터 바 (제품 + 캠페인) -->
         <section class="section-filter-bar mb-4">

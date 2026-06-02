@@ -2,7 +2,7 @@
 // State Management
 // ============================
 let allCreatives = [];
-let currentBrand = 'ALL';
+let currentBrand = 'BOH';   // 전체(ALL) 탭 제거됨 → 기본 BOH
 let currentCampaign = ''; // ★ 전역 캠페인 필터 ('' = 전체) — UI 제거됐지만 호환용 유지
 let currentPlatform = ''; // ★ 전역 매체(Platform) 필터 ('' = 전체) — 브랜드별로 동적 구성
 let currentRetail = '';   // ★ 전역 Retail 채널 필터 ('' = 전체, 'Qoo10'/'RKT' 등)
@@ -444,8 +444,8 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, unified: false, performance: false, ai: false, weekly: false, funnel: false, gmv: false };
-let _currentSection = 'overview';
+let _renderedSections = { unified: false, performance: true, ai: false, weekly: false, funnel: false, gmv: false };
+let _currentSection = 'performance';   // 개요 탭 제거됨 → 기본 성과 분석
 
 function switchSection(sectionName) {
     _currentSection = sectionName;
