@@ -479,10 +479,19 @@ function renderSummaryTab(brand, data, prods) {
   if(charts[id]) charts[id].destroy();
   const _showCart = _funnelMetric === 'both' || _funnelMetric === 'cart';
   const _showBuy  = _funnelMetric === 'both' || _funnelMetric === 'buy';
-  const _btDs = [
-      {type:'bar',label:'262Q 유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:3},
-      {type:'bar',label:'261Q 유입',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#fdba7488',yAxisID:'cnt',borderRadius:3,order:3},
-  ];
+  const _btDs = [];
+  // 막대(건수): 전체=유입·장바구니수·구매수 / 장바구니율=장바구니수 / 구매율=구매수
+  if(_funnelMetric === 'both'){
+    _btDs.push({type:'bar',label:'유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
+  } else if(_funnelMetric === 'cart'){
+    _btDs.push({type:'bar',label:'262Q 장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'261Q 장바구니수',data:pad(ser261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'66',yAxisID:'cnt',borderRadius:3,order:3});
+  } else if(_funnelMetric === 'buy'){
+    _btDs.push({type:'bar',label:'262Q 구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'261Q 구매수',data:pad(ser261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'66',yAxisID:'cnt',borderRadius:3,order:3});
+  }
   if(_showCart){
     _btDs.push({type:'line',label:'262Q 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
     _btDs.push({type:'line',label:'261Q 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
@@ -498,7 +507,7 @@ function renderSummaryTab(brand, data, prods) {
         tooltip:{callbacks:{label:c=>{const v=c.parsed.y;if(v===null)return `${c.dataset.label}: -`;return c.dataset.yAxisID==='cnt'?`${c.dataset.label}: ${n(v)}`:`${c.dataset.label}: ${v.toFixed(2)}%`;}}}},
       scales:{x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#f1f5f9'}},
         rate:{position:'left',ticks:{color:'#6366f1',font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'},title:{display:true,text:'전환율',color:'#94a3b8',font:{size:9}}},
-        cnt:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'유입',color:'#94a3b8',font:{size:9}}}}}
+        cnt:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'건수',color:'#94a3b8',font:{size:9}}}}}
   });
 
   // ── 제품별 구매 전환율 랭킹 (262Q 누적) ──
