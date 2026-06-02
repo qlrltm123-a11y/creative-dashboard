@@ -1942,10 +1942,11 @@ function renderRoasDiagnosis() {
     const cell = (val, idx, key, isWeak) => {
         const pct = Math.round((idx-1)*100);
         const col = idx >= 1 ? '#059669' : idx >= 0.7 ? '#d97706' : '#dc2626';
+        const arrow = idx >= 1.05 ? '▲' : idx <= 0.95 ? '▼' : '→';
         const valStr = key==='aov' ? '₩'+formatNumber(Math.round(val)) : (val*100).toFixed(key==='ctr'?2:1)+'%';
         return `<td class="mw-td mw-td-num${isWeak?' roasdx-weak':''}">
             <div style="font-weight:700;color:#334155">${valStr}</div>
-            <div style="font-size:9px;color:${col}">${pct>=0?'+':''}${pct}%</div>
+            <div style="font-size:9px;color:${col}">${arrow} ${pct>=0?'+':''}${pct}%</div>
         </td>`;
     };
 

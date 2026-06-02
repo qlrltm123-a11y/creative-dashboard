@@ -235,7 +235,8 @@
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             <div class="chart-card">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="chart-title"><i class="fas fa-tags mr-2 text-indigo-500"></i>브랜드별 성과</h3>
+                    <h3 class="chart-title"><i class="fas fa-tags mr-2 text-indigo-500"></i>브랜드별 성과 <span class="info-tip" tabindex="0" data-tip="브랜드별로 광고비를 얼마 쓰고 매출이 얼마 나왔는지 비교해요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 어느 브랜드가 광고비 대비 매출이 큰지 한눈에 비교</p>
                 </div>
                 <div style="height: 280px;">
                     <canvas id="brandChart"></canvas>
@@ -243,7 +244,8 @@
             </div>
             <div class="chart-card">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="chart-title"><i class="fas fa-broadcast-tower mr-2 text-indigo-500"></i>매체별 광고비 분포</h3>
+                    <h3 class="chart-title"><i class="fas fa-broadcast-tower mr-2 text-indigo-500"></i>매체별 광고비 분포 <span class="info-tip" tabindex="0" data-tip="Meta·TikTok 등 어느 매체(채널)에 광고비를 얼마씩 나눠 썼는지 비율로 보여줘요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 광고비가 어느 매체에 집중돼 있는지 (비중)</p>
                 </div>
                 <div style="height: 280px;">
                     <canvas id="platformChart"></canvas>
@@ -333,8 +335,8 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-indigo-500"></i>소재별 CTR × ROAS 분포</h3>
-                    <p class="text-xs text-slate-500 mt-1">버블 크기 = 광고비 규모 · 점 위에 마우스를 올리면 소재 정보가 표시됩니다</p>
+                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-indigo-500"></i>소재별 CTR × ROAS 분포 <span class="info-tip" tabindex="0" data-tip="가로=클릭률(CTR), 세로=광고효율(ROAS). 오른쪽 위로 갈수록 '잘 눌리고 잘 파는' 좋은 소재예요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 어떤 소재가 클릭도 잘 되고 매출 효율도 좋은지. 오른쪽 위 = 우수, 왼쪽 아래 = 부진 (버블 크기 = 광고비)</p>
                 </div>
                 <span id="scatter-count-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
             </div>
@@ -347,8 +349,8 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-emerald-500"></i>소재별 광고비 × <span id="spend-scatter-metric-label">매출</span> 분포</h3>
-                    <p class="text-xs text-slate-500 mt-1">X = 광고비 · Y = 선택 지표 · 버블 크기 = ROAS · 평균 십자선 기준 사분면(⭐증액후보 🚀주력 ⚠️비효율 🌱테스트)</p>
+                    <h3 class="chart-title"><i class="fas fa-chart-scatter mr-2 text-emerald-500"></i>소재별 광고비 × <span id="spend-scatter-metric-label">매출</span> 분포 <span class="info-tip" tabindex="0" data-tip="가로=쓴 광고비, 세로=성과(매출·주문·담기). 십자선은 평균. 위치로 '돈 더 넣을지/줄일지'를 신호등처럼 보여줘요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 돈 대비 성과가 좋은 소재 vs 돈만 쓰는 소재. <b>⭐좌상=증액후보 🚀우상=주력 ⚠️우하=비효율(줄이기) 🌱좌하=소규모</b></p>
                 </div>
                 <div class="flex items-center gap-2">
                     <select id="spend-scatter-metric" class="filter-select text-sm">
@@ -368,8 +370,8 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-chart-line mr-2 text-rose-500"></i>광고비 한계효율 곡선 <span class="text-xs font-normal text-slate-400">(포화 분석)</span></h3>
-                    <p class="text-xs text-slate-500 mt-1">소재를 ROAS 높은 순으로 줄세워 광고비를 누적 → 다음 1원의 효율(한계 ROAS)이 떨어지는 지점 = 예산 상한 신호</p>
+                    <h3 class="chart-title"><i class="fas fa-chart-line mr-2 text-rose-500"></i>광고비 한계효율 곡선 <span class="text-xs font-normal text-slate-400">(포화 분석)</span> <span class="info-tip" tabindex="0" data-tip="광고비를 계속 늘려도 어느 순간부터 매출이 잘 안 늘어요. '더 부어봤자 손해'가 시작되는 지점(빨간 선이 100% 아래로)을 보여줘요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 광고비를 어디까지 늘려도 남는지. 빨간 '한계 ROAS' 선이 100%(손익분기) 아래로 떨어지는 지점부터는 더 써도 손해</p>
                 </div>
                 <span id="saturation-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
             </div>
@@ -383,8 +385,8 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>장바구니 이탈 손실액 랭킹</h3>
-                    <p class="text-xs text-slate-500 mt-1">담은 뒤 구매 안 한 건수 × 객단가 = 놓친 매출. 절대 금액 큰 제품부터 구매단계(PDP·쿠폰·재고) 개선 우선순위</p>
+                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>장바구니 이탈 손실액 랭킹 <span class="info-tip" tabindex="0" data-tip="장바구니에 담아놓고 안 산 사람들이 만약 샀다면 벌었을 매출. 금액 큰 제품일수록 결제 단계 개선 효과가 커요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: '거의 살 뻔했는데 놓친' 매출이 큰 제품. 여기부터 가격·쿠폰·재고·결제 화면을 고치면 매출 회복 효과 큼</p>
                 </div>
                 <span id="leak-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
             </div>
@@ -395,8 +397,8 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-stethoscope mr-2 text-rose-500"></i>ROAS 진단 — 제품별 최약 레버</h3>
-                    <p class="text-xs text-slate-500 mt-1">ROAS = CTR × 장바구니율 × 구매율 × 객단가. 브랜드 평균 대비 가장 약한 단계를 찾아 조치 대상을 라우팅합니다</p>
+                    <h3 class="chart-title"><i class="fas fa-stethoscope mr-2 text-rose-500"></i>ROAS 진단 — 제품별 최약 레버 <span class="info-tip" tabindex="0" data-tip="매출 효율이 낮은 이유가 '클릭이 안 됨(소재)'인지 '구매 전환이 안 됨(가격·페이지)'인지 자동으로 짚어줘요.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 제품마다 어느 단계(클릭/장바구니/구매/객단가)가 약한지 → 누가 고쳐야 하는지(소재팀/상품팀)까지 라우팅</p>
                 </div>
                 <span id="roasdx-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
             </div>
@@ -602,7 +604,7 @@
                 <!-- 소구포인트별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-bullseye mr-2 text-purple-500"></i>소구포인트별 평균 <span id="appeal-metric-lbl">ROAS</span></h3>
+                        <h3 class="chart-title"><i class="fas fa-bullseye mr-2 text-purple-500"></i>소구포인트별 평균 <span id="appeal-metric-lbl">ROAS</span> <span class="info-tip" tabindex="0" data-tip="소구포인트 = 광고에서 내세운 강점(보습·탄력·콜라겐 등). 어떤 강점을 내세운 소재가 평균적으로 잘 팔렸는지.">ⓘ</span></h3>
                         <div class="flex items-center gap-2">
                             <label class="text-xs text-slate-500">지표</label>
                             <select id="appeal-metric-select" class="insight-chart-metric-sel">
@@ -641,7 +643,7 @@
                 <!-- 후킹 방식별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-fish mr-2 text-cyan-500"></i>후킹 방식별 평균 <span id="hook-metric-lbl">ROAS</span></h3>
+                        <h3 class="chart-title"><i class="fas fa-fish mr-2 text-cyan-500"></i>후킹 방식별 평균 <span id="hook-metric-lbl">ROAS</span> <span class="info-tip" tabindex="0" data-tip="후킹 = 첫 3초/헤드라인에서 시선 끄는 방식(할인 강조, 후기, 비포애프터 등). 어떤 방식이 효과적이었는지.">ⓘ</span></h3>
                         <div class="flex items-center gap-2">
                             <label class="text-xs text-slate-500">지표</label>
                             <select id="hook-metric-select" class="insight-chart-metric-sel">
