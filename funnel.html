@@ -465,14 +465,14 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">🛒 전체 장바구니 전환율</div>
+      <div class="kpi-label">🛒 전체 장바구니 전환율 <span style="font-weight:500;color:#94a3b8">(유입→장바구니)</span></div>
       <div class="kpi-val" style="color:#4f46e5">${f(cr262)}</div>
       <div class="kpi-sub">${n(agg262.cart)}건</div>
       ${badge(dlt(cr262,cr261))}
       <div class="kpi-sub" style="margin-top:4px">261Q ${f(cr261)} · ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
-      <div class="kpi-label">💳 전체 구매 전환율</div>
+      <div class="kpi-label">💳 전체 구매 전환율 <span style="font-weight:500;color:#94a3b8">(장바구니→구매)</span></div>
       <div class="kpi-val" style="color:#7c3aed">${f(br262)}</div>
       <div class="kpi-sub">${n(agg262.buy)}건</div>
       ${badge(dlt(br262,br261))}
