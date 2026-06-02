@@ -404,7 +404,7 @@ function _ubAdVsActualCard(brands) {
     }).filter(Boolean);
 
     if (!rows.length) {
-        return `<div class="ub-cmp-card"><div class="ub-cmp-hd">🔍 광고 vs 실제(QSM) 전환 비교</div>
+        return `<div class="ub-cmp-card"><div class="ub-cmp-hd">🔍 광고 집계 vs 실제 구매 비교 (QSM)</div>
             <div class="ub-empty-s">${_ubFunnelLoading?'퍼널 데이터 로딩 중…':'광고·퍼널 데이터가 모두 있어야 비교됩니다'}</div></div>`;
     }
 
@@ -428,7 +428,7 @@ function _ubAdVsActualCard(brands) {
     }).join('');
 
     return `<div class="ub-cmp-card">
-        <div class="ub-cmp-hd">🔍 광고 vs 실제(QSM) 전환 비교 <span class="info-tip" tabindex="0" data-tip="광고가 담게 한 장바구니의 구매율 vs 스토어 전체 장바구니 구매율. 광고가 데려온 트래픽이 평균보다 잘 사는지/덜 사는지 비교해요.">ⓘ</span></div>
+        <div class="ub-cmp-hd">🔍 광고 집계 vs 실제 구매 비교 (QSM) <span class="info-tip" tabindex="0" data-tip="광고가 담게 한 장바구니의 구매율 vs 스토어 전체 장바구니 구매율. 광고가 데려온 트래픽이 평균보다 잘 사는지/덜 사는지 비교해요.">ⓘ</span></div>
         <div class="ub-cmp-sub">장바구니→구매 전환율 기준 · 광고(담기/구매는 소재 데이터) vs 실제(퍼널 262Q 누적)</div>
         ${body}
     </div>`;

@@ -131,7 +131,7 @@ window.updateDashboard = function() {
     } else if (_currentSection === 'performance') {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
-        renderSpendScatterChart();
+        renderSpendScatterChart();
         renderCartLeakRanking();
         renderRoasDiagnosis();
         renderProductPerformance();
@@ -472,7 +472,7 @@ function switchSection(sectionName) {
             } else if (sectionName === 'performance') {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
-                renderSpendScatterChart();
+                renderSpendScatterChart();
                 renderCartLeakRanking();
                 renderRoasDiagnosis();
                 renderAppealInsight();
@@ -882,7 +882,7 @@ function syncHiddenAiSelect() {
 function refreshPerformanceSection() {
     renderPerformanceCriteriaBadge();
     renderScatterChart();
-    renderSpendScatterChart();
+    renderSpendScatterChart();
     renderCartLeakRanking();
     renderRoasDiagnosis();
     renderAppealInsight();
@@ -926,7 +926,7 @@ function updateDashboard() {
     if (_renderedSections.performance) {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
-        renderSpendScatterChart();
+        renderSpendScatterChart();
         renderCartLeakRanking();
         renderRoasDiagnosis();
         renderProductPerformance();
@@ -1968,12 +1968,12 @@ function renderRoasDiagnosis() {
 
     wrap.innerHTML = `<table class="mw-table"><thead><tr>
         <th class="mw-th mw-th-prod">브랜드 · 제품</th>
-        <th class="mw-th">ROAS</th>
-        <th class="mw-th">CTR</th>
-        <th class="mw-th">장바구니율</th>
-        <th class="mw-th">구매율</th>
-        <th class="mw-th">객단가</th>
-        <th class="mw-th">최약 레버 → 조치</th>
+        <th class="mw-th">광고효율<br><span style="font-weight:400;color:#94a3b8">ROAS</span></th>
+        <th class="mw-th">클릭률<br><span style="font-weight:400;color:#94a3b8">CTR</span></th>
+        <th class="mw-th">장바구니<br>담는 비율</th>
+        <th class="mw-th">담고 산<br>비율</th>
+        <th class="mw-th">1인당<br>구매액</th>
+        <th class="mw-th">약점 → 조치</th>
     </tr></thead><tbody>
     ${rows.map(r => `<tr class="mw-tr">
         <td class="mw-td mw-td-prod"><div class="mw-prod-name">${r.prod}</div><div style="font-size:10px;color:#94a3b8">${r.brand} · ₩${formatNumber(Math.round(r.spend))}</div></td>
