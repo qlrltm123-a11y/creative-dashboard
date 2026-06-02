@@ -279,42 +279,97 @@ function _ubBrandCard(brand, date, actualsByDate) {
     const rateColor = rate >= 1 ? '#059669' : rate >= 0.8 ? '#d97706' : '#dc2626';
     const barW = Math.min(100, rate*100);
 
+    // 이벤트 마감 페이스 (상태 신호)
+    const pace = _ubPaceToFinish(brand, actualsByDate);
+    const status = rate >= 1 ? 'green' : rate >= 0.8 ? 'amber' : 'red';
+    const dotColor = status==='green' ? '#22c55e' : status==='amber' ? '#f59e0b' : '#ef4444';
+
+    // 신호 1줄: 페이스 pill + 대표 진단
+    let paceSignal = '';
+    if (pace && pace.hasActual) {
+        const stCls = pace.status === 'ahead' ? 'ub-pace-ahead' : pace.status === 'behind' ? 'ub-pace-behind' : 'ub-pace-on';
+        const stTxt = pace.status === 'ahead' ? '초과 전망' : pace.status === 'behind' ? '마감 뒤처짐' : '정상 페이스';
+        paceSignal = `<span class="ub-pace-pill ${stCls}">${stTxt}</span>`;
+    }
+    const topDiag = diag.find(d => d.cls==='ub-bad') || diag.find(d => d.cls==='ub-hint') || diag[0];
+    const signalLine = `<div class="ub-signal">${paceSignal}<span class="ub-signal-gap" style="color:${gap>0?'#dc2626':'#059669'}">${gap>0?'잔여 ':'초과 '}${_ubKRW(Math.abs(gap))}</span>${topDiag?`<span class="ub-signal-diag">${topDiag.t.replace(/^[🟢🟡🔴]\s*/,'')}</span>`:''}</div>`;
+
     return `
-    <div class="ub-card" style="border-top:3px solid ${color}">
-        <div class="ub-card-hd">
-            <span class="ub-brand" style="color:${color}">${brand}</span>
-            <span class="ub-rate" style="color:${rateColor}">${target>0?_ubPct(rate):'-'}</span>
+    <div class="ub-card2" data-status="${status}">
+        <div class="ub-card2-hd">
+            <span class="ub-dot" style="background:${dotColor}"></span>
+            <span class="ub-brand2" style="color:${color}">${brand}</span>
+            <span class="ub-rate2" style="color:${dotColor}">${target>0?_ubPct(rate):'-'}</span>
         </div>
-        <div class="ub-bar"><div class="ub-bar-fill" style="width:${barW}%;background:${rateColor}"></div></div>
-
-        ${_ubPaceStripHtml(brand, actualsByDate)}
-
-        <div class="ub-gmv-row">
-            <div><span class="ub-lbl">목표</span><span class="ub-val">${_ubKRW(target)}</span></div>
-            <div><span class="ub-lbl">실적</span><span class="ub-val">${_ubKRW(actual)}</span></div>
-            <div><span class="ub-lbl">${gap>0?'잔여':'초과'}</span><span class="ub-val" style="color:${gap>0?'#dc2626':'#059669'}">${_ubKRW(Math.abs(gap))}</span></div>
-        </div>
-
-        <div class="ub-sub-hd">📣 오늘 광고 성과 ${cr.count>0?`<span class="ub-cnt">${cr.count}개</span>`:''}</div>
-        ${cr.count>0 ? `<div class="ub-metrics">
-            <div class="ub-m"><span>ROAS</span><b style="color:${cr.roas>=2?'#059669':cr.roas>=1?'#6366f1':'#dc2626'}">${_ubRoas(cr.roas)}</b></div>
-            <div class="ub-m"><span>광고비</span><b>${_ubKRW(cr.spend)}</b></div>
-            <div class="ub-m"><span>CTR</span><b>${_ubCtr(cr.ctr)}</b></div>
-            <div class="ub-m"><span>전환</span><b>${cr.conv>0?Math.round(cr.conv).toLocaleString():'-'}</b></div>
-        </div>` : `<div class="ub-empty-s">해당일 광고 데이터 없음</div>`}
-
-        <div class="ub-sub-hd">🛒 퍼널 전환 <span style="font-size:9px;color:#94a3b8;font-weight:400">262Q 누적</span></div>
-        ${fn ? `<div class="ub-metrics">
-            <div class="ub-m"><span>장바구니율</span><b style="color:#6366f1">${fn.cartRate!=null?fn.cartRate.toFixed(1)+'%':'-'}</b></div>
-            <div class="ub-m"><span>구매율</span><b style="color:#7c3aed">${fn.buyRate!=null?fn.buyRate.toFixed(1)+'%':'-'}</b></div>
-            <div class="ub-m"><span>유입</span><b>${fn.inflow?Math.round(fn.inflow).toLocaleString():'-'}</b></div>
-            <div class="ub-m"><span>구매</span><b>${fn.buy?Math.round(fn.buy).toLocaleString():'-'}</b></div>
-        </div>` : `<div class="ub-empty-s">${_ubFunnelLoading?'퍼널 데이터 로딩 중…':'퍼널 데이터 없음'}</div>`}
-
-        <div class="ub-diag">
-            ${diag.map(d => `<div class="ub-diag-line ${d.cls}">${d.t}</div>`).join('')}
-        </div>
+        <div class="ub-bar"><div class="ub-bar-fill" style="width:${barW}%;background:${dotColor}"></div></div>
+        ${signalLine}
+        <details class="ub-detail">
+            <summary>상세 (광고·퍼널·마감페이스)</summary>
+            ${_ubPaceStripHtml(brand, actualsByDate)}
+            <div class="ub-gmv-row">
+                <div><span class="ub-lbl">목표</span><span class="ub-val">${_ubKRW(target)}</span></div>
+                <div><span class="ub-lbl">실적</span><span class="ub-val">${_ubKRW(actual)}</span></div>
+                <div><span class="ub-lbl">${gap>0?'잔여':'초과'}</span><span class="ub-val" style="color:${gap>0?'#dc2626':'#059669'}">${_ubKRW(Math.abs(gap))}</span></div>
+            </div>
+            <div class="ub-sub-hd">📣 오늘 광고 성과 ${cr.count>0?`<span class="ub-cnt">${cr.count}개</span>`:''}</div>
+            ${cr.count>0 ? `<div class="ub-metrics">
+                <div class="ub-m"><span>ROAS</span><b style="color:${cr.roas>=2?'#059669':cr.roas>=1?'#6366f1':'#dc2626'}">${_ubRoas(cr.roas)}</b></div>
+                <div class="ub-m"><span>광고비</span><b>${_ubKRW(cr.spend)}</b></div>
+                <div class="ub-m"><span>CTR</span><b>${_ubCtr(cr.ctr)}</b></div>
+                <div class="ub-m"><span>전환</span><b>${cr.conv>0?Math.round(cr.conv).toLocaleString():'-'}</b></div>
+            </div>` : `<div class="ub-empty-s">해당일 광고 데이터 없음</div>`}
+            <div class="ub-sub-hd">🛒 퍼널 전환 <span style="font-size:9px;color:#94a3b8;font-weight:400">262Q 누적</span></div>
+            ${fn ? `<div class="ub-metrics">
+                <div class="ub-m"><span>장바구니율</span><b style="color:#6366f1">${fn.cartRate!=null?fn.cartRate.toFixed(1)+'%':'-'}</b></div>
+                <div class="ub-m"><span>구매율</span><b style="color:#7c3aed">${fn.buyRate!=null?fn.buyRate.toFixed(1)+'%':'-'}</b></div>
+                <div class="ub-m"><span>유입</span><b>${fn.inflow?Math.round(fn.inflow).toLocaleString():'-'}</b></div>
+                <div class="ub-m"><span>구매</span><b>${fn.buy?Math.round(fn.buy).toLocaleString():'-'}</b></div>
+            </div>` : `<div class="ub-empty-s">${_ubFunnelLoading?'퍼널 데이터 로딩 중…':'퍼널 데이터 없음'}</div>`}
+            <div class="ub-diag">
+                ${diag.map(d => `<div class="ub-diag-line ${d.cls}">${d.t}</div>`).join('')}
+            </div>
+        </details>
     </div>`;
+}
+
+/* ── 자동 1줄 진단 (verdict) ── */
+function _ubBuildVerdict(brands, date, actualsByDate, totRate) {
+    // 브랜드별 오늘 달성률 + 마감 페이스
+    const arr = brands.map(b => {
+        const t = _ubTgt(b, date), a = _ubAct(actualsByDate, date, b);
+        const rate = t>0 ? a/t : null;
+        const pace = _ubPaceToFinish(b, actualsByDate);
+        return { b, rate, pace };
+    }).filter(x => x.rate !== null);
+    if (!arr.length) return null;
+
+    // 가장 뒤처진 브랜드 (마감 전망 projRate 최저, 없으면 오늘 rate 최저)
+    const worst = [...arr].sort((x,y) => {
+        const px = x.pace?.projRate ?? x.rate, py = y.pace?.projRate ?? y.rate;
+        return px - py;
+    })[0];
+    const onTrack = arr.filter(x => (x.pace?.projRate ?? x.rate) >= 0.97).map(x => x.b);
+
+    const overall = totRate >= 1 ? '🟢 전체 목표 달성/상회'
+                  : totRate >= 0.9 ? `🟡 전체 목표 ${_ubPct(totRate)}`
+                  : `🔴 전체 목표 ${_ubPct(totRate)} (-${_ubPct(1-totRate)}p)`;
+    const tone = totRate >= 1 ? 'good' : totRate >= 0.9 ? 'warn' : 'bad';
+
+    let risk = '', action = '';
+    const wp = worst.pace;
+    if (wp && wp.status === 'behind') {
+        const mult = wp.avgDaily>0 ? (wp.requiredRunRate/wp.avgDaily) : null;
+        risk = `${worst.b} 마감 페이스 미달${mult?` (필요 ${mult.toFixed(1)}x)`:''}`;
+        action = `오늘 ${worst.b} 예산·소재 점검`;
+    } else if (worst.rate < 0.9) {
+        risk = `${worst.b} 오늘 달성 ${_ubPct(worst.rate)}`;
+        action = `${worst.b} 점검`;
+    } else {
+        risk = '전 브랜드 정상 페이스';
+        action = '현 배분 유지';
+    }
+    const okTxt = onTrack.length ? ` · ${onTrack.join('·')} on-track` : '';
+    return { tone, text: `${overall} — ${risk}${okTxt}. → ${action}` };
 }
 
 /* ── 메인 렌더 ── */
@@ -342,6 +397,13 @@ function renderUnifiedBriefing() {
     const funnelStatus = _ubFunnelDone ? '' : (_ubFunnelLoading
         ? `<span class="ub-scope"><i class="fas fa-spinner fa-spin mr-1"></i>퍼널 로딩중</span>` : '');
 
+    // 이벤트 D+N 컨텍스트 (경과일% vs 목표달성%)
+    const elapsed = dates.filter(d => d <= date).length;
+    const dayCtx = dates.length ? `이벤트 ${elapsed}/${dates.length}일차 (경과 ${Math.round(elapsed/dates.length*100)}% · 달성 ${_ubPct(totRate)})` : '';
+
+    // 자동 verdict (1줄)
+    const verdict = _ubBuildVerdict(brands, date, actualsByDate, totRate);
+
     body.innerHTML = `
     <div class="ub-toolbar">
         <div class="ub-date-wrap">
@@ -352,9 +414,11 @@ function renderUnifiedBriefing() {
         <span class="ub-scope">${globalBrand==='ALL'?'전체 브랜드':globalBrand}</span>
     </div>
 
+    ${verdict ? `<div class="ub-verdict ub-verdict-${verdict.tone}">💬 ${verdict.text}</div>` : ''}
+
     <div class="ub-headline" style="border-color:${totColor}33">
         <div class="ub-hl-left">
-            <div class="ub-hl-lbl">${date} · ${globalBrand==='ALL'?'전체':globalBrand} 목표 달성률</div>
+            <div class="ub-hl-lbl">${date} · ${globalBrand==='ALL'?'전체':globalBrand} 목표 달성률 ${dayCtx?`<span style="color:#94a3b8">· ${dayCtx}</span>`:''}</div>
             <div class="ub-hl-rate" style="color:${totColor}">${totT>0?_ubPct(totRate):'-'}</div>
         </div>
         <div class="ub-hl-right">
