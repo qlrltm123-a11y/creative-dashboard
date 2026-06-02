@@ -5559,6 +5559,22 @@ body {
 .ub-lbl { font-size: 10px; color: #94a3b8; font-weight: 600; }
 .ub-val { font-size: 13px; font-weight: 700; color: #1e293b; }
 
+/* 이벤트 마감 페이스 스트립 */
+.ub-pace { margin: 10px 0 4px; padding: 9px 10px; background: #f8fafc; border: 1px solid #eef2f6; border-radius: 10px; }
+.ub-pace-empty { font-size: 10.5px; color: #94a3b8; font-style: italic; }
+.ub-pace-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ub-pace-pill { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.ub-pace-behind { background: #fee2e2; color: #b91c1c; }
+.ub-pace-on { background: #fef3c7; color: #92400e; }
+.ub-pace-ahead { background: #dcfce7; color: #166534; }
+.ub-pace-proj { font-size: 10.5px; color: #475569; font-weight: 600; text-align: right; }
+.ub-pace-bar { position: relative; height: 9px; background: #e7ebf0; border-radius: 5px; overflow: hidden; margin-bottom: 5px; }
+.ub-pace-fill { position: absolute; left: 0; top: 0; height: 100%; background: #3b82f6; border-radius: 5px; }
+.ub-pace-ghost { position: absolute; top: 0; height: 100%; background: #3b82f6; opacity: .32; }
+.ub-pace-tick { position: absolute; top: -2px; width: 2px; height: 13px; background: #64748b; }
+.ub-pace-foot { font-size: 10.5px; color: #64748b; }
+.ub-pace-foot b { color: #1e293b; }
+
 .ub-sub-hd { font-size: 11px; font-weight: 700; color: #475569; margin: 10px 0 6px; display: flex; align-items: center; gap: 6px; }
 .ub-cnt { font-size: 9px; font-weight: 600; color: #6366f1; background: #eef2ff; border-radius: 4px; padding: 1px 5px; }
 .ub-cnt-muted { color: #94a3b8; background: #f1f5f9; }

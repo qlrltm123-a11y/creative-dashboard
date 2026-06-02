@@ -53,6 +53,51 @@ function _ubGmvActuals() {
     } catch(e) { return {}; }
 }
 
+/* ── 이벤트 마감 페이스 전망 (브랜드별, 이벤트 전체 기간) ── */
+function _ubPaceToFinish(brand, actualsByDate) {
+    const tgt = window.GMV_TARGETS?.[brand];
+    if (!tgt) return null;
+    const dates = Object.keys(tgt).sort();
+    if (!dates.length) return null;
+
+    const today = _ubTodayStr();
+    const first = dates[0], last = dates[dates.length - 1];
+    // 오늘을 이벤트 창 안으로 클램프
+    const cutoff = today < first ? first : (today > last ? last : today);
+    const eventOver = today > last;
+
+    const eventTarget = dates.reduce((s, d) => s + (tgt[d] || 0), 0);
+    const elapsedDates = dates.filter(d => d <= cutoff);
+    const daysElapsed = elapsedDates.length;
+    const daysLeft = eventOver ? 0 : (dates.length - daysElapsed);
+
+    // 누적 실적 = 경과일 실적 합 / 평균은 '입력된 날'로만 나눔(빈날 보정)
+    let cumulative = 0, enteredDays = 0;
+    elapsedDates.forEach(d => {
+        const v = actualsByDate[d]?.[brand] || 0;
+        cumulative += v;
+        if (v > 0) enteredDays++;
+    });
+    const avgDaily = cumulative / Math.max(enteredDays, 1);
+    const projectedEOD = cumulative + avgDaily * daysLeft;
+    const gap = eventTarget - projectedEOD;
+    const requiredRunRate = daysLeft > 0 ? Math.max(0, (eventTarget - cumulative)) / daysLeft : 0;
+
+    // 상태: 전망/목표
+    const projRate = eventTarget > 0 ? projectedEOD / eventTarget : 0;
+    let status = 'on';
+    if (eventOver)        status = cumulative >= eventTarget ? 'ahead' : 'behind';
+    else if (projRate < 0.97) status = 'behind';
+    else if (projRate >= 1.03) status = 'ahead';
+
+    return {
+        eventTarget, cumulative, projectedEOD, gap, requiredRunRate, avgDaily,
+        daysElapsed, daysLeft, totalDays: dates.length, enteredDays,
+        cumRate: eventTarget > 0 ? cumulative / eventTarget : 0,
+        projRate, status, eventOver, hasActual: enteredDays > 0,
+    };
+}
+
 /* ── 소재 성과 (allCreatives, 특정 날짜·브랜드) ── */
 function _ubCreativeForDate(date, brand) {
     const list = (window.allCreatives || []).filter(c => {
@@ -123,6 +168,36 @@ function _ubDiagnose(g, cr, fn) {
     return msgs;
 }
 
+/* ── 이벤트 마감 페이스 스트립 HTML ── */
+function _ubPaceStripHtml(brand, actualsByDate) {
+    const p = _ubPaceToFinish(brand, actualsByDate);
+    if (!p || p.eventTarget <= 0) return '';
+    if (!p.hasActual) {
+        return `<div class="ub-pace ub-pace-empty">📅 이벤트 페이스: GMV 실적 입력 시 마감 전망 표시</div>`;
+    }
+    const stCls = p.status === 'ahead' ? 'ub-pace-ahead' : p.status === 'behind' ? 'ub-pace-behind' : 'ub-pace-on';
+    const stTxt = p.status === 'ahead' ? '초과 전망' : p.status === 'behind' ? '뒤처짐' : '정상 페이스';
+    const cumW  = Math.min(100, p.cumRate * 100);
+    const projW = Math.min(100, Math.max(p.projRate * 100 - p.cumRate * 100, 0));
+    const tick  = Math.min(100, (p.daysElapsed / p.totalDays) * 100); // 오늘 기대 위치
+    const runHint = p.daysLeft > 0
+        ? `잔여 ${p.daysLeft}일 · 필요 일평균 <b>${_ubKRW(p.requiredRunRate)}</b>${p.requiredRunRate > p.avgDaily ? ' <span style="color:#dc2626">▲</span>' : ' <span style="color:#059669">▼</span>'}`
+        : (p.eventOver ? '이벤트 종료' : '마지막 날');
+    return `
+    <div class="ub-pace">
+        <div class="ub-pace-top">
+            <span class="ub-pace-pill ${stCls}">${stTxt}</span>
+            <span class="ub-pace-proj">전망 ${_ubKRW(p.projectedEOD)} / 목표 ${_ubKRW(p.eventTarget)} (${_ubPct(p.projRate)})</span>
+        </div>
+        <div class="ub-pace-bar">
+            <div class="ub-pace-fill" style="width:${cumW}%"></div>
+            <div class="ub-pace-ghost" style="left:${cumW}%;width:${projW}%"></div>
+            <div class="ub-pace-tick" style="left:${tick}%" title="오늘 기대 위치"></div>
+        </div>
+        <div class="ub-pace-foot">${runHint}</div>
+    </div>`;
+}
+
 /* ── 브랜드 카드 HTML ── */
 function _ubBrandCard(brand, date, actualsByDate) {
     const color  = _UB_COLOR[brand];
@@ -144,6 +219,8 @@ function _ubBrandCard(brand, date, actualsByDate) {
             <span class="ub-rate" style="color:${rateColor}">${target>0?_ubPct(rate):'-'}</span>
         </div>
         <div class="ub-bar"><div class="ub-bar-fill" style="width:${barW}%;background:${rateColor}"></div></div>
+
+        ${_ubPaceStripHtml(brand, actualsByDate)}
 
         <div class="ub-gmv-row">
             <div><span class="ub-lbl">목표</span><span class="ub-val">${_ubKRW(target)}</span></div>
