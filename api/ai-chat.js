@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
   if (!apiKey) {
     return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다. Vercel → Settings → Environment Variables에서 추가해주세요.' });
   }
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
   // body 파싱 (Vercel은 보통 자동 파싱하지만 방어적으로 처리)
   let body = req.body;
