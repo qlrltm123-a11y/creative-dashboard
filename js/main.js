@@ -1632,9 +1632,54 @@ function renderSpendScatterChart() {
     const countEl = document.getElementById('spend-scatter-count-info');
     if (countEl) countEl.textContent = `총 ${totalCount}개 표시`;
 
+    // ── 4사분면 가이드 플러그인 (평균 광고비 수직선 + 평균 지표 수평선 + 코너 라벨) ──
+    const spendQuadrantPlugin = {
+        id: 'spendQuadrant',
+        afterDraw(chart) {
+            const { ctx: c, chartArea: { left, right, top, bottom }, scales: { x, y } } = chart;
+            if (!x || !y) return;
+            let xs = [], ys = [];
+            chart.data.datasets.forEach(ds => ds.data.forEach(p => { if (p.x != null) xs.push(p.x); if (p.y != null) ys.push(p.y); }));
+            if (!xs.length || !ys.length) return;
+            const avgX = xs.reduce((s,v)=>s+v,0)/xs.length;
+            const avgY = ys.reduce((s,v)=>s+v,0)/ys.length;
+            const xPx = x.getPixelForValue(avgX), yPx = y.getPixelForValue(avgY);
+
+            c.save();
+            // 십자선
+            c.setLineDash([5,4]); c.strokeStyle = 'rgba(100,116,139,0.45)'; c.lineWidth = 1.2;
+            c.beginPath(); c.moveTo(xPx, top); c.lineTo(xPx, bottom); c.stroke();
+            c.beginPath(); c.moveTo(left, yPx); c.lineTo(right, yPx); c.stroke();
+            c.setLineDash([]);
+
+            // 사분면 배경 라벨 (코너)
+            const ml = (metricKey === 'revenue') ? '매출' : (metricKey === 'conversions' ? '주문' : '담기');
+            const labels = [
+                { t:`⭐ 효율 우수 · 증액검토`, sub:'저광고비·고'+ml, x:left+8,  y:top+14,    align:'left',  col:'#059669' },
+                { t:`🚀 주력 · 유지/확대`,    sub:'고광고비·고'+ml, x:right-8, y:top+14,    align:'right', col:'#2563eb' },
+                { t:`🌱 소규모 테스트`,       sub:'저광고비·저'+ml, x:left+8,  y:bottom-20, align:'left',  col:'#94a3b8' },
+                { t:`⚠️ 비효율 · 점검/감액`,  sub:'고광고비·저'+ml, x:right-8, y:bottom-20, align:'right', col:'#dc2626' },
+            ];
+            labels.forEach(L => {
+                c.textAlign = L.align; c.textBaseline = 'top';
+                c.font = '700 11px sans-serif'; c.fillStyle = L.col;
+                c.fillText(L.t, L.x, L.y);
+                c.font = '9px sans-serif'; c.fillStyle = 'rgba(100,116,139,0.7)';
+                c.fillText(L.sub, L.x, L.y + 13);
+            });
+
+            // 평균선 값 라벨
+            c.textAlign = 'left'; c.textBaseline = 'bottom';
+            c.font = '9px sans-serif'; c.fillStyle = 'rgba(100,116,139,0.8)';
+            c.fillText(`평균 광고비 ₩${formatNumber(Math.round(avgX))}`, xPx + 4, bottom - 2);
+            c.restore();
+        }
+    };
+
     charts.spendScatter = new Chart(ctx, {
         type: 'bubble',
         data: { datasets },
+        plugins: [spendQuadrantPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
