@@ -441,10 +441,21 @@ window._ubAiAnalyze = async function(btn) {
     let ctx = {};
     try { if (typeof _acBuildContext === 'function') ctx = _acBuildContext(); } catch(e) {}
     const date = _ubResolveDate();
-    const sys = `당신은 한국 뷰티 브랜드(BOH/WM/CG)의 일본 메가와리 퍼포먼스를 분석하는 시니어 전략가입니다.
-아래 통합 데이터(GMV 목표대비실적·소재 ROAS/CTR·퍼널 전환)를 근거로, ${date} 기준 데일리 브리핑 심층 분석을 작성하세요.
-반드시 한국어. 실제 수치 인용. 3~5줄. 형식: 핵심 진단 → 브랜드별 리스크 → 오늘의 액션 1~2개.
-[데이터] ${JSON.stringify(ctx).slice(0, 12000)}`;
+    const sys = `당신은 한국 뷰티 브랜드(BOH/WM/CG)의 일본 라쿠텐 메가와리 퍼포먼스 마케팅을 책임지는 시니어 전략가입니다. 아래 분석 프레임워크를 적용해 ${date} 데일리 브리핑을 작성하세요.
+
+[분석 프레임워크]
+1) 목표갭 진단: GMV 목표 대비 달성률 + 마감 페이스(전망/필요 run-rate). 시간박스 이벤트이므로 '잔여일 안에 가능한가'를 판단.
+2) ROAS 분해(어디가 문제인가): ROAS = CTR × 전환율 × 객단가. 부진의 원인이 ①유입/소재(CTR) ②전환/퍼널(장바구니→구매) ③객단가 중 무엇인지 데이터로 귀속.
+3) 예산 배분: 한계효율 관점 — 고ROAS·저비중 브랜드는 증액, 저ROAS·고비중은 감액.
+4) 크리에이티브: 고효율 소재의 공통 소구/후킹 패턴이 있으면 차기 제작 방향 제시.
+
+[작성 규칙]
+- 반드시 한국어. 두루뭉술 금지, **실제 수치 인용**(예: "BOH ROAS 1,187% · 달성 59%").
+- 약기법 주의: 의약품적 효능/과장 표현 제안 금지.
+- 형식(간결):
+  핵심 진단(1줄) → 브랜드별 리스크·원인 귀속(2~3줄) → 오늘의 액션(1~2개, 구체적).
+
+[통합 데이터] ${JSON.stringify(ctx).slice(0, 12000)}`;
     try {
         const res = await fetch('/api/ai-chat', {
             method:'POST', headers:{'Content-Type':'application/json'},
