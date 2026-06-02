@@ -348,6 +348,21 @@
             </div>
         </section>
 
+        <!-- ★ 광고비 한계효율(포화) 곡선 -->
+        <section class="chart-card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="chart-title"><i class="fas fa-chart-line mr-2 text-rose-500"></i>광고비 한계효율 곡선 <span class="text-xs font-normal text-slate-400">(포화 분석)</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">소재를 ROAS 높은 순으로 줄세워 광고비를 누적 → 다음 1원의 효율(한계 ROAS)이 떨어지는 지점 = 예산 상한 신호</p>
+                </div>
+                <span id="saturation-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
+            </div>
+            <div style="height: 340px;">
+                <canvas id="saturationChart"></canvas>
+            </div>
+            <div id="saturation-insight" class="text-xs text-slate-600 mt-3"></div>
+        </section>
+
         <!-- 제품별 소구포인트 인사이트 (이 소구는 좋았다 → 다음에 이렇게) -->
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">

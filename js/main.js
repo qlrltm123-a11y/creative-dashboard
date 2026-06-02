@@ -132,6 +132,7 @@ window.updateDashboard = function() {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
         renderSpendScatterChart();
+        renderSaturationChart();
         renderProductPerformance();
     } else if (_currentSection === 'ai') {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
@@ -461,6 +462,7 @@ function switchSection(sectionName) {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
                 renderSpendScatterChart();
+                renderSaturationChart();
                 renderAppealInsight();
                 renderProductPerformance();
                 renderPlatformCreativeMatrix();
@@ -853,6 +855,7 @@ function refreshPerformanceSection() {
     renderPerformanceCriteriaBadge();
     renderScatterChart();
     renderSpendScatterChart();
+    renderSaturationChart();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
@@ -895,6 +898,7 @@ function updateDashboard() {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
         renderSpendScatterChart();
+        renderSaturationChart();
         renderProductPerformance();
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
@@ -1716,6 +1720,93 @@ function renderSpendScatterChart() {
     });
 }
 window.renderSpendScatterChart = renderSpendScatterChart;
+
+// ============================
+// 광고비 한계효율(포화) 곡선
+// ============================
+function renderSaturationChart() {
+    destroyChart('saturation');
+    const ctx = document.getElementById('saturationChart');
+    if (!ctx) return;
+
+    const base = (typeof aggregateByAdName === 'function')
+        ? aggregateByAdName(getBrandCreatives('performance'))
+        : getBrandCreatives('performance');
+    // 광고비·매출 유효한 소재만, ROAS 높은 순(=효율 좋은 소재부터 예산 투입 가정)
+    const pool = base.filter(c => (c.spend || 0) > 0 && (c.revenue || 0) > 0)
+                     .sort((a, b) => (b.roas || 0) - (a.roas || 0));
+
+    const infoEl = document.getElementById('saturation-info');
+    const insightEl = document.getElementById('saturation-insight');
+
+    if (pool.length < 3) {
+        if (infoEl) infoEl.textContent = '데이터 부족';
+        if (insightEl) insightEl.innerHTML = '';
+        charts.saturation = new Chart(ctx, { type:'line', data:{datasets:[]}, options:{responsive:true,maintainAspectRatio:false} });
+        return;
+    }
+
+    let cumSpend = 0, cumRev = 0;
+    const marginalPts = [];   // {x: 누적광고비, y: 해당 소재 ROAS%}
+    const cumPts = [];        // {x: 누적광고비, y: 누적 ROAS%}
+    let ceilingSpend = null;  // 한계 ROAS가 100% 미만으로 처음 떨어지는 누적광고비
+    pool.forEach(c => {
+        cumSpend += c.spend || 0;
+        cumRev   += c.revenue || 0;
+        const mRoas = (c.roas || 0) * 100;
+        const cRoas = cumSpend > 0 ? (cumRev / cumSpend) * 100 : 0;
+        marginalPts.push({ x: cumSpend, y: Math.round(mRoas) });
+        cumPts.push({ x: cumSpend, y: Math.round(cRoas) });
+        if (ceilingSpend === null && mRoas < 100) ceilingSpend = cumSpend;
+    });
+
+    const totalSpend = cumSpend;
+    const blendedRoas = cumRev / cumSpend * 100;
+
+    // 손익분기(100%) 기준선
+    const breakeven = [{ x: 0, y: 100 }, { x: totalSpend, y: 100 }];
+
+    if (infoEl) infoEl.textContent = `소재 ${pool.length}개 · 누적 광고비 ₩${formatNumber(Math.round(totalSpend))}`;
+    if (insightEl) {
+        if (ceilingSpend !== null) {
+            const pct = Math.round(ceilingSpend / totalSpend * 100);
+            insightEl.innerHTML = `🚩 <b>예산 상한 신호</b>: 누적 광고비 <b>₩${formatNumber(Math.round(ceilingSpend))}</b> (전체의 ${pct}%) 지점부터 한계 ROAS가 100% 미만(손익분기 이하)으로 떨어집니다. 그 이후 소재는 매출보다 광고비가 큼 → 예산 재배분 검토. <span style="color:#94a3b8">(블렌디드 ROAS ${Math.round(blendedRoas)}%)</span>`;
+        } else {
+            insightEl.innerHTML = `✅ 모든 소재의 한계 ROAS가 손익분기(100%) 이상입니다. 현재 풀에 비효율 구간 없음. <span style="color:#94a3b8">(블렌디드 ROAS ${Math.round(blendedRoas)}%)</span>`;
+        }
+    }
+
+    charts.saturation = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [
+                { label: '누적 ROAS', data: cumPts, borderColor: '#6366f1', backgroundColor: '#6366f120',
+                  borderWidth: 2.5, pointRadius: 0, tension: 0.25, fill: true, yAxisID: 'y' },
+                { label: '한계 ROAS (다음 소재)', data: marginalPts, borderColor: '#f43f5e', backgroundColor: 'transparent',
+                  borderWidth: 1.5, pointRadius: 2, tension: 0.15, yAxisID: 'y' },
+                { label: '손익분기 100%', data: breakeven, borderColor: '#94a3b8', borderDash: [6,4],
+                  borderWidth: 1.2, pointRadius: 0, yAxisID: 'y' },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'nearest', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+                tooltip: { callbacks: {
+                    title: items => `누적 광고비 ₩${formatNumber(Math.round(items[0].parsed.x))}`,
+                    label: item => `${item.dataset.label}: ${item.parsed.y}%`,
+                } }
+            },
+            scales: {
+                x: { type: 'linear', title: { display: true, text: '누적 광고비 (₩, 효율 높은 소재부터)', font: { size: 11 } },
+                     ticks: { font: { size: 10 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? Math.round(v/1000)+'K' : v } },
+                y: { title: { display: true, text: 'ROAS (%)', font: { size: 11 } }, ticks: { font: { size: 10 } }, beginAtZero: true }
+            }
+        }
+    });
+}
+window.renderSaturationChart = renderSaturationChart;
 
 // ============================
 // 스캐터 차트 hover 미리보기 카드
