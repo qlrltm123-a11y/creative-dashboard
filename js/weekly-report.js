@@ -236,7 +236,7 @@ function _wrPlatColor(p) { return _WR_PLAT_COLOR[p] || '#6366f1'; }
 /* ── KPI 섹션 HTML ── */
 function _wrKpiSectionHtml(kpi, count) {
     const cards = [
-        { lbl:'집행비',   val: _wrW(kpi.spend),   icon:'fa-won-sign',      color:'#ef4444' },
+        { lbl:'광고비',   val: _wrW(kpi.spend),   icon:'fa-won-sign',      color:'#ef4444' },
         { lbl:'노출수',   val: _wrN(kpi.impr),    icon:'fa-eye',           color:'#6366f1' },
         { lbl:'클릭수',   val: _wrN(kpi.clicks),  icon:'fa-mouse-pointer', color:'#3b82f6' },
         { lbl:'CTR',      val: _wrP(kpi.ctr),     icon:'fa-percentage',    color:'#06b6d4' },
@@ -297,7 +297,7 @@ function _wrPlatformSectionHtml(byPlatform) {
             <table class="wr-table">
                 <thead><tr>
                     <th class="wr-th wr-th-left">매체</th>
-                    <th class="wr-th">집행비</th>
+                    <th class="wr-th">광고비</th>
                     <th class="wr-th">노출</th>
                     <th class="wr-th">클릭</th>
                     <th class="wr-th">CTR</th>
@@ -331,7 +331,7 @@ function _wrCreativeSectionHtml(byCreative) {
                     ${c.product  ? `<span class="wr-tag-prod">${c.product}</span>` : ''}
                 </div>
                 <div class="wr-creative-stats">
-                    <div class="wr-stat"><div class="wr-stat-lbl">집행비</div><div class="wr-stat-val">${_wrW(c.spend)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">광고비</div><div class="wr-stat-val">${_wrW(c.spend)}</div></div>
                     <div class="wr-stat"><div class="wr-stat-lbl">노출</div><div class="wr-stat-val">${_wrN(c.impr)}</div></div>
                     <div class="wr-stat"><div class="wr-stat-lbl">CTR</div><div class="wr-stat-val">${_wrP(c.ctr)}</div></div>
                     <div class="wr-stat"><div class="wr-stat-lbl">ROAS</div><div class="wr-stat-val wr-roas-cell">${_wrR(c.roas)}</div></div>
@@ -578,7 +578,7 @@ function _wrProductInsightSectionHtml(productData) {
             <div class="wr-pi-header" style="border-top:3px solid ${color}">
                 <div class="wr-pi-product-name" style="color:${color}">${pd.product}</div>
                 <div class="wr-pi-kpis">
-                    <span>집행비 <strong>${_wrW(pd.kpi.spend)}</strong></span>
+                    <span>광고비 <strong>${_wrW(pd.kpi.spend)}</strong></span>
                     <span>ROAS <strong style="color:${color}">${_wrR(pd.kpi.roas)}</strong></span>
                     <span>CTR <strong>${_wrP(pd.kpi.ctr)}</strong></span>
                 </div>
@@ -743,7 +743,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     /* KPI */
     if (!sections || sections.includes('kpi')) {
         html += `<h3>📊 KPI 요약</h3><table><thead><tr>
-            <th>집행비</th><th>노출수</th><th>클릭수</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환수</th>
+            <th>광고비</th><th>노출수</th><th>클릭수</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환수</th>
         </tr></thead><tbody><tr>
             <td class="num">${_wrW(kpi.spend)}</td>
             <td class="num">${_wrN(kpi.impr)}</td>
@@ -759,7 +759,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     if (!sections || sections.includes('platform')) {
         const total = byPlatform.reduce((s, p) => s + p.spend, 0);
         html += `<h3>📺 매체별 성과</h3><table><thead><tr>
-            <th style="text-align:left">매체</th><th>집행비</th><th>비중</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+            <th style="text-align:left">매체</th><th>광고비</th><th>비중</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
         </tr></thead><tbody>`;
         byPlatform.forEach(p => {
             const pct = total > 0 ? (p.spend / total * 100).toFixed(1) + '%' : '-';
@@ -781,12 +781,12 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     /* 제품별 인사이트 */
     if (!sections || sections.includes('products')) {
         byProduct.forEach(pd => {
-            html += `<h3>📦 ${pd.product} — 집행비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)}</h3>`;
+            html += `<h3>📦 ${pd.product} — 광고비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)}</h3>`;
             // TOP 5 테이블
             html += `<table><thead><tr>
                 <th>#</th><th style="width:80px">소재 이미지</th>
                 <th style="text-align:left">소재명</th><th>매체</th>
-                <th>집행비</th><th>CTR</th><th>매출</th><th>ROAS</th>
+                <th>광고비</th><th>CTR</th><th>매출</th><th>ROAS</th>
             </tr></thead><tbody>`;
             pd.top5.forEach((c, i) => {
                 const imgHtml = c.thumb ? `<img class="thumb" src="${c.thumb}" alt="">` : '-';
@@ -843,7 +843,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     if (!sections || sections.includes('creatives')) {
         html += `<h3>🎨 소재별 성과 TOP ${byCreative.length}</h3><table><thead><tr>
             <th>#</th><th>소재 이미지</th><th style="text-align:left;min-width:160px">소재명</th>
-            <th>매체</th><th>제품</th><th>집행비</th><th>노출</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+            <th>매체</th><th>제품</th><th>광고비</th><th>노출</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
         </tr></thead><tbody>`;
         byCreative.forEach((c, i) => {
             const thumb = toThumb(c.thumb);
