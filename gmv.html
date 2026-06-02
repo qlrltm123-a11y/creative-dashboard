@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>브랜드 매출 시뮬레이터</title>
+<script src="js/gmv-targets.js"></script>
 <style>
 :root {
   --bg: #f8fafc;
@@ -195,7 +196,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 <script>
 // ───────── 데이터 ─────────
-const TARGET_DATA = {
+// 공유 타겟(js/gmv-targets.js) 우선, 없으면 인라인 폴백 (standalone 호환)
+const TARGET_DATA = (typeof window !== 'undefined' && window.GMV_TARGETS) ? window.GMV_TARGETS : {
   BOH: {
     "2026-05-29":110065773,"2026-05-30":119125048,"2026-05-31":75190821,
     "2026-06-01":45091293,"2026-06-02":95109046,"2026-06-03":50119217,

@@ -140,6 +140,11 @@
                 <span class="label">개요</span>
                 <span class="sub">KPI · 핵심 지표</span>
             </button>
+            <button class="section-tab" data-section="unified">
+                <i class="fas fa-bullseye"></i>
+                <span class="label">통합 브리핑</span>
+                <span class="sub">목표갭 · GMV·소재·퍼널</span>
+            </button>
             <button class="section-tab" data-section="performance">
                 <i class="fas fa-trophy"></i>
                 <span class="label">성과 분석</span>
@@ -743,6 +748,20 @@
         </div>
         <!-- ============ /SECTION: 주간 업무 보고서 ============ -->
 
+        <!-- ============ SECTION: 통합 브리핑 ============ -->
+        <div class="section-panel" data-panel="unified">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-bullseye text-indigo-500"></i> 통합 데일리 브리핑
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">목표 달성률 · GMV 페이스 × 소재 효율 × 퍼널 전환 통합 진단</p>
+                </div>
+            </div>
+            <div id="unified-body" class="ub-body"></div>
+        </div>
+        <!-- ============ /SECTION: 통합 브리핑 ============ -->
+
         <!-- ============ SECTION: 퍼널 (iframe 통합) ============ -->
         <div class="section-panel" data-panel="funnel">
             <iframe id="funnel-frame" class="embed-frame" title="퍼널 전환율 대시보드"
@@ -954,8 +973,10 @@
     <script src="js/sheets.js"></script>
     <script src="js/insights.js"></script>
     <script src="js/generate_v2.js"></script>
+    <script src="js/gmv-targets.js"></script>
     <script src="js/megawari-report.js"></script>
     <script src="js/weekly-report.js"></script>
+    <script src="js/unified-briefing.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

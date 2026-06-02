@@ -1,0 +1,253 @@
+// ============================================================
+//  통합 데일리 브리핑 (Unified Daily Briefing)
+//  GMV 페이스 × 소재 효율 × 퍼널 전환 → 모닝 스탠드업 단일 뷰
+//  - 동일 origin: GMV(localStorage+공유타겟) / 소재(allCreatives) /
+//    퍼널(iframe contentWindow.brandData best-effort)
+// ============================================================
+
+const _UB_BRANDS = ['BOH', 'WM', 'CG'];
+const _UB_COLOR  = { BOH: '#7c3aed', WM: '#059669', CG: '#d97706' };
+
+let _ubDate = null; // 선택된 브리핑 날짜 (ISO)
+
+/* ── 포맷 ── */
+function _ubKRW(v) {
+    if (!v) return '₩0';
+    const a = Math.abs(v);
+    if (a >= 100000000) return '₩' + (v/100000000).toFixed(2) + '억';
+    if (a >= 10000000)  return '₩' + (v/10000000).toFixed(1) + '천만';
+    if (a >= 10000)     return '₩' + Math.round(v/10000) + '만';
+    return '₩' + Math.round(v).toLocaleString();
+}
+function _ubPct(r) { return (r*100).toFixed(0) + '%'; }
+function _ubRoas(r){ return r > 0 ? Math.round(r*100) + '%' : '-'; }
+function _ubCtr(r) { return r > 0 ? (r*100).toFixed(2) + '%' : '-'; }
+
+/* ── 날짜 헬퍼 ── */
+function _ubTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function _ubTargetDates() {
+    const t = window.GMV_TARGETS || {};
+    const all = new Set();
+    Object.values(t).forEach(o => Object.keys(o).forEach(d => all.add(d)));
+    return [...all].sort();
+}
+function _ubResolveDate() {
+    if (_ubDate) return _ubDate;
+    const dates = _ubTargetDates();
+    if (!dates.length) return _ubTodayStr();
+    const today = _ubTodayStr();
+    if (dates.includes(today)) return today;
+    // 오늘 이전 중 가장 최근, 없으면 마지막
+    const past = dates.filter(d => d <= today);
+    return past.length ? past[past.length-1] : dates[dates.length-1];
+}
+
+/* ── GMV 실적 (localStorage smDash2, 동일 origin) ── */
+function _ubGmvActuals() {
+    try {
+        const d = JSON.parse(localStorage.getItem('smDash2') || '{}');
+        return d.actualsByDate || {};
+    } catch(e) { return {}; }
+}
+
+/* ── 소재 성과 (allCreatives, 특정 날짜·브랜드) ── */
+function _ubCreativeForDate(date, brand) {
+    const list = (window.allCreatives || []).filter(c => {
+        const d = (c.start_date || '').slice(0,10);
+        if (d !== date) return false;
+        if (brand && c.brand !== brand) return false;
+        return true;
+    });
+    let spend=0, revenue=0, impr=0, clicks=0, conv=0;
+    list.forEach(c => {
+        spend += c.spend||0; revenue += c.revenue||0;
+        impr += c.impressions||0; clicks += c.clicks||0; conv += c.conversions||0;
+    });
+    return {
+        spend, revenue, impr, clicks, conv,
+        roas: spend>0 ? revenue/spend : 0,
+        ctr:  impr>0  ? clicks/impr   : 0,
+        cvr:  clicks>0? conv/clicks   : 0,
+        count: list.length,
+    };
+}
+
+/* ── 퍼널 최신 전환 (iframe best-effort, 동일 origin) ── */
+function _ubFunnelForBrand(brand) {
+    try {
+        const fr = document.getElementById('funnel-frame');
+        const w = fr && fr.contentWindow;
+        if (!w || !w.brandData || !w.brandData[brand]) return null;
+        const q = w.brandData[brand]['262Q'];
+        if (!q) return null;
+        // 전 제품 최신일 합산 → cart/buy rate
+        let inflow=0, cart=0, buy=0;
+        Object.values(q).forEach(rows => {
+            if (!rows || !rows.length) return;
+            const last = rows[rows.length-1];
+            inflow += last.inflow||0; cart += last.cart||0; buy += last.buy||0;
+        });
+        if (inflow === 0 && cart === 0) return null;
+        return {
+            inflow, cart, buy,
+            cartRate: inflow>0 ? cart/inflow*100 : null,
+            buyRate:  cart>0   ? buy/cart*100    : null,
+        };
+    } catch(e) { return null; }
+}
+
+/* ── 브랜드별 진단 메시지 (룰 기반) ── */
+function _ubDiagnose(g, cr, fn) {
+    // g: {target, actual, rate}  cr: creative  fn: funnel|null
+    const msgs = [];
+    if (g.target > 0) {
+        if (g.rate >= 1)      msgs.push({ t:'🟢 목표 달성', cls:'ub-good' });
+        else if (g.rate >= 0.8) msgs.push({ t:`🟡 목표 ${_ubPct(g.rate)} · 막판 푸시 필요`, cls:'ub-warn' });
+        else                  msgs.push({ t:`🔴 목표 ${_ubPct(g.rate)} · 격차 ${_ubKRW(g.target-g.actual)}`, cls:'ub-bad' });
+    }
+    // 격차 원인 귀속: 소재 효율 vs 퍼널 전환
+    if (g.target > 0 && g.rate < 0.9) {
+        if (cr.count > 0 && cr.roas > 0 && cr.roas < 2) {
+            msgs.push({ t:`소재 효율 저조 (ROAS ${_ubRoas(cr.roas)}) → 고효율 소재로 예산 이동`, cls:'ub-hint' });
+        }
+        if (fn && fn.buyRate != null && fn.buyRate < 30) {
+            msgs.push({ t:`퍼널 구매전환 ${fn.buyRate.toFixed(1)}% → 장바구니→구매 이탈 점검`, cls:'ub-hint' });
+        }
+        if (cr.count > 0 && cr.ctr > 0 && cr.ctr < 0.01) {
+            msgs.push({ t:`CTR ${_ubCtr(cr.ctr)} 낮음 → 유입 단계(소재 후킹) 약화`, cls:'ub-hint' });
+        }
+    }
+    return msgs;
+}
+
+/* ── 브랜드 카드 HTML ── */
+function _ubBrandCard(brand, date, actualsByDate) {
+    const color  = _UB_COLOR[brand];
+    const target = (window.GMV_TARGETS?.[brand]?.[date]) || 0;
+    const actual = (actualsByDate[date]?.[brand]) || 0;
+    const rate   = target > 0 ? actual/target : 0;
+    const gap    = target - actual;
+    const cr = _ubCreativeForDate(date, brand);
+    const fn = _ubFunnelForBrand(brand);
+    const diag = _ubDiagnose({target, actual, rate}, cr, fn);
+
+    const rateColor = rate >= 1 ? '#059669' : rate >= 0.8 ? '#d97706' : '#dc2626';
+    const barW = Math.min(100, rate*100);
+
+    return `
+    <div class="ub-card" style="border-top:3px solid ${color}">
+        <div class="ub-card-hd">
+            <span class="ub-brand" style="color:${color}">${brand}</span>
+            <span class="ub-rate" style="color:${rateColor}">${target>0?_ubPct(rate):'-'}</span>
+        </div>
+        <div class="ub-bar"><div class="ub-bar-fill" style="width:${barW}%;background:${rateColor}"></div></div>
+
+        <div class="ub-gmv-row">
+            <div><span class="ub-lbl">목표</span><span class="ub-val">${_ubKRW(target)}</span></div>
+            <div><span class="ub-lbl">실적</span><span class="ub-val">${_ubKRW(actual)}</span></div>
+            <div><span class="ub-lbl">${gap>0?'잔여':'초과'}</span><span class="ub-val" style="color:${gap>0?'#dc2626':'#059669'}">${_ubKRW(Math.abs(gap))}</span></div>
+        </div>
+
+        <div class="ub-sub-hd">📣 오늘 광고 성과 ${cr.count>0?`<span class="ub-cnt">${cr.count}개</span>`:''}</div>
+        ${cr.count>0 ? `<div class="ub-metrics">
+            <div class="ub-m"><span>ROAS</span><b style="color:${cr.roas>=2?'#059669':cr.roas>=1?'#6366f1':'#dc2626'}">${_ubRoas(cr.roas)}</b></div>
+            <div class="ub-m"><span>광고비</span><b>${_ubKRW(cr.spend)}</b></div>
+            <div class="ub-m"><span>CTR</span><b>${_ubCtr(cr.ctr)}</b></div>
+            <div class="ub-m"><span>전환</span><b>${cr.conv>0?Math.round(cr.conv).toLocaleString():'-'}</b></div>
+        </div>` : `<div class="ub-empty-s">해당일 광고 데이터 없음</div>`}
+
+        <div class="ub-sub-hd">🛒 퍼널 전환 ${!fn?'<span class="ub-cnt ub-cnt-muted">미동기화</span>':''}</div>
+        ${fn ? `<div class="ub-metrics">
+            <div class="ub-m"><span>장바구니율</span><b style="color:#6366f1">${fn.cartRate!=null?fn.cartRate.toFixed(1)+'%':'-'}</b></div>
+            <div class="ub-m"><span>구매율</span><b style="color:#7c3aed">${fn.buyRate!=null?fn.buyRate.toFixed(1)+'%':'-'}</b></div>
+        </div>` : `<div class="ub-empty-s">퍼널 탭을 한번 열면 자동 동기화됩니다</div>`}
+
+        <div class="ub-diag">
+            ${diag.map(d => `<div class="ub-diag-line ${d.cls}">${d.t}</div>`).join('')}
+        </div>
+    </div>`;
+}
+
+/* ── 메인 렌더 ── */
+function renderUnifiedBriefing() {
+    const body = document.getElementById('unified-body');
+    if (!body) return;
+
+    const date = _ubResolveDate();
+    const actualsByDate = _ubGmvActuals();
+    const globalBrand = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : 'ALL') || 'ALL';
+    const brands = globalBrand === 'ALL' ? _UB_BRANDS : [globalBrand];
+
+    // 전체 합산 헤드라인
+    let totT=0, totA=0;
+    brands.forEach(b => {
+        totT += (window.GMV_TARGETS?.[b]?.[date]) || 0;
+        totA += (actualsByDate[date]?.[b]) || 0;
+    });
+    const totRate = totT>0 ? totA/totT : 0;
+    const totColor = totRate>=1 ? '#059669' : totRate>=0.8 ? '#d97706' : '#dc2626';
+
+    const dates = _ubTargetDates();
+    const dateOpts = dates.map(d => `<option value="${d}"${d===date?' selected':''}>${d}</option>`).join('');
+
+    const funnelLoaded = !!(document.getElementById('funnel-frame')?.src);
+
+    body.innerHTML = `
+    <div class="ub-toolbar">
+        <div class="ub-date-wrap">
+            <span class="ub-toolbar-lbl">📅 브리핑 날짜</span>
+            <select id="ub-date-sel" class="ub-date-sel" onchange="window._ubSetDate(this.value)">${dateOpts}</select>
+        </div>
+        ${!funnelLoaded ? `<button class="ub-sync-btn" onclick="window._ubSyncFunnel(this)"><i class="fas fa-rotate mr-1"></i>퍼널 데이터 동기화</button>` : ''}
+        <span class="ub-scope">${globalBrand==='ALL'?'전체 브랜드':globalBrand}</span>
+    </div>
+
+    <div class="ub-headline" style="border-color:${totColor}33">
+        <div class="ub-hl-left">
+            <div class="ub-hl-lbl">${date} · ${globalBrand==='ALL'?'전체':globalBrand} 목표 달성률</div>
+            <div class="ub-hl-rate" style="color:${totColor}">${totT>0?_ubPct(totRate):'-'}</div>
+        </div>
+        <div class="ub-hl-right">
+            <div><span class="ub-lbl">목표</span><span class="ub-val">${_ubKRW(totT)}</span></div>
+            <div><span class="ub-lbl">실적</span><span class="ub-val">${_ubKRW(totA)}</span></div>
+            <div><span class="ub-lbl">${totT-totA>0?'잔여':'초과'}</span><span class="ub-val" style="color:${totT-totA>0?'#dc2626':'#059669'}">${_ubKRW(Math.abs(totT-totA))}</span></div>
+        </div>
+    </div>
+
+    <div class="ub-grid">
+        ${brands.map(b => _ubBrandCard(b, date, actualsByDate)).join('')}
+    </div>
+
+    <div class="ub-note">
+        💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 퍼널 탭 로드 후 동기화됩니다.
+    </div>`;
+}
+window.renderUnifiedBriefing = renderUnifiedBriefing;
+
+/* ── 날짜 변경 ── */
+window._ubSetDate = function(d) { _ubDate = d; renderUnifiedBriefing(); };
+
+/* ── 퍼널 동기화: 퍼널 iframe 로드 후 재렌더 ── */
+window._ubSyncFunnel = function(btn) {
+    const fr = document.getElementById('funnel-frame');
+    if (!fr) return;
+    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>동기화 중...'; btn.disabled = true; }
+    if (!fr.src && fr.dataset.src) {
+        const b = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : 'ALL') || 'ALL';
+        fr.src = fr.dataset.src + '?brand=' + encodeURIComponent(b);
+    }
+    // 퍼널 데이터 로드 폴링 (최대 12초)
+    let tries = 0;
+    const timer = setInterval(() => {
+        tries++;
+        const w = fr.contentWindow;
+        const ready = w && w.brandData && Object.values(w.brandData).some(v => v);
+        if (ready || tries > 24) {
+            clearInterval(timer);
+            renderUnifiedBriefing();
+        }
+    }, 500);
+};

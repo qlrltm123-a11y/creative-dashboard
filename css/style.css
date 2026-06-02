@@ -5419,6 +5419,65 @@ body {
 .mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
 
+/* ══════════════════════════════════════════════
+   통합 데일리 브리핑 (.ub-*)
+══════════════════════════════════════════════ */
+.ub-body { display: flex; flex-direction: column; gap: 16px; }
+
+/* 툴바 */
+.ub-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ub-date-wrap { display: flex; align-items: center; gap: 8px; }
+.ub-toolbar-lbl { font-size: 12px; font-weight: 600; color: #64748b; }
+.ub-date-sel { height: 32px; padding: 0 10px; font-size: 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; outline: none; }
+.ub-date-sel:focus { border-color: #6366f1; }
+.ub-sync-btn { height: 30px; padding: 0 12px; font-size: 11px; font-weight: 600; color: #6366f1; background: #eef2ff; border: 1.5px solid #c7d2fe; border-radius: 7px; cursor: pointer; }
+.ub-sync-btn:hover { background: #e0e7ff; }
+.ub-scope { margin-left: auto; font-size: 11px; font-weight: 600; color: #94a3b8; }
+
+/* 헤드라인 */
+.ub-headline { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 16px 22px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.ub-hl-lbl { font-size: 12px; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+.ub-hl-rate { font-size: 40px; font-weight: 800; line-height: 1; }
+.ub-hl-right { display: flex; gap: 22px; flex-wrap: wrap; }
+.ub-hl-right > div { display: flex; flex-direction: column; gap: 2px; }
+
+/* 카드 그리드 */
+.ub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.ub-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.ub-card-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+.ub-brand { font-size: 16px; font-weight: 800; }
+.ub-rate { font-size: 24px; font-weight: 800; }
+.ub-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+.ub-bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+
+.ub-gmv-row { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 12px; }
+.ub-gmv-row > div { display: flex; flex-direction: column; gap: 2px; }
+.ub-lbl { font-size: 10px; color: #94a3b8; font-weight: 600; }
+.ub-val { font-size: 13px; font-weight: 700; color: #1e293b; }
+
+.ub-sub-hd { font-size: 11px; font-weight: 700; color: #475569; margin: 10px 0 6px; display: flex; align-items: center; gap: 6px; }
+.ub-cnt { font-size: 9px; font-weight: 600; color: #6366f1; background: #eef2ff; border-radius: 4px; padding: 1px 5px; }
+.ub-cnt-muted { color: #94a3b8; background: #f1f5f9; }
+.ub-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ub-m { background: #f8fafc; border-radius: 8px; padding: 6px 4px; text-align: center; }
+.ub-m span { display: block; font-size: 9px; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+.ub-m b { font-size: 12px; font-weight: 700; color: #334155; }
+.ub-empty-s { font-size: 10.5px; color: #94a3b8; font-style: italic; padding: 4px 0; }
+
+.ub-diag { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+.ub-diag-line { font-size: 11px; font-weight: 600; padding: 5px 9px; border-radius: 7px; line-height: 1.4; }
+.ub-good { background: #f0fdf4; color: #15803d; }
+.ub-warn { background: #fffbeb; color: #b45309; }
+.ub-bad  { background: #fef2f2; color: #b91c1c; }
+.ub-hint { background: #f8fafc; color: #475569; border: 1px dashed #cbd5e1; }
+
+.ub-note { font-size: 11px; color: #94a3b8; padding: 8px 0; line-height: 1.6; }
+
+@media (max-width: 600px) {
+    .ub-metrics { grid-template-columns: repeat(2, 1fr); }
+    .ub-hl-rate { font-size: 32px; }
+}
+
 /* ── 통합 iframe 패널 (퍼널 / GMV) ── */
 .embed-frame {
     width: 100%;
