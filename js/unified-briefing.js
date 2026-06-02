@@ -15,6 +15,12 @@ function _ubFx() {
     try { const v = parseFloat(localStorage.getItem('jpy_to_krw_rate')); if (!isNaN(v) && v > 0) return v; } catch(e) {}
     return 9.5;
 }
+/* 용어 ⓘ 툴팁 (glossary.js 연동) */
+function _ubTip(key) {
+    const e = (window.GLOSSARY||{})[key];
+    return (e && typeof window.infoTip==='function') ? window.infoTip(e.d) : '';
+}
+
 /* GMV 목표/실적 조회 (원화 환산) */
 function _ubTgt(brand, date) { return ((window.GMV_TARGETS?.[brand]?.[date]) || 0) * _ubFx(); }
 function _ubAct(actualsByDate, date, brand) { return ((actualsByDate?.[date]?.[brand]) || 0) * _ubFx(); }
@@ -313,9 +319,9 @@ function _ubBrandCard(brand, date, actualsByDate) {
             </div>
             <div class="ub-sub-hd">📣 오늘 광고 성과 ${cr.count>0?`<span class="ub-cnt">${cr.count}개</span>`:''}</div>
             ${cr.count>0 ? `<div class="ub-metrics">
-                <div class="ub-m"><span>ROAS</span><b style="color:${cr.roas>=2?'#059669':cr.roas>=1?'#6366f1':'#dc2626'}">${_ubRoas(cr.roas)}</b></div>
+                <div class="ub-m"><span>ROAS${_ubTip('ROAS')}</span><b style="color:${cr.roas>=2?'#059669':cr.roas>=1?'#6366f1':'#dc2626'}">${_ubRoas(cr.roas)}</b></div>
                 <div class="ub-m"><span>광고비</span><b>${_ubKRW(cr.spend)}</b></div>
-                <div class="ub-m"><span>CTR</span><b>${_ubCtr(cr.ctr)}</b></div>
+                <div class="ub-m"><span>CTR${_ubTip('CTR')}</span><b>${_ubCtr(cr.ctr)}</b></div>
                 <div class="ub-m"><span>전환</span><b>${cr.conv>0?Math.round(cr.conv).toLocaleString():'-'}</b></div>
             </div>` : `<div class="ub-empty-s">해당일 광고 데이터 없음</div>`}
             <div class="ub-sub-hd">🛒 퍼널 전환 <span style="font-size:9px;color:#94a3b8;font-weight:400">262Q 누적</span></div>
