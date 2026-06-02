@@ -10,6 +10,15 @@ const _UB_COLOR  = { BOH: '#7c3aed', WM: '#059669', CG: '#d97706' };
 
 let _ubDate = null; // 선택된 브리핑 날짜 (ISO)
 
+/* ── 엔화→원화 환율 (GMV 원본은 JPY) ── */
+function _ubFx() {
+    try { const v = parseFloat(localStorage.getItem('jpy_to_krw_rate')); if (!isNaN(v) && v > 0) return v; } catch(e) {}
+    return 9.5;
+}
+/* GMV 목표/실적 조회 (원화 환산) */
+function _ubTgt(brand, date) { return ((window.GMV_TARGETS?.[brand]?.[date]) || 0) * _ubFx(); }
+function _ubAct(actualsByDate, date, brand) { return ((actualsByDate?.[date]?.[brand]) || 0) * _ubFx(); }
+
 /* ── 포맷 ── */
 function _ubKRW(v) {
     if (!v) return '₩0';
@@ -66,15 +75,16 @@ function _ubPaceToFinish(brand, actualsByDate) {
     const cutoff = today < first ? first : (today > last ? last : today);
     const eventOver = today > last;
 
-    const eventTarget = dates.reduce((s, d) => s + (tgt[d] || 0), 0);
+    const fx = _ubFx();
+    const eventTarget = dates.reduce((s, d) => s + (tgt[d] || 0), 0) * fx;
     const elapsedDates = dates.filter(d => d <= cutoff);
     const daysElapsed = elapsedDates.length;
     const daysLeft = eventOver ? 0 : (dates.length - daysElapsed);
 
-    // 누적 실적 = 경과일 실적 합 / 평균은 '입력된 날'로만 나눔(빈날 보정)
+    // 누적 실적 = 경과일 실적 합 / 평균은 '입력된 날'로만 나눔(빈날 보정) — 원화 환산
     let cumulative = 0, enteredDays = 0;
     elapsedDates.forEach(d => {
-        const v = actualsByDate[d]?.[brand] || 0;
+        const v = (actualsByDate[d]?.[brand] || 0) * fx;
         cumulative += v;
         if (v > 0) enteredDays++;
     });
@@ -201,8 +211,8 @@ function _ubPaceStripHtml(brand, actualsByDate) {
 /* ── 브랜드 카드 HTML ── */
 function _ubBrandCard(brand, date, actualsByDate) {
     const color  = _UB_COLOR[brand];
-    const target = (window.GMV_TARGETS?.[brand]?.[date]) || 0;
-    const actual = (actualsByDate[date]?.[brand]) || 0;
+    const target = _ubTgt(brand, date);          // 원화 환산
+    const actual = _ubAct(actualsByDate, date, brand);
     const rate   = target > 0 ? actual/target : 0;
     const gap    = target - actual;
     const cr = _ubCreativeForDate(date, brand);
@@ -261,8 +271,8 @@ function renderUnifiedBriefing() {
     // 전체 합산 헤드라인
     let totT=0, totA=0;
     brands.forEach(b => {
-        totT += (window.GMV_TARGETS?.[b]?.[date]) || 0;
-        totA += (actualsByDate[date]?.[b]) || 0;
+        totT += _ubTgt(b, date);          // 원화 환산
+        totA += _ubAct(actualsByDate, date, b);
     });
     const totRate = totT>0 ? totA/totT : 0;
     const totColor = totRate>=1 ? '#059669' : totRate>=0.8 ? '#d97706' : '#dc2626';
@@ -299,10 +309,39 @@ function renderUnifiedBriefing() {
     </div>
 
     <div class="ub-note">
-        💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 퍼널 탭 로드 후 동기화됩니다.
+        💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 자동 동기화됩니다.
     </div>`;
+
+    // 퍼널 데이터 자동 동기화 (백그라운드 로드 후 1회 재렌더)
+    _ubAutoSyncFunnel();
 }
 window.renderUnifiedBriefing = renderUnifiedBriefing;
+
+/* ── 퍼널 자동 동기화 (브리핑 진입 시 1회) ── */
+let _ubFunnelTried = false;
+function _ubAutoSyncFunnel() {
+    const fr = document.getElementById('funnel-frame');
+    if (!fr) return;
+    // 이미 데이터 있으면 스킵
+    try { if (fr.contentWindow && fr.contentWindow.brandData &&
+        Object.values(fr.contentWindow.brandData).some(v => v)) return; } catch(e) {}
+    if (_ubFunnelTried) return;
+    _ubFunnelTried = true;
+    // 미로드면 백그라운드 로드
+    if (!fr.src && fr.dataset.src) {
+        const b = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : 'ALL') || 'ALL';
+        fr.src = fr.dataset.src + '?brand=' + encodeURIComponent(b);
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+        tries++;
+        let ready = false;
+        try { ready = fr.contentWindow && fr.contentWindow.brandData &&
+            Object.values(fr.contentWindow.brandData).some(v => v); } catch(e) {}
+        if (ready) { clearInterval(timer); renderUnifiedBriefing(); }
+        else if (tries > 30) clearInterval(timer); // 15초 타임아웃
+    }, 500);
+}
 
 /* ── 날짜 변경 ── */
 window._ubSetDate = function(d) { _ubDate = d; renderUnifiedBriefing(); };

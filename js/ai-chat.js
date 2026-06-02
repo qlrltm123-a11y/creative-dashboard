@@ -59,11 +59,13 @@ function _acBuildContext() {
     try { actualsByDate = (JSON.parse(localStorage.getItem('smDash2')||'{}').actualsByDate) || {}; } catch(e) {}
     if (Object.keys(targets).length) {
         const gmv = {};
+        let _fx = 9.5;
+        try { const v = parseFloat(localStorage.getItem('jpy_to_krw_rate')); if (!isNaN(v) && v > 0) _fx = v; } catch(e) {}
         Object.keys(targets).forEach(brand => {
             gmv[brand] = Object.keys(targets[brand]).sort().map(dt => {
-                const tgt = targets[brand][dt] || 0;
-                const act = (actualsByDate[dt]?.[brand]) || 0;
-                return { 날짜: dt, 목표: tgt, 실적: act, 달성률: tgt>0 ? +(act/tgt*100).toFixed(0) : null };
+                const tgt = (targets[brand][dt] || 0) * _fx;          // 원화 환산
+                const act = ((actualsByDate[dt]?.[brand]) || 0) * _fx;
+                return { 날짜: dt, 목표_원화: Math.round(tgt), 실적_원화: Math.round(act), 달성률: tgt>0 ? +(act/tgt*100).toFixed(0) : null };
             });
         });
         ctx.데이터.GMV_목표대비실적 = gmv;

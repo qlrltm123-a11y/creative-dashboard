@@ -253,13 +253,19 @@ function todayStr() {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+// 엔화→원화 환율 (메인 앱과 동일 키 공유, 기본 9.5)
+function _gmvFx() {
+  try { const v = parseFloat(localStorage.getItem('jpy_to_krw_rate')); if (!isNaN(v) && v > 0) return v; } catch(e) {}
+  return 9.5;
+}
+// 내부 값은 JPY 기준 → 표시는 원화(₩)로 환산
 function fmt(n) {
   if (n === null || n === undefined || isNaN(n)) return '—';
   const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(n);
-  if (abs >= 1e8) return sign+'¥'+(abs/1e8).toFixed(2)+'억';
-  if (abs >= 1e4) return sign+'¥'+(abs/1e4).toFixed(0)+'만';
-  return sign+'¥'+abs.toLocaleString();
+  const abs = Math.abs(n) * _gmvFx();
+  if (abs >= 1e8) return sign+'₩'+(abs/1e8).toFixed(2)+'억';
+  if (abs >= 1e4) return sign+'₩'+(abs/1e4).toFixed(0)+'만';
+  return sign+'₩'+Math.round(abs).toLocaleString();
 }
 
 function fmtNum(n) { return n ? Math.round(n).toLocaleString() : '0'; }
@@ -479,11 +485,12 @@ function renderBrandPanel(brand) {
       <h2>현재 실적 입력</h2>
       <div class="input-row">
         <div class="target-block">
-          <div class="target-label">오늘 목표</div>
-          <div class="target-num" style="color:${BRAND_COLOR[brand]}">${fmtNum(target)} <span style="font-size:0.8rem;font-weight:400;color:var(--muted)">엔</span></div>
+          <div class="target-label">오늘 목표 (원화 환산)</div>
+          <div class="target-num" style="color:${BRAND_COLOR[brand]}">${fmt(target)}</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:2px">¥${fmtNum(target)} · 환율 ${_gmvFx()}</div>
         </div>
         <div class="actual-input-wrap">
-          <label>현재 실적 (엔)</label>
+          <label>현재 실적 입력 (엔화 ¥)</label>
           <input class="actual-input" id="inp_${brand}" type="text"
             placeholder="0" value="${actual>0?fmtNum(actual):''}"
             oninput="onInput('${brand}',this.value)"
