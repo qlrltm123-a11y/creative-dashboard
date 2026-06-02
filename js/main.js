@@ -772,7 +772,11 @@ function populateEventOptions() {
 // 섹션별 제품 옵션 목록 (현재 브랜드+전역 캠페인 기준)
 function getSectionProductList() {
     // scope 없이 전역 필터까지만 적용한 결과로 옵션 산출
-    const base = getBrandCreatives();
+    let base = getBrandCreatives();
+    // 성과 분석 이벤트 필터 적용 시 해당 이벤트 제품만
+    if (performanceEvent) {
+        base = base.filter(c => (c.event || '').trim() === performanceEvent);
+    }
     return Array.from(new Set(
         base.map(c => (c.product || '').trim()).filter(Boolean)
     )).sort();
