@@ -133,6 +133,7 @@ window.updateDashboard = function() {
         renderScatterChart();
         renderSpendScatterChart();
         renderSaturationChart();
+        renderCartLeakRanking();
         renderProductPerformance();
     } else if (_currentSection === 'ai') {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
@@ -463,6 +464,7 @@ function switchSection(sectionName) {
                 renderScatterChart();
                 renderSpendScatterChart();
                 renderSaturationChart();
+                renderCartLeakRanking();
                 renderAppealInsight();
                 renderProductPerformance();
                 renderPlatformCreativeMatrix();
@@ -477,7 +479,10 @@ function switchSection(sectionName) {
                 const frame = document.getElementById(sectionName + '-frame');
                 if (frame && !frame.src && frame.dataset.src) {
                     const b = (typeof currentBrand !== 'undefined') ? currentBrand : 'ALL';
+                    // iframe은 로드 완료(onload) 시점에 로딩 표시 해제 (빈 화면 방지)
+                    frame.addEventListener('load', () => { if (panel) panel.classList.remove('section-loading'); }, { once: true });
                     frame.src = frame.dataset.src + '?brand=' + encodeURIComponent(b);
+                    return; // 로딩 해제를 onload에 위임 (아래 즉시 해제 스킵)
                 }
             }
             if (panel) panel.classList.remove('section-loading');
@@ -856,6 +861,7 @@ function refreshPerformanceSection() {
     renderScatterChart();
     renderSpendScatterChart();
     renderSaturationChart();
+    renderCartLeakRanking();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
@@ -899,6 +905,7 @@ function updateDashboard() {
         renderScatterChart();
         renderSpendScatterChart();
         renderSaturationChart();
+        renderCartLeakRanking();
         renderProductPerformance();
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
@@ -1807,6 +1814,61 @@ function renderSaturationChart() {
     });
 }
 window.renderSaturationChart = renderSaturationChart;
+
+// ============================
+// 장바구니 이탈 손실액 랭킹 (제품별)
+// ============================
+function renderCartLeakRanking() {
+    const wrap = document.getElementById('leak-ranking');
+    if (!wrap) return;
+    const infoEl = document.getElementById('leak-info');
+
+    const list = getBrandCreatives('performance');
+    // 제품별 집계
+    const m = {};
+    list.forEach(c => {
+        const prod = (c.product || '기타').trim();
+        if (!m[prod]) m[prod] = { atc:0, conv:0, revenue:0 };
+        m[prod].atc     += c.add_to_cart || 0;
+        m[prod].conv    += c.conversions || 0;
+        m[prod].revenue += c.revenue || 0;
+    });
+    const rows = Object.entries(m).map(([prod, d]) => {
+        const aov = d.conv > 0 ? d.revenue / d.conv : 0;          // 객단가
+        const lost = Math.max(0, (d.atc - d.conv)) * aov;         // 이탈 손실액
+        const buyRate = d.atc > 0 ? d.conv / d.atc : 0;           // 장바구니→구매율
+        return { prod, atc: d.atc, conv: d.conv, aov, lost, buyRate };
+    }).filter(r => r.atc > 0 && r.lost > 0)
+      .sort((a, b) => b.lost - a.lost)
+      .slice(0, 10);
+
+    if (!rows.length) {
+        wrap.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-cart-shopping text-2xl mb-2"></i><br>장바구니 데이터 없음</div>`;
+        if (infoEl) infoEl.textContent = '';
+        return;
+    }
+    const totalLost = rows.reduce((s, r) => s + r.lost, 0);
+    if (infoEl) infoEl.textContent = `총 추정 손실 ₩${formatNumber(Math.round(totalLost))}`;
+    const max = rows[0].lost;
+
+    wrap.innerHTML = rows.map((r, i) => {
+        const w = Math.round(r.lost / max * 100);
+        const brCls = r.buyRate >= 0.5 ? '#059669' : r.buyRate >= 0.3 ? '#d97706' : '#dc2626';
+        return `
+        <div class="leak-row">
+            <div class="leak-rank">${i+1}</div>
+            <div class="leak-main">
+                <div class="leak-name">${r.prod}</div>
+                <div class="leak-bar-track"><div class="leak-bar" style="width:${w}%"></div></div>
+            </div>
+            <div class="leak-stats">
+                <div class="leak-lost">−₩${formatNumber(Math.round(r.lost))}</div>
+                <div class="leak-meta">이탈 ${formatNumber(r.atc - r.conv)}건 · 구매율 <b style="color:${brCls}">${(r.buyRate*100).toFixed(0)}%</b> · 객단가 ₩${formatNumber(Math.round(r.aov))}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.renderCartLeakRanking = renderCartLeakRanking;
 
 // ============================
 // 스캐터 차트 hover 미리보기 카드

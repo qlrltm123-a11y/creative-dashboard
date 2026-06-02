@@ -135,48 +135,60 @@
             </div>
         </section>
 
-        <!-- Section Tabs Navigation -->
+        <!-- Section Tabs Navigation (4클러스터: 분석·제작·운영·보고) -->
         <nav id="section-tabs" class="section-tabs mb-5">
-            <button class="section-tab active" data-section="overview">
-                <i class="fas fa-chart-pie"></i>
-                <span class="label">개요</span>
-                <span class="sub">KPI · 핵심 지표</span>
-            </button>
-            <button class="section-tab" data-section="unified">
-                <i class="fas fa-bullseye"></i>
-                <span class="label">통합 브리핑</span>
-                <span class="sub">목표갭 · GMV·소재·퍼널</span>
-            </button>
-            <button class="section-tab" data-section="performance">
-                <i class="fas fa-trophy"></i>
-                <span class="label">성과 분석</span>
-                <span class="sub">TOP 소재 · 갤러리</span>
-            </button>
-            <button class="section-tab" data-section="funnel">
-                <i class="fas fa-filter"></i>
-                <span class="label">퍼널</span>
-                <span class="sub">유입→구매 전환 · 분기 비교</span>
-            </button>
-            <button class="section-tab" data-section="ai">
-                <i class="fas fa-magic-wand-sparkles"></i>
-                <span class="label">AI 인사이트</span>
-                <span class="sub">소구점 · 후킹 · 감정</span>
-            </button>
-            <button class="section-tab" data-section="megawari">
-                <i class="fas fa-fire"></i>
-                <span class="label">메가와리</span>
-                <span class="sub">일별 성과 · 카카오 리포트</span>
-            </button>
-            <button class="section-tab" data-section="gmv">
-                <i class="fas fa-gauge-high"></i>
-                <span class="label">GMV</span>
-                <span class="sub">실시간 매출 시뮬레이션</span>
-            </button>
-            <button class="section-tab" data-section="weekly">
-                <i class="fas fa-clipboard-list"></i>
-                <span class="label">주간 업무</span>
-                <span class="sub">보고서 · Confluence 복사</span>
-            </button>
+            <div class="tab-group" data-group="분석">
+                <span class="group-label">📊 분석</span>
+                <button class="section-tab active" data-section="overview">
+                    <i class="fas fa-chart-pie"></i>
+                    <span class="label">개요</span>
+                    <span class="sub">KPI · 핵심 지표</span>
+                </button>
+                <button class="section-tab" data-section="performance">
+                    <i class="fas fa-trophy"></i>
+                    <span class="label">성과 분석</span>
+                    <span class="sub">TOP 소재 · 갤러리</span>
+                </button>
+                <button class="section-tab" data-section="funnel">
+                    <i class="fas fa-filter"></i>
+                    <span class="label">퍼널</span>
+                    <span class="sub">유입→구매 전환</span>
+                </button>
+            </div>
+            <div class="tab-group" data-group="제작">
+                <span class="group-label">✨ 제작</span>
+                <button class="section-tab" data-section="ai">
+                    <i class="fas fa-magic-wand-sparkles"></i>
+                    <span class="label">AI 인사이트</span>
+                    <span class="sub">소구점 · 후킹 · 감정</span>
+                </button>
+            </div>
+            <div class="tab-group" data-group="운영">
+                <span class="group-label">🔥 운영</span>
+                <button class="section-tab" data-section="megawari">
+                    <i class="fas fa-fire"></i>
+                    <span class="label">메가와리</span>
+                    <span class="sub">일별 성과 · 카카오</span>
+                </button>
+                <button class="section-tab" data-section="gmv">
+                    <i class="fas fa-gauge-high"></i>
+                    <span class="label">GMV</span>
+                    <span class="sub">실시간 매출 시뮬</span>
+                </button>
+            </div>
+            <div class="tab-group" data-group="보고">
+                <span class="group-label">📋 보고</span>
+                <button class="section-tab" data-section="unified">
+                    <i class="fas fa-bullseye"></i>
+                    <span class="label">통합 브리핑</span>
+                    <span class="sub">목표갭 · 마감전망</span>
+                </button>
+                <button class="section-tab" data-section="weekly">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span class="label">주간 업무</span>
+                    <span class="sub">보고서 · Confluence</span>
+                </button>
+            </div>
         </nav>
 
         <!-- ============ SECTION: OVERVIEW ============ -->
@@ -361,6 +373,18 @@
                 <canvas id="saturationChart"></canvas>
             </div>
             <div id="saturation-insight" class="text-xs text-slate-600 mt-3"></div>
+        </section>
+
+        <!-- ★ 장바구니 이탈 손실액 랭킹 -->
+        <section class="chart-card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>장바구니 이탈 손실액 랭킹</h3>
+                    <p class="text-xs text-slate-500 mt-1">담은 뒤 구매 안 한 건수 × 객단가 = 놓친 매출. 절대 금액 큰 제품부터 구매단계(PDP·쿠폰·재고) 개선 우선순위</p>
+                </div>
+                <span id="leak-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
+            </div>
+            <div id="leak-ranking"></div>
         </section>
 
         <!-- 제품별 소구포인트 인사이트 (이 소구는 좋았다 → 다음에 이렇게) -->

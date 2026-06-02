@@ -53,14 +53,33 @@ body {
 
 /* Section Tabs (Main Navigation) */
 .section-tabs {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 6px 10px;
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 14px;
-    padding: 8px;
+    padding: 8px 10px;
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+/* 4클러스터 그룹 */
+.tab-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-right: 10px;
+    border-right: 1px solid #eef2f6;
+    flex-wrap: wrap;
+}
+.tab-group:last-child { border-right: none; padding-right: 0; }
+.group-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    padding: 0 2px;
 }
 
 .section-tab {
@@ -137,8 +156,15 @@ body {
 
 @media (max-width: 768px) {
     .section-tabs {
-        grid-template-columns: 1fr;
+        flex-direction: column;
         gap: 6px;
+    }
+    .tab-group {
+        border-right: none;
+        padding-right: 0;
+        width: 100%;
+        border-bottom: 1px solid #eef2f6;
+        padding-bottom: 6px;
     }
     .section-tab {
         flex-direction: row;
@@ -5418,6 +5444,20 @@ body {
 .mw-dtab-roas.roas-mid  { color: #2563eb; background: #eff6ff; }
 .mw-dtab-roas.roas-low  { color: #d97706; background: #fffbeb; }
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
+
+/* ══════════════════════════════════════════════
+   장바구니 이탈 손실액 랭킹 (.leak-*)
+══════════════════════════════════════════════ */
+.leak-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.leak-row:last-child { border-bottom: none; }
+.leak-rank { width: 24px; height: 24px; border-radius: 7px; background: #fef3c7; color: #b45309; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.leak-main { flex: 1; min-width: 0; }
+.leak-name { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leak-bar-track { height: 7px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.leak-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.leak-stats { text-align: right; flex-shrink: 0; min-width: 200px; }
+.leak-lost { font-size: 15px; font-weight: 800; color: #dc2626; line-height: 1.1; }
+.leak-meta { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
 
 /* ══════════════════════════════════════════════
    약기법 컴플라이언스 배지 (.cmpl-*) + 현재필터칩 + 스티키
