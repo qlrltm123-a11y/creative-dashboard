@@ -134,6 +134,7 @@ window.updateDashboard = function() {
         renderSpendScatterChart();
         renderSaturationChart();
         renderCartLeakRanking();
+        renderRoasDiagnosis();
         renderProductPerformance();
     } else if (_currentSection === 'ai') {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
@@ -465,6 +466,7 @@ function switchSection(sectionName) {
                 renderSpendScatterChart();
                 renderSaturationChart();
                 renderCartLeakRanking();
+                renderRoasDiagnosis();
                 renderAppealInsight();
                 renderProductPerformance();
                 renderPlatformCreativeMatrix();
@@ -862,6 +864,7 @@ function refreshPerformanceSection() {
     renderSpendScatterChart();
     renderSaturationChart();
     renderCartLeakRanking();
+    renderRoasDiagnosis();
     renderAppealInsight();
     renderProductPerformance();
     renderPlatformCreativeMatrix();
@@ -906,6 +909,7 @@ function updateDashboard() {
         renderSpendScatterChart();
         renderSaturationChart();
         renderCartLeakRanking();
+        renderRoasDiagnosis();
         renderProductPerformance();
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
@@ -1869,6 +1873,103 @@ function renderCartLeakRanking() {
     }).join('');
 }
 window.renderCartLeakRanking = renderCartLeakRanking;
+
+// ============================
+// ROAS 진단 — 제품별 최약 레버 (단일기간 vs 브랜드 벤치마크)
+// ============================
+function _roasdxClass(r) { return r>=3?'roas-high':r>=1.5?'roas-mid':r>=1?'roas-low':'roas-bad'; }
+function renderRoasDiagnosis() {
+    const wrap = document.getElementById('roasdx-table');
+    if (!wrap) return;
+    const infoEl = document.getElementById('roasdx-info');
+
+    const list = getBrandCreatives('performance');
+    const pm = {};
+    list.forEach(c => {
+        const brand = c.brand || '기타', prod = (c.product || '기타').trim();
+        const k = brand + '||' + prod;
+        if (!pm[k]) pm[k] = { brand, prod, spend:0, revenue:0, impr:0, clicks:0, conv:0, atc:0 };
+        pm[k].spend += c.spend||0; pm[k].revenue += c.revenue||0;
+        pm[k].impr += c.impressions||0; pm[k].clicks += c.clicks||0;
+        pm[k].conv += c.conversions||0; pm[k].atc += c.add_to_cart||0;
+    });
+    const bm = {};
+    Object.values(pm).forEach(p => {
+        if (!bm[p.brand]) bm[p.brand] = { impr:0, clicks:0, conv:0, atc:0, revenue:0 };
+        const b = bm[p.brand];
+        b.impr+=p.impr; b.clicks+=p.clicks; b.conv+=p.conv; b.atc+=p.atc; b.revenue+=p.revenue;
+    });
+    const benchLever = (b) => ({
+        ctr:  b.impr>0 ? b.clicks/b.impr : 0,
+        cart: b.clicks>0 ? b.atc/b.clicks : 0,
+        buy:  b.atc>0 ? b.conv/b.atc : 0,
+        aov:  b.conv>0 ? b.revenue/b.conv : 0,
+    });
+    const ROUTE = {
+        ctr:  { name:'CTR',      fix:'크리에이티브 훅' },
+        cart: { name:'장바구니율', fix:'크리에이티브/LP' },
+        buy:  { name:'구매율',    fix:'PDP·가격·체크아웃' },
+        aov:  { name:'객단가',    fix:'장바구니 구성·가격' },
+    };
+
+    const rows = Object.values(pm).map(p => {
+        const lev = {
+            ctr:  p.impr>0 ? p.clicks/p.impr : 0,
+            cart: p.clicks>0 ? p.atc/p.clicks : 0,
+            buy:  p.atc>0 ? p.conv/p.atc : 0,
+            aov:  p.conv>0 ? p.revenue/p.conv : 0,
+        };
+        const bench = benchLever(bm[p.brand] || {});
+        const idx = {
+            ctr:  bench.ctr>0  ? lev.ctr/bench.ctr   : 1,
+            cart: bench.cart>0 ? lev.cart/bench.cart : 1,
+            buy:  bench.buy>0  ? lev.buy/bench.buy   : 1,
+            aov:  bench.aov>0  ? lev.aov/bench.aov   : 1,
+        };
+        const cand = [['ctr', idx.ctr]];
+        if (p.clicks >= 100) cand.push(['cart', idx.cart]);
+        if (p.atc >= 20)     cand.push(['buy', idx.buy]);
+        if (p.conv > 0)      cand.push(['aov', idx.aov]);
+        cand.sort((a,b) => a[1]-b[1]);
+        const weak = cand[0][0];
+        return { ...p, lev, idx, weak, roas: p.spend>0 ? p.revenue/p.spend : 0 };
+    }).filter(r => r.spend > 0)
+      .sort((a,b) => b.spend - a.spend).slice(0, 15);
+
+    if (!rows.length) { wrap.innerHTML = `<div class="text-center text-slate-400 text-sm py-8">데이터 없음</div>`; if(infoEl) infoEl.textContent=''; return; }
+    if (infoEl) infoEl.textContent = `제품 ${rows.length}개 · 브랜드 평균 대비`;
+
+    const cell = (val, idx, key, isWeak) => {
+        const pct = Math.round((idx-1)*100);
+        const col = idx >= 1 ? '#059669' : idx >= 0.7 ? '#d97706' : '#dc2626';
+        const valStr = key==='aov' ? '₩'+formatNumber(Math.round(val)) : (val*100).toFixed(key==='ctr'?2:1)+'%';
+        return `<td class="mw-td mw-td-num${isWeak?' roasdx-weak':''}">
+            <div style="font-weight:700;color:#334155">${valStr}</div>
+            <div style="font-size:9px;color:${col}">${pct>=0?'+':''}${pct}%</div>
+        </td>`;
+    };
+
+    wrap.innerHTML = `<table class="mw-table"><thead><tr>
+        <th class="mw-th mw-th-prod">브랜드 · 제품</th>
+        <th class="mw-th">ROAS</th>
+        <th class="mw-th">CTR</th>
+        <th class="mw-th">장바구니율</th>
+        <th class="mw-th">구매율</th>
+        <th class="mw-th">객단가</th>
+        <th class="mw-th">최약 레버 → 조치</th>
+    </tr></thead><tbody>
+    ${rows.map(r => `<tr class="mw-tr">
+        <td class="mw-td mw-td-prod"><div class="mw-prod-name">${r.prod}</div><div style="font-size:10px;color:#94a3b8">${r.brand} · ₩${formatNumber(Math.round(r.spend))}</div></td>
+        <td class="mw-td mw-td-num"><span class="mw-roas-badge ${_roasdxClass(r.roas)}">${r.roas>0?Math.round(r.roas*100)+'%':'-'}</span></td>
+        ${cell(r.lev.ctr, r.idx.ctr, 'ctr', r.weak==='ctr')}
+        ${cell(r.lev.cart, r.idx.cart, 'cart', r.weak==='cart')}
+        ${cell(r.lev.buy, r.idx.buy, 'buy', r.weak==='buy')}
+        ${cell(r.lev.aov, r.idx.aov, 'aov', r.weak==='aov')}
+        <td class="mw-td"><span class="roasdx-route">${ROUTE[r.weak].name} 약함</span><div style="font-size:10px;color:#6366f1;margin-top:2px">→ ${ROUTE[r.weak].fix}</div></td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+window.renderRoasDiagnosis = renderRoasDiagnosis;
 
 // ============================
 // 스캐터 차트 hover 미리보기 카드
