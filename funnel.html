@@ -82,11 +82,23 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 .bar-buy{background:linear-gradient(90deg,#c4b5fd,#a78bfa)}
 .delta-pos{color:#059669}.delta-neg{color:#dc2626}.delta-neu{color:#94a3b8}
 
+/* ═══ 전환지표 토글 ═══ */
+.fm-toggle{display:inline-flex;gap:2px;background:#f1f5f9;border-radius:9px;padding:3px}
+.fm-btn{border:none;background:transparent;font-size:11px;font-weight:600;color:#64748b;padding:5px 11px;border-radius:7px;cursor:pointer;transition:all .15s}
+.fm-btn:hover{color:#334155}
+.fm-btn.active{background:#fff;color:#4f46e5;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
 /* ═══ DELTA CARDS ═══ */
 .delta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:28px}
 .delta-card{padding:18px 20px}
 .dc-name{font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:4px}
 .dc-dates{font-size:10px;color:#94a3b8;margin-bottom:14px}
+.dc-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.dc-count{background:#fafbfd;border:1px solid #eef1f6;border-radius:9px;padding:9px 10px;text-align:center}
+.dc-count-lbl{font-size:9.5px;color:#94a3b8;font-weight:600;margin-bottom:3px}
+.dc-count-val{font-size:16px;font-weight:800;color:#334155;line-height:1.1;margin-bottom:3px}
+.dc-cnt-delta{font-size:9.5px;font-weight:700}
+.dc-cnt-delta.delta-pos{color:#059669}.dc-cnt-delta.delta-neg{color:#dc2626}.dc-cnt-delta.delta-neu{color:#94a3b8}
 .dc-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .dc-metric{background:#f8fafc;border:1px solid #eef1f6;border-radius:10px;padding:12px 14px}
 .dc-metric-label{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
@@ -215,6 +227,17 @@ let currentBrand = 'BOH';
 let brandData = {BOH:null,WM:null,CG:null};
 let charts = {};
 
+// 전환 지표 필터: 'both' | 'cart' | 'buy' (유입 막대는 항상 표시)
+let _funnelMetric = 'both';
+function _funnelMetricToggle(brand) {
+  const opt = (v, label) => `<button class="fm-btn${_funnelMetric===v?' active':''}" onclick="setFunnelMetric('${v}')">${label}</button>`;
+  return `<div class="fm-toggle">${opt('both','전체')}${opt('cart','장바구니율')}${opt('buy','구매율')}</div>`;
+}
+function setFunnelMetric(v) {
+  _funnelMetric = v;
+  if (brandData[currentBrand]) { render(currentBrand); _restoreInner(currentBrand); }
+}
+
 // ── 기본 시트 URL (링크 공유 시 자동 로드) ──────────────────────────────────────
 const DEFAULT_URLS = {
   BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
@@ -342,7 +365,10 @@ function buildPanelHTML(brand) {
       <div class="sec-label">${brand} 브랜드 현황 요약 · 262Q (vs 261Q 동기간)</div>
       <div class="kpi-row" id="kpi-${brand}"></div>
       <div class="brand-trend-box">
-        <h3>📈 브랜드 전체 일별 추이</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <h3 style="margin:0">📈 브랜드 전체 일별 추이</h3>
+          ${_funnelMetricToggle(brand)}
+        </div>
         <div class="brand-trend-wrap"><canvas id="btrend-${brand}"></canvas></div>
       </div>
       <div class="summary-cols">
@@ -365,7 +391,10 @@ function buildPanelHTML(brand) {
       <div class="delta-grid" id="dcards-${brand}"></div>
     </div>
     <div id="inner-${brand}-trend" style="display:none">
-      <div class="sec-label">일별 추이 · 막대=건수(우) 선=전환율(좌) · 실선 262Q 점선 261Q</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div class="sec-label" style="margin:0">일별 추이 · 막대=건수(우) 선=전환율(좌) · 실선 262Q 점선 261Q</div>
+        ${_funnelMetricToggle(brand)}
+      </div>
       <div class="trend-grid" id="trend-${brand}"></div>
     </div>
     <div id="inner-${brand}-compare" style="display:none">
@@ -448,15 +477,22 @@ function renderSummaryTab(brand, data, prods) {
   const pad = (arr,len)=>{const a=[...arr];while(a.length<len)a.push(null);return a;};
   const id = `${brand}_btrend`;
   if(charts[id]) charts[id].destroy();
-  charts[id] = new Chart(document.getElementById(`btrend-${brand}`),{
-    data:{ labels, datasets:[
+  const _showCart = _funnelMetric === 'both' || _funnelMetric === 'cart';
+  const _showBuy  = _funnelMetric === 'both' || _funnelMetric === 'buy';
+  const _btDs = [
       {type:'bar',label:'262Q 유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:3},
       {type:'bar',label:'261Q 유입',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#fdba7488',yAxisID:'cnt',borderRadius:3,order:3},
-      {type:'line',label:'262Q 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
-      {type:'line',label:'262Q 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
-      {type:'line',label:'261Q 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
-      {type:'line',label:'261Q 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
-    ]},
+  ];
+  if(_showCart){
+    _btDs.push({type:'line',label:'262Q 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+    _btDs.push({type:'line',label:'261Q 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+  }
+  if(_showBuy){
+    _btDs.push({type:'line',label:'262Q 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+    _btDs.push({type:'line',label:'261Q 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+  }
+  charts[id] = new Chart(document.getElementById(`btrend-${brand}`),{
+    data:{ labels, datasets:_btDs },
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{color:'#64748b',font:{size:11},boxWidth:12,padding:8}},
         tooltip:{callbacks:{label:c=>{const v=c.parsed.y;if(v===null)return `${c.dataset.label}: -`;return c.dataset.yAxisID==='cnt'?`${c.dataset.label}: ${n(v)}`:`${c.dataset.label}: ${v.toFixed(2)}%`;}}}},
@@ -606,11 +642,27 @@ function renderDeltaCards(brand, data, prods) {
     const last = rows[rows.length-1], prev = rows[rows.length-2];
     const cD = dlt(last.cartRate, prev.cartRate);
     const bD = dlt(last.buyRate,  prev.buyRate);
+    // 건수 증감 (%) 헬퍼
+    const cntPct = (cur, pv) => (pv != null && pv > 0 && cur != null) ? (cur - pv) / pv * 100 : null;
+    const iP = cntPct(last.inflow, prev.inflow);
+    const ctP = cntPct(last.cart,  prev.cart);
+    const bP = cntPct(last.buy,   prev.buy);
+    const cntBadge = (cur, pv, pct) => {
+        const d = (cur != null && pv != null) ? cur - pv : null;
+        const cls = d === null ? 'delta-neu' : (d > 0 ? 'delta-pos' : (d < 0 ? 'delta-neg' : 'delta-neu'));
+        const dtxt = d === null ? '-' : `${d>0?'+':''}${n(d)}${pct!=null?` (${pct>0?'+':''}${pct.toFixed(0)}%)`:''}`;
+        return `<span class="dc-cnt-delta ${cls}">${arrow(d)} ${dtxt}</span>`;
+    };
 
     grid.insertAdjacentHTML('beforeend',`
       <div class="delta-card">
         <div class="dc-name">${prod}</div>
         <div class="dc-dates">${prev.date} → <b style="color:#888">${last.date}</b></div>
+        <div class="dc-counts">
+          <div class="dc-count"><div class="dc-count-lbl">유입자수</div><div class="dc-count-val">${n(last.inflow)}</div>${cntBadge(last.inflow, prev.inflow, iP)}</div>
+          <div class="dc-count"><div class="dc-count-lbl">🛒 장바구니수</div><div class="dc-count-val" style="color:#6366f1">${n(last.cart)}</div>${cntBadge(last.cart, prev.cart, ctP)}</div>
+          <div class="dc-count"><div class="dc-count-lbl">💳 구매수</div><div class="dc-count-val" style="color:#7c3aed">${n(last.buy)}</div>${cntBadge(last.buy, prev.buy, bP)}</div>
+        </div>
         <div class="dc-metrics">
           <div class="dc-metric">
             <div class="dc-metric-label">🛒 장바구니 전환율</div>
@@ -645,19 +697,27 @@ function renderTrendCharts(brand, data, prods) {
       </div>`);
     const labels = (d262.length>=d261.length?d262:d261).map(r=>r.date);
     const pad = (arr,len) => { const a=[...arr]; while(a.length<len) a.push(null); return a; };
+    const _showCart = _funnelMetric === 'both' || _funnelMetric === 'cart';
+    const _showBuy  = _funnelMetric === 'both' || _funnelMetric === 'buy';
+    const _tDs = [];
+    if(_showCart){
+      _tDs.push({type:'bar',label:'262Q 장바구니수',data:pad(d262.map(r=>r.cart),labels.length),backgroundColor:C262.cart+'66',yAxisID:'count',borderRadius:3,order:3});
+      _tDs.push({type:'bar',label:'261Q 장바구니수',data:pad(d261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'55',yAxisID:'count',borderRadius:3,order:4});
+    }
+    if(_showBuy){
+      _tDs.push({type:'bar',label:'262Q 구매수',data:pad(d262.map(r=>r.buy),labels.length),backgroundColor:C262.buy+'66',yAxisID:'count',borderRadius:3,order:3});
+      _tDs.push({type:'bar',label:'261Q 구매수',data:pad(d261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'55',yAxisID:'count',borderRadius:3,order:4});
+    }
+    if(_showCart){
+      _tDs.push({type:'line',label:'262Q 장바구니율',data:pad(d262.map(r=>r.cartRate),labels.length),borderColor:C262.cart,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+      _tDs.push({type:'line',label:'261Q 장바구니율',data:pad(d261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    }
+    if(_showBuy){
+      _tDs.push({type:'line',label:'262Q 구매율',data:pad(d262.map(r=>r.buyRate),labels.length),borderColor:C262.buy,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+      _tDs.push({type:'line',label:'261Q 구매율',data:pad(d261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    }
     charts[id] = new Chart(document.getElementById(id),{
-      data:{ labels, datasets:[
-        // 건수 막대 (우측 축)
-        {type:'bar',label:'262Q 장바구니수',data:pad(d262.map(r=>r.cart),labels.length),backgroundColor:C262.cart+'66',yAxisID:'count',borderRadius:3,order:3},
-        {type:'bar',label:'262Q 구매수',    data:pad(d262.map(r=>r.buy), labels.length),backgroundColor:C262.buy+'66',yAxisID:'count',borderRadius:3,order:3},
-        {type:'bar',label:'261Q 장바구니수',data:pad(d261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'55',yAxisID:'count',borderRadius:3,order:4},
-        {type:'bar',label:'261Q 구매수',    data:pad(d261.map(r=>r.buy), labels.length),backgroundColor:C261.buy+'55',yAxisID:'count',borderRadius:3,order:4},
-        // 전환율 선 (좌측 축)
-        {type:'line',label:'262Q 장바구니율',data:pad(d262.map(r=>r.cartRate),labels.length),borderColor:C262.cart,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
-        {type:'line',label:'262Q 구매율',    data:pad(d262.map(r=>r.buyRate), labels.length),borderColor:C262.buy, backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1},
-        {type:'line',label:'261Q 장바구니율',data:pad(d261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
-        {type:'line',label:'261Q 구매율',    data:pad(d261.map(r=>r.buyRate), labels.length),borderColor:C261.buy, backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2},
-      ]},
+      data:{ labels, datasets:_tDs },
       options:{
         responsive:true,maintainAspectRatio:false,
         interaction:{mode:'index',intersect:false},
@@ -732,13 +792,27 @@ function renderCmpCharts(brand, data, prods) {
 }
 
 // ── Inner tab switch ──────────────────────────────────────────────────────────
+let _activeInner = 'summary';
 function switchInner(brand, tab, btn) {
+  _activeInner = tab;
   ['summary','snapshot','delta','trend','compare'].forEach(t=>{
     const el=document.getElementById(`inner-${brand}-${t}`);
     if(el) el.style.display=t===tab?'':'none';
   });
   document.querySelectorAll(`#itabs-${brand} .inner-tab`).forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+}
+// 지표 토글 후 패널 재렌더 시 활성 inner 탭 복원
+function _restoreInner(brand) {
+  const tab = _activeInner || 'summary';
+  ['summary','snapshot','delta','trend','compare'].forEach(t=>{
+    const el=document.getElementById(`inner-${brand}-${t}`);
+    if(el) el.style.display=t===tab?'':'none';
+  });
+  const btns = document.querySelectorAll(`#itabs-${brand} .inner-tab`);
+  const idx = ['summary','snapshot','delta','trend','compare'].indexOf(tab);
+  btns.forEach(b=>b.classList.remove('active'));
+  if (btns[idx]) btns[idx].classList.add('active');
 }
 
 // ── Panel states ──────────────────────────────────────────────────────────────
