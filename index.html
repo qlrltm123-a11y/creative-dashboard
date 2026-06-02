@@ -38,6 +38,8 @@
                     <p class="text-xs text-slate-500">최종 업데이트</p>
                     <p class="text-sm font-semibold text-slate-700" id="last-updated">-</p>
                 </div>
+                <!-- 현재 적용 필터 칩 -->
+                <span id="active-filter-chip" class="active-filter-chip" title="현재 적용된 필터"></span>
                 <!-- 환율 설정 -->
                 <div class="border-l border-slate-200 pl-3 flex items-center gap-2">
                     <div class="text-right">
@@ -68,7 +70,7 @@
 
     <main class="max-w-[1600px] mx-auto px-6 py-6">
         <!-- Brand Tabs -->
-        <section id="brand-tabs" class="mb-5">
+        <section id="brand-tabs" class="mb-5 brand-tabs-sticky">
             <div class="flex gap-2 flex-wrap items-center">
                 <button class="brand-tab active" data-brand="ALL">
                     <i class="fas fa-layer-group mr-2"></i>전체
@@ -999,6 +1001,7 @@
     <script src="js/insights.js"></script>
     <script src="js/generate_v2.js"></script>
     <script src="js/gmv-targets.js"></script>
+    <script src="js/compliance.js"></script>
     <script src="js/megawari-report.js"></script>
     <script src="js/weekly-report.js"></script>
     <script src="js/unified-briefing.js"></script>

@@ -5420,6 +5420,34 @@ body {
 .mw-dtab-roas.roas-bad  { color: #dc2626; background: #fef2f2; }
 
 /* ══════════════════════════════════════════════
+   약기법 컴플라이언스 배지 (.cmpl-*) + 현재필터칩 + 스티키
+══════════════════════════════════════════════ */
+.cmpl-badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 4px; white-space: nowrap; cursor: help; }
+.cmpl-block { background: #fee2e2; color: #b91c1c; }
+.cmpl-warn  { background: #fef3c7; color: #b45309; }
+.wr-tag-risk { box-shadow: 0 0 0 1.5px #fca5a5 inset; }
+.wr-cmpl-line {
+    margin-top: 12px; padding: 8px 10px; font-size: 10.5px; line-height: 1.6;
+    background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #7f1d1d;
+}
+
+/* 현재 적용 필터 칩 (헤더) */
+.active-filter-chip {
+    display: inline-flex; align-items: center; font-size: 12px; font-weight: 700;
+    color: #4338ca; background: #eef2ff; border: 1px solid #c7d2fe;
+    border-radius: 20px; padding: 5px 12px; white-space: nowrap; max-width: 320px;
+    overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 브랜드/필터 바 — 헤더 아래 스티키 (top은 JS가 헤더 높이로 설정) */
+.brand-tabs-sticky {
+    position: sticky; top: var(--header-h, 68px); z-index: 30;
+    background: #f8fafc; padding-top: 10px;
+    margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px;
+    box-shadow: 0 6px 10px -8px rgba(15,23,42,0.12);
+}
+
+/* ══════════════════════════════════════════════
    AI 챗봇 (.ac-*)
 ══════════════════════════════════════════════ */
 .ac-fab {

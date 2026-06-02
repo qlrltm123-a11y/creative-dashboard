@@ -531,14 +531,36 @@ function _wrProductInsightSectionHtml(productData) {
             ).join('')
             : '<span class="wr-no-data">데이터 없음</span>';
 
-        // 고효율 메시지 요소 (캐치카피에서 추출한 반복 구절, ROAS 가중)
+        // 고효율 메시지 요소 (캐치카피에서 추출한 반복 구절, ROAS 가중) + 약기법 감수
+        const _cmpl = typeof window.checkCompliance === 'function' ? window.checkCompliance : null;
         const phraseTags = (pd.topPhrases && pd.topPhrases.length)
             ? pd.topPhrases.map(d => {
                 const r = d.avgRoas;
                 const tier = r >= 10 ? '#059669' : r >= 5 ? color : '#94a3b8';
-                return `<span class="wr-insight-tag" style="background:${tier}14;color:${tier};border-color:${tier}40" title="${d.count}개 소재 · 평균 ROAS ${_wrR(r)}">${d.k}<em>${_wrR(r)}</em></span>`;
+                const c = _cmpl ? _cmpl(d.k) : { level:'ok' };
+                const warn = c.level === 'block' ? ' ⚠' : c.level === 'warn' ? ' ⚠' : '';
+                const cls = c.level !== 'ok' ? ' wr-tag-risk' : '';
+                const tip = c.level !== 'ok' ? ` · ⚠ 약기법 주의(${c.hits.map(h=>h.term).join(',')})` : '';
+                return `<span class="wr-insight-tag${cls}" style="background:${tier}14;color:${tier};border-color:${tier}40" title="${d.count}개 소재 · 평균 ROAS ${_wrR(r)}${tip}">${d.k}<em>${_wrR(r)}</em>${warn}</span>`;
             }).join('')
             : '';
+        // 약기법 컴플라이언스 요약 (소구+카피+키워드 전체 스캔)
+        let cmplLine = '';
+        if (typeof window.summarizeCompliance === 'function') {
+            const texts = [
+                ...(pd.topPhrases||[]).map(d=>d.k),
+                ...(pd.topKeywords||[]).map(d=>d.k),
+                ...(pd.topAppeals||[]).map(d=>d.k),
+                pd.copySampleBest?.raw || '',
+            ];
+            const sum = window.summarizeCompliance(texts);
+            if (sum.count > 0) {
+                const parts = [];
+                if (sum.blockTerms.length) parts.push(`<b style="color:#b91c1c">위반소지 ${sum.blockTerms.length}건</b>(${sum.blockTerms.join(', ')})`);
+                if (sum.warnTerms.length)  parts.push(`<span style="color:#b45309">과장 ${sum.warnTerms.length}건</span>(${sum.warnTerms.join(', ')})`);
+                cmplLine = `<div class="wr-cmpl-line">💄 약기법 감수: ${parts.join(' · ')}</div>`;
+            }
+        }
         // 대표 카피 예시 1개 (접힘)
         const copySample = (pd.copySampleBest && pd.copySampleBest.raw)
             ? `<details class="wr-copy-sample"><summary>대표 카피 예시 (ROAS ${_wrR(pd.copySampleBest.roas)})</summary><div class="wr-copy-sample-text">${pd.copySampleBest.raw.replace(/</g,'&lt;')}</div></details>`
@@ -578,6 +600,7 @@ function _wrProductInsightSectionHtml(productData) {
                     ${kwTags ? `
                     <div class="wr-pi-sub-hd" style="margin-top:10px">🔑 키워드</div>
                     <div class="wr-insight-tags">${kwTags}</div>` : ''}
+                    ${cmplLine}
                 </div>
             </div>
         </div>`;

@@ -47,7 +47,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindEvents();
     updateDashboard();
     document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
+    setStickyHeaderOffset();
 });
+
+// 스티키 필터바 top 오프셋 = 헤더 실제 높이 (반응형 대응)
+function setStickyHeaderOffset() {
+    const header = document.querySelector('header');
+    const apply = () => {
+        if (header) document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+    };
+    apply();
+    window.addEventListener('resize', apply);
+}
 
 async function loadData() {
     // 1순위: Google Sheets 연동 데이터
@@ -107,6 +118,8 @@ window.updateDashboard = function() {
     populateProductOptions();
     populateAppealInsightProductOptions();
     populatePlatformMatrixProductOptions();
+
+    updateActiveFilterChip(); // 현재 필터 칩 갱신
 
     // ④ 개요 탭은 항상 즉시 갱신 (KPI + 차트 + 위닝 요소)
     updateKPIs();
@@ -487,6 +500,19 @@ window.switchSection = switchSection;
 
 // ★ 주간 업무 등 외부 JS에서 브랜드 상태를 읽을 수 있도록 getter 노출
 window.getCurrentBrand = () => currentBrand;
+
+// ★ 현재 적용 필터 요약 칩 갱신 (헤더에 상시 표시)
+function updateActiveFilterChip() {
+    const el = document.getElementById('active-filter-chip');
+    if (!el) return;
+    const parts = [];
+    parts.push(currentBrand && currentBrand !== 'ALL' ? currentBrand : '전체 브랜드');
+    if (currentPlatform) parts.push(currentPlatform);
+    if (currentRetail)   parts.push(currentRetail);
+    if (currentEvent)    parts.push(currentEvent);
+    el.textContent = '🔎 ' + parts.join(' · ');
+}
+window.updateActiveFilterChip = updateActiveFilterChip;
 
 // ============================
 // Filtering
