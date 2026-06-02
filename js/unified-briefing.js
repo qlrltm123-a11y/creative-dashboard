@@ -169,23 +169,42 @@ function _ubAggFunnel(rows) {
         buyRate:  cart>0?buy/cart*100:null };
 }
 
+// 타임아웃 fetch
+function _ubFetchTimeout(url, ms) {
+    return new Promise((resolve, reject) => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => { ctrl.abort(); reject(new Error('timeout')); }, ms);
+        fetch(url, { cache:'no-store', signal: ctrl.signal })
+            .then(r => { clearTimeout(t); r.ok ? r.text().then(resolve) : reject(new Error('http '+r.status)); })
+            .catch(e => { clearTimeout(t); reject(e); });
+    });
+}
+// 프록시 폴백 체인으로 1개 URL 텍스트 가져오기
+async function _ubFetchCsv(url) {
+    const tries = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+        url, // 직접 (CORS 허용 시)
+    ];
+    for (const u of tries) {
+        try { const txt = await _ubFetchTimeout(u, 9000); if (txt && txt.length > 20) return txt; } catch(e) {}
+    }
+    return null;
+}
+
 async function _ubFetchFunnel() {
     if (_ubFunnelLoading || _ubFunnelDone) return;
     _ubFunnelLoading = true;
     const brands = Object.keys(_UB_FUNNEL_URLS);
-    await Promise.all(brands.map(async b => {
-        const url = _UB_FUNNEL_URLS[b];
-        let text = null;
-        try {
-            const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {cache:'no-store'});
-            if (r.ok) text = await r.text();
-        } catch(e) {}
-        if (text === null) { try { const r2 = await fetch(url,{cache:'no-store'}); text = await r2.text(); } catch(e) {} }
+    // 브랜드별 개별 처리 — 하나 도착할 때마다 재렌더 (전체 대기 안 함)
+    await Promise.allSettled(brands.map(async b => {
+        const text = await _ubFetchCsv(_UB_FUNNEL_URLS[b]);
         if (text) { try { _ubFunnelCache[b] = _ubAggFunnel(_ubParseCSV(text)); } catch(e) {} }
+        renderUnifiedBriefing(); // 부분 도착 즉시 반영
     }));
     _ubFunnelLoading = false;
     _ubFunnelDone = true;
-    renderUnifiedBriefing(); // 데이터 도착 → 재렌더
+    renderUnifiedBriefing();
 }
 
 function _ubFunnelForBrand(brand) {
