@@ -131,8 +131,7 @@ window.updateDashboard = function() {
     } else if (_currentSection === 'performance') {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
-        renderSpendScatterChart();
-        renderSaturationChart();
+        renderSpendScatterChart();
         renderCartLeakRanking();
         renderRoasDiagnosis();
         renderProductPerformance();
@@ -473,8 +472,7 @@ function switchSection(sectionName) {
             } else if (sectionName === 'performance') {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
-                renderSpendScatterChart();
-                renderSaturationChart();
+                renderSpendScatterChart();
                 renderCartLeakRanking();
                 renderRoasDiagnosis();
                 renderAppealInsight();
@@ -884,8 +882,7 @@ function syncHiddenAiSelect() {
 function refreshPerformanceSection() {
     renderPerformanceCriteriaBadge();
     renderScatterChart();
-    renderSpendScatterChart();
-    renderSaturationChart();
+    renderSpendScatterChart();
     renderCartLeakRanking();
     renderRoasDiagnosis();
     renderAppealInsight();
@@ -929,8 +926,7 @@ function updateDashboard() {
     if (_renderedSections.performance) {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
-        renderSpendScatterChart();
-        renderSaturationChart();
+        renderSpendScatterChart();
         renderCartLeakRanking();
         renderRoasDiagnosis();
         renderProductPerformance();
