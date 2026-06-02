@@ -778,6 +778,37 @@
 
     </main>
 
+    <!-- ============ AI 챗봇 (플로팅, 전 탭 공통) ============ -->
+    <button id="ac-fab" class="ac-fab" onclick="toggleAiChat()" title="통합 데이터 AI 어시스턴트">
+        <i class="fas fa-robot"></i>
+    </button>
+    <div id="ac-panel" class="ac-panel">
+        <div class="ac-header">
+            <div class="ac-title"><i class="fas fa-robot"></i> 통합 데이터 AI</div>
+            <div class="ac-header-btns">
+                <button class="ac-icon-btn" onclick="acClear()" title="대화 초기화"><i class="fas fa-trash-can"></i></button>
+                <button class="ac-icon-btn" onclick="toggleAiChat()" title="닫기"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div id="ac-messages" class="ac-messages">
+            <div class="ac-welcome">
+                <div class="ac-welcome-icon">🤖</div>
+                <p class="ac-welcome-title">통합 데이터 AI 어시스턴트</p>
+                <p class="ac-welcome-sub">GMV · 소재 · 퍼널 데이터를 기반으로 답변합니다</p>
+                <div class="ac-quick-chips">
+                    <button class="ac-chip" onclick="acQuick('BOH 최근 ROAS 추이 분석해줘')">BOH ROAS 추이</button>
+                    <button class="ac-chip" onclick="acQuick('오늘 목표 미달 브랜드와 원인은?')">목표 미달 진단</button>
+                    <button class="ac-chip" onclick="acQuick('퍼널에서 가장 이탈이 큰 단계는?')">퍼널 이탈 분석</button>
+                    <button class="ac-chip" onclick="acQuick('가장 효율 좋은 제품 TOP3는?')">고효율 제품</button>
+                </div>
+            </div>
+        </div>
+        <div class="ac-input-bar">
+            <textarea id="ac-input" class="ac-input" rows="1" placeholder="통합 데이터에 대해 질문하세요…" onkeydown="acKeydown(event)"></textarea>
+            <button class="ac-send" onclick="acSend()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
     <!-- AI 이미지 생성 Modal -->
     <div id="creative-prompt-modal" class="modal-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="modal-container ai-gen-modal">
@@ -977,6 +1008,7 @@
     <script src="js/megawari-report.js"></script>
     <script src="js/weekly-report.js"></script>
     <script src="js/unified-briefing.js"></script>
+    <script src="js/ai-chat.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
