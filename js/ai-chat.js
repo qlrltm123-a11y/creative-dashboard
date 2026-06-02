@@ -134,7 +134,9 @@ ${JSON.stringify(ctx, null, 1)}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents,
-                generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
+                // thinkingBudget:0 → 2.5 Flash의 내부 사고 토큰이 출력 예산을 잠식해
+                // 답변이 잘리는 문제 방지. maxOutputTokens는 본문에 온전히 사용됨.
+                generationConfig: { temperature: 0.4, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
             }),
         });
         const data = await res.json();

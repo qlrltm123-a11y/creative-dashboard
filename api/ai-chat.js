@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
 
   const payload = JSON.stringify({
     contents: body.contents,
-    generationConfig: body.generationConfig || { temperature: 0.4, maxOutputTokens: 4096 },
+    generationConfig: body.generationConfig || { temperature: 0.4, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
   });
 
   const callModel = async (model) => {
@@ -49,8 +49,14 @@ module.exports = async function handler(req, res) {
     for (const m of candidates) {
       const r = await callModel(m);
       if (r.ok) {
-        const text = r.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        return res.status(200).json({ text, model: m });
+        const cand = r.data.candidates?.[0];
+        const text = cand?.content?.parts?.map(p => p.text).filter(Boolean).join('') || '';
+        const finish = cand?.finishReason || '';
+        // 사고 토큰으로 본문이 잘린 경우 안내
+        if (!text && finish === 'MAX_TOKENS') {
+          return res.status(200).json({ text: '⚠️ 답변 생성 중 토큰 한도에 도달했습니다. 질문을 더 구체적으로(예: 특정 브랜드·기간) 좁혀주세요.', model: m, finishReason: finish });
+        }
+        return res.status(200).json({ text, model: m, finishReason: finish });
       }
       last = r;
       const msg = r.data?.error?.message || '';
