@@ -237,18 +237,18 @@ function _wrPlatColor(p) { return _WR_PLAT_COLOR[p] || '#6366f1'; }
 function _wrKpiSectionHtml(kpi, count) {
     const cards = [
         { lbl:'광고비',   val: _wrW(kpi.spend),   icon:'fa-won-sign',      color:'#ef4444' },
-        { lbl:'노출수',   val: _wrN(kpi.impr),    icon:'fa-eye',           color:'#6366f1' },
-        { lbl:'클릭수',   val: _wrN(kpi.clicks),  icon:'fa-mouse-pointer', color:'#3b82f6' },
-        { lbl:'CTR',      val: _wrP(kpi.ctr),     icon:'fa-percentage',    color:'#06b6d4' },
-        { lbl:'매출',     val: _wrW(kpi.rev),     icon:'fa-chart-line',    color:'#10b981' },
-        { lbl:'ROAS',     val: _wrR(kpi.roas),    icon:'fa-bullseye',      color:'#f97316' },
-        { lbl:'전환수',   val: _wrN(kpi.conv),    icon:'fa-check-circle',  color:'#8b5cf6' },
+        { lbl:'노출 수',  val: _wrN(kpi.impr),    icon:'fa-eye',           color:'#6366f1' },
+        { lbl:'클릭 수',  val: _wrN(kpi.clicks),  icon:'fa-mouse-pointer', color:'#3b82f6' },
+        { lbl:'클릭률(CTR)',     val: _wrP(kpi.ctr),     icon:'fa-percentage',    color:'#06b6d4' },
+        { lbl:'매출',            val: _wrW(kpi.rev),     icon:'fa-chart-line',    color:'#10b981' },
+        { lbl:'광고효율(ROAS)',  val: _wrR(kpi.roas),    icon:'fa-bullseye',      color:'#f97316' },
+        { lbl:'구매 건수',       val: _wrN(kpi.conv),    icon:'fa-check-circle',  color:'#8b5cf6' },
         { lbl:'소재 수',  val: count + '개',       icon:'fa-image',         color:'#64748b' },
     ];
     return `
     <div class="wr-section" id="wr-kpi-section">
         <div class="wr-section-hd">
-            <span><i class="fas fa-chart-bar mr-1.5" style="color:#6366f1"></i>KPI 요약</span>
+            <span><i class="fas fa-chart-bar mr-1.5" style="color:#6366f1"></i>핵심 지표 요약</span>
             <button class="wr-copy-btn" onclick="window._wrCopySection('kpi', this)">
                 <i class="fas fa-copy mr-1"></i>복사
             </button>
@@ -298,12 +298,12 @@ function _wrPlatformSectionHtml(byPlatform) {
                 <thead><tr>
                     <th class="wr-th wr-th-left">매체</th>
                     <th class="wr-th">광고비</th>
-                    <th class="wr-th">노출</th>
-                    <th class="wr-th">클릭</th>
-                    <th class="wr-th">CTR</th>
+                    <th class="wr-th">노출 수</th>
+                    <th class="wr-th">클릭 수</th>
+                    <th class="wr-th">클릭률</th>
                     <th class="wr-th">매출</th>
-                    <th class="wr-th">ROAS</th>
-                    <th class="wr-th">전환</th>
+                    <th class="wr-th">광고효율</th>
+                    <th class="wr-th">구매</th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>
@@ -332,10 +332,10 @@ function _wrCreativeSectionHtml(byCreative) {
                 </div>
                 <div class="wr-creative-stats">
                     <div class="wr-stat"><div class="wr-stat-lbl">광고비</div><div class="wr-stat-val">${_wrW(c.spend)}</div></div>
-                    <div class="wr-stat"><div class="wr-stat-lbl">노출</div><div class="wr-stat-val">${_wrN(c.impr)}</div></div>
-                    <div class="wr-stat"><div class="wr-stat-lbl">CTR</div><div class="wr-stat-val">${_wrP(c.ctr)}</div></div>
-                    <div class="wr-stat"><div class="wr-stat-lbl">ROAS</div><div class="wr-stat-val wr-roas-cell">${_wrR(c.roas)}</div></div>
-                    ${c.conv > 0 ? `<div class="wr-stat"><div class="wr-stat-lbl">전환</div><div class="wr-stat-val">${_wrN(c.conv)}</div></div>` : ''}
+                    <div class="wr-stat"><div class="wr-stat-lbl">노출 수</div><div class="wr-stat-val">${_wrN(c.impr)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">클릭률</div><div class="wr-stat-val">${_wrP(c.ctr)}</div></div>
+                    <div class="wr-stat"><div class="wr-stat-lbl">광고효율</div><div class="wr-stat-val wr-roas-cell">${_wrR(c.roas)}</div></div>
+                    ${c.conv > 0 ? `<div class="wr-stat"><div class="wr-stat-lbl">구매</div><div class="wr-stat-val">${_wrN(c.conv)}</div></div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -343,7 +343,7 @@ function _wrCreativeSectionHtml(byCreative) {
     return `
     <div class="wr-section" id="wr-creative-section">
         <div class="wr-section-hd">
-            <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>소재별 성과 TOP ${byCreative.length}</span>
+            <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>잘된 광고 TOP ${byCreative.length}</span>
             <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
                 <i class="fas fa-copy mr-1"></i>복사
             </button>
@@ -589,9 +589,9 @@ function _wrProductInsightSectionHtml(productData) {
                     <div class="wr-pi-rows">${top5Rows}</div>
                 </div>
                 <div class="wr-pi-col wr-pi-col-side">
-                    <div class="wr-pi-sub-hd">💡 소구포인트</div>
+                    <div class="wr-pi-sub-hd">💡 강조 포인트 <span style="font-size:9px;color:#94a3b8;font-weight:400">(소구점)</span></div>
                     <div class="wr-insight-tags">${appealTags}</div>
-                    <div class="wr-pi-sub-hd" style="margin-top:10px">⚡ 후킹 유형</div>
+                    <div class="wr-pi-sub-hd" style="margin-top:10px">⚡ 시선 끄는 방식 <span style="font-size:9px;color:#94a3b8;font-weight:400">(후킹)</span></div>
                     <div class="wr-insight-tags">${hookTags}</div>
                     ${phraseTags ? `
                     <div class="wr-pi-sub-hd" style="margin-top:10px">✍️ 고효율 메시지 요소 <span style="font-size:9px;color:#94a3b8">카피 반복구절 · ROAS 가중</span></div>
@@ -609,7 +609,7 @@ function _wrProductInsightSectionHtml(productData) {
     return `
     <div class="wr-section" id="wr-product-section">
         <div class="wr-section-hd">
-            <span><i class="fas fa-box-open mr-1.5" style="color:#f97316"></i>제품별 소재 인사이트</span>
+            <span><i class="fas fa-box-open mr-1.5" style="color:#f97316"></i>제품별 잘된 포인트 분석</span>
             <button class="wr-copy-btn" onclick="window._wrCopySection('products', this)">
                 <i class="fas fa-copy mr-1"></i>복사
             </button>
