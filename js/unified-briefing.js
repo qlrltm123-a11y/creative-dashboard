@@ -130,28 +130,66 @@ function _ubCreativeForDate(date, brand) {
     };
 }
 
-/* ── 퍼널 최신 전환 (iframe best-effort, 동일 origin) ── */
+/* ── 퍼널 데이터: 시트 직접 fetch (3개 브랜드 전체) ─────────────
+   iframe은 한 브랜드만 로드하므로, 브리핑은 시트를 직접 받아 캐시 */
+const _UB_FUNNEL_URLS = {
+    BOH: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
+    WM:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
+    CG:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
+};
+const _UB_F262 = { date:1, product:2, inflow:3, cart:4, buy:5 };
+let _ubFunnelCache = {};   // brand -> {inflow,cart,buy,cartRate,buyRate}
+let _ubFunnelLoading = false;
+let _ubFunnelDone = false;
+
+function _ubParseCSV(text) {
+    return text.split(/\r?\n/).filter(l => l.trim()).map(line => {
+        const cols = []; let cur = '', q = false;
+        for (let i=0;i<line.length;i++){ const ch=line[i];
+            if (ch==='"'){q=!q;continue;}
+            if (ch===','&&!q){cols.push(cur.trim());cur='';continue;}
+            cur+=ch; }
+        cols.push(cur.trim()); return cols;
+    });
+}
+function _ubNum(v){ if(!v||v==='-')return 0; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?0:n; }
+
+// 262Q 누적 합산 → 브랜드 전환율
+function _ubAggFunnel(rows) {
+    let inflow=0, cart=0, buy=0;
+    for (let i=1;i<rows.length;i++){
+        const r = rows[i]; if(!r||r.length<=_UB_F262.buy) continue;
+        const prod=(r[_UB_F262.product]||'').trim(), date=(r[_UB_F262.date]||'').trim();
+        if(!prod||!date||prod==='제품'||date==='date') continue;
+        inflow+=_ubNum(r[_UB_F262.inflow]); cart+=_ubNum(r[_UB_F262.cart]); buy+=_ubNum(r[_UB_F262.buy]);
+    }
+    if(inflow===0&&cart===0) return null;
+    return { inflow, cart, buy,
+        cartRate: inflow>0?cart/inflow*100:null,
+        buyRate:  cart>0?buy/cart*100:null };
+}
+
+async function _ubFetchFunnel() {
+    if (_ubFunnelLoading || _ubFunnelDone) return;
+    _ubFunnelLoading = true;
+    const brands = Object.keys(_UB_FUNNEL_URLS);
+    await Promise.all(brands.map(async b => {
+        const url = _UB_FUNNEL_URLS[b];
+        let text = null;
+        try {
+            const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {cache:'no-store'});
+            if (r.ok) text = await r.text();
+        } catch(e) {}
+        if (text === null) { try { const r2 = await fetch(url,{cache:'no-store'}); text = await r2.text(); } catch(e) {} }
+        if (text) { try { _ubFunnelCache[b] = _ubAggFunnel(_ubParseCSV(text)); } catch(e) {} }
+    }));
+    _ubFunnelLoading = false;
+    _ubFunnelDone = true;
+    renderUnifiedBriefing(); // 데이터 도착 → 재렌더
+}
+
 function _ubFunnelForBrand(brand) {
-    try {
-        const fr = document.getElementById('funnel-frame');
-        const w = fr && fr.contentWindow;
-        if (!w || !w.brandData || !w.brandData[brand]) return null;
-        const q = w.brandData[brand]['262Q'];
-        if (!q) return null;
-        // 전 제품 최신일 합산 → cart/buy rate
-        let inflow=0, cart=0, buy=0;
-        Object.values(q).forEach(rows => {
-            if (!rows || !rows.length) return;
-            const last = rows[rows.length-1];
-            inflow += last.inflow||0; cart += last.cart||0; buy += last.buy||0;
-        });
-        if (inflow === 0 && cart === 0) return null;
-        return {
-            inflow, cart, buy,
-            cartRate: inflow>0 ? cart/inflow*100 : null,
-            buyRate:  cart>0   ? buy/cart*100    : null,
-        };
-    } catch(e) { return null; }
+    return _ubFunnelCache[brand] || null;
 }
 
 /* ── 브랜드별 진단 메시지 (룰 기반) ── */
@@ -246,11 +284,13 @@ function _ubBrandCard(brand, date, actualsByDate) {
             <div class="ub-m"><span>전환</span><b>${cr.conv>0?Math.round(cr.conv).toLocaleString():'-'}</b></div>
         </div>` : `<div class="ub-empty-s">해당일 광고 데이터 없음</div>`}
 
-        <div class="ub-sub-hd">🛒 퍼널 전환 ${!fn?'<span class="ub-cnt ub-cnt-muted">미동기화</span>':''}</div>
+        <div class="ub-sub-hd">🛒 퍼널 전환 <span style="font-size:9px;color:#94a3b8;font-weight:400">262Q 누적</span></div>
         ${fn ? `<div class="ub-metrics">
             <div class="ub-m"><span>장바구니율</span><b style="color:#6366f1">${fn.cartRate!=null?fn.cartRate.toFixed(1)+'%':'-'}</b></div>
             <div class="ub-m"><span>구매율</span><b style="color:#7c3aed">${fn.buyRate!=null?fn.buyRate.toFixed(1)+'%':'-'}</b></div>
-        </div>` : `<div class="ub-empty-s">퍼널 탭을 한번 열면 자동 동기화됩니다</div>`}
+            <div class="ub-m"><span>유입</span><b>${fn.inflow?Math.round(fn.inflow).toLocaleString():'-'}</b></div>
+            <div class="ub-m"><span>구매</span><b>${fn.buy?Math.round(fn.buy).toLocaleString():'-'}</b></div>
+        </div>` : `<div class="ub-empty-s">${_ubFunnelLoading?'퍼널 데이터 로딩 중…':'퍼널 데이터 없음'}</div>`}
 
         <div class="ub-diag">
             ${diag.map(d => `<div class="ub-diag-line ${d.cls}">${d.t}</div>`).join('')}
@@ -280,7 +320,8 @@ function renderUnifiedBriefing() {
     const dates = _ubTargetDates();
     const dateOpts = dates.map(d => `<option value="${d}"${d===date?' selected':''}>${d}</option>`).join('');
 
-    const funnelLoaded = !!(document.getElementById('funnel-frame')?.src);
+    const funnelStatus = _ubFunnelDone ? '' : (_ubFunnelLoading
+        ? `<span class="ub-scope"><i class="fas fa-spinner fa-spin mr-1"></i>퍼널 로딩중</span>` : '');
 
     body.innerHTML = `
     <div class="ub-toolbar">
@@ -288,7 +329,7 @@ function renderUnifiedBriefing() {
             <span class="ub-toolbar-lbl">📅 브리핑 날짜</span>
             <select id="ub-date-sel" class="ub-date-sel" onchange="window._ubSetDate(this.value)">${dateOpts}</select>
         </div>
-        ${!funnelLoaded ? `<button class="ub-sync-btn" onclick="window._ubSyncFunnel(this)"><i class="fas fa-rotate mr-1"></i>퍼널 데이터 동기화</button>` : ''}
+        ${funnelStatus}
         <span class="ub-scope">${globalBrand==='ALL'?'전체 브랜드':globalBrand}</span>
     </div>
 
@@ -312,58 +353,13 @@ function renderUnifiedBriefing() {
         💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 자동 동기화됩니다.
     </div>`;
 
-    // 퍼널 데이터 자동 동기화 (백그라운드 로드 후 1회 재렌더)
-    _ubAutoSyncFunnel();
+    // 퍼널 데이터: 시트 직접 fetch (3개 브랜드) → 도착 시 자동 재렌더
+    if (!_ubFunnelDone) _ubFetchFunnel();
 }
 window.renderUnifiedBriefing = renderUnifiedBriefing;
-
-/* ── 퍼널 자동 동기화 (브리핑 진입 시 1회) ── */
-let _ubFunnelTried = false;
-function _ubAutoSyncFunnel() {
-    const fr = document.getElementById('funnel-frame');
-    if (!fr) return;
-    // 이미 데이터 있으면 스킵
-    try { if (fr.contentWindow && fr.contentWindow.brandData &&
-        Object.values(fr.contentWindow.brandData).some(v => v)) return; } catch(e) {}
-    if (_ubFunnelTried) return;
-    _ubFunnelTried = true;
-    // 미로드면 백그라운드 로드
-    if (!fr.src && fr.dataset.src) {
-        const b = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : 'ALL') || 'ALL';
-        fr.src = fr.dataset.src + '?brand=' + encodeURIComponent(b);
-    }
-    let tries = 0;
-    const timer = setInterval(() => {
-        tries++;
-        let ready = false;
-        try { ready = fr.contentWindow && fr.contentWindow.brandData &&
-            Object.values(fr.contentWindow.brandData).some(v => v); } catch(e) {}
-        if (ready) { clearInterval(timer); renderUnifiedBriefing(); }
-        else if (tries > 30) clearInterval(timer); // 15초 타임아웃
-    }, 500);
-}
 
 /* ── 날짜 변경 ── */
 window._ubSetDate = function(d) { _ubDate = d; renderUnifiedBriefing(); };
 
-/* ── 퍼널 동기화: 퍼널 iframe 로드 후 재렌더 ── */
-window._ubSyncFunnel = function(btn) {
-    const fr = document.getElementById('funnel-frame');
-    if (!fr) return;
-    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>동기화 중...'; btn.disabled = true; }
-    if (!fr.src && fr.dataset.src) {
-        const b = (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : 'ALL') || 'ALL';
-        fr.src = fr.dataset.src + '?brand=' + encodeURIComponent(b);
-    }
-    // 퍼널 데이터 로드 폴링 (최대 12초)
-    let tries = 0;
-    const timer = setInterval(() => {
-        tries++;
-        const w = fr.contentWindow;
-        const ready = w && w.brandData && Object.values(w.brandData).some(v => v);
-        if (ready || tries > 24) {
-            clearInterval(timer);
-            renderUnifiedBriefing();
-        }
-    }, 500);
-};
+/* ── 퍼널 수동 재동기화 ── */
+window._ubSyncFunnel = function() { _ubFunnelDone = false; _ubFunnelCache = {}; _ubFetchFunnel(); };
