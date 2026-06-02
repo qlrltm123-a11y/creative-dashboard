@@ -372,6 +372,93 @@ function _ubBuildVerdict(brands, date, actualsByDate, totRate) {
     return { tone, text: `${overall} — ${risk}${okTxt}. → ${action}` };
 }
 
+/* ── 분석 코멘트 카드 (룰 기반 종합 + AI 버튼) ── */
+function _ubAnalysisCard(brands, date, actualsByDate, totRate) {
+    const lines = [];
+
+    // 브랜드별 페이스/달성 요약
+    const rows = brands.map(b => {
+        const t = _ubTgt(b, date), a = _ubAct(actualsByDate, date, b);
+        const rate = t>0 ? a/t : null;
+        const pace = _ubPaceToFinish(b, actualsByDate);
+        const cr = _ubCreativeForDate(date, b);
+        const fn = _ubFunnelForBrand(b);
+        return { b, rate, pace, cr, fn };
+    }).filter(x => x.rate !== null);
+
+    if (!rows.length) return '';
+
+    // 1) 종합 페이스
+    const behind = rows.filter(x => x.pace && x.pace.status === 'behind').map(x=>x.b);
+    const ahead  = rows.filter(x => x.pace && x.pace.status === 'ahead').map(x=>x.b);
+    if (totRate >= 1) lines.push({ ic:'🟢', t:`전체 목표 달성/상회 (${_ubPct(totRate)}). 현 배분 유지하며 상위 소재 확대.` });
+    else lines.push({ ic: totRate>=0.9?'🟡':'🔴', t:`전체 목표 ${_ubPct(totRate)}. ${behind.length?`<b>${behind.join('·')}</b> 마감 페이스 미달`:'대부분 정상 페이스'}${ahead.length?` · ${ahead.join('·')} 초과 전망`:''}.` });
+
+    // 2) 소재 효율 — 가장 낮은 ROAS 브랜드
+    const withCr = rows.filter(x => x.cr.count>0 && x.cr.roas>0).sort((a,b)=>a.cr.roas-b.cr.roas);
+    if (withCr.length) {
+        const lo = withCr[0], hi = withCr[withCr.length-1];
+        if (lo.cr.roas < 2) lines.push({ ic:'📣', t:`소재 효율 최저 <b>${lo.b}</b> (ROAS ${_ubRoas(lo.cr.roas)}). 고효율 소재로 예산 이동 검토.` });
+        if (hi.cr.roas >= 3) lines.push({ ic:'🏆', t:`<b>${hi.b}</b> 소재 효율 우수 (ROAS ${_ubRoas(hi.cr.roas)}) — 증액 여력.` });
+    }
+
+    // 3) 퍼널 — 구매전환 약한 브랜드
+    const withFn = rows.filter(x => x.fn && x.fn.buyRate != null).sort((a,b)=>a.fn.buyRate-b.fn.buyRate);
+    if (withFn.length) {
+        const lo = withFn[0];
+        if (lo.fn.buyRate < 40) lines.push({ ic:'🛒', t:`<b>${lo.b}</b> 장바구니→구매 전환 ${lo.fn.buyRate.toFixed(1)}% — PDP·가격·체크아웃 점검.` });
+    }
+
+    // 4) 액션
+    const action = behind.length
+        ? `오늘 <b>${behind[0]}</b>에 예산 집중 + 소재 점검`
+        : (withCr.length && withCr[0].cr.roas<2 ? `${withCr[0].b} 소재 교체 우선` : '현 배분 유지 · 상위 소재 스케일');
+
+    return `
+    <div class="ub-analysis">
+        <div class="ub-analysis-hd">
+            <span>🧭 분석 코멘트</span>
+            <button class="ub-ai-btn" onclick="window._ubAiAnalyze(this)"><i class="fas fa-robot mr-1"></i>AI 심층분석</button>
+        </div>
+        <div class="ub-analysis-body">
+            ${lines.map(l => `<div class="ub-an-line"><span class="ub-an-ic">${l.ic}</span><span>${l.t}</span></div>`).join('')}
+            <div class="ub-an-action">👉 ${action}</div>
+        </div>
+        <div id="ub-ai-out" class="ub-ai-out" style="display:none"></div>
+    </div>`;
+}
+
+/* AI 심층분석 (요청 시 Gemini 호출) */
+window._ubAiAnalyze = async function(btn) {
+    const out = document.getElementById('ub-ai-out');
+    if (!out) return;
+    btn.disabled = true; const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>분석 중…';
+    out.style.display = 'block';
+    out.innerHTML = '<span style="color:#94a3b8;font-size:12px">AI가 통합 데이터를 분석 중입니다…</span>';
+
+    // 컨텍스트: 현재 브리핑 요약 (chatbot의 컨텍스트 빌더 재사용)
+    let ctx = {};
+    try { if (typeof _acBuildContext === 'function') ctx = _acBuildContext(); } catch(e) {}
+    const date = _ubResolveDate();
+    const sys = `당신은 한국 뷰티 브랜드(BOH/WM/CG)의 일본 메가와리 퍼포먼스를 분석하는 시니어 전략가입니다.
+아래 통합 데이터(GMV 목표대비실적·소재 ROAS/CTR·퍼널 전환)를 근거로, ${date} 기준 데일리 브리핑 심층 분석을 작성하세요.
+반드시 한국어. 실제 수치 인용. 3~5줄. 형식: 핵심 진단 → 브랜드별 리스크 → 오늘의 액션 1~2개.
+[데이터] ${JSON.stringify(ctx).slice(0, 12000)}`;
+    try {
+        const res = await fetch('/api/ai-chat', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ contents:[{role:'user',parts:[{text:sys}]}], generationConfig:{temperature:0.4,maxOutputTokens:2048,thinkingConfig:{thinkingBudget:0}} })
+        });
+        const data = await res.json();
+        if (data.text) {
+            out.innerHTML = data.text.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+        } else out.innerHTML = `<span style="color:#dc2626">분석 실패: ${data.error||'응답 없음'}</span>`;
+    } catch(e) { out.innerHTML = `<span style="color:#dc2626">오류: ${e.message}</span>`; }
+    btn.disabled = false; btn.innerHTML = orig;
+};
+
 /* ── 메인 렌더 ── */
 function renderUnifiedBriefing() {
     const body = document.getElementById('unified-body');
@@ -430,6 +517,7 @@ function renderUnifiedBriefing() {
 
     <div class="ub-grid">
         ${brands.map(b => _ubBrandCard(b, date, actualsByDate)).join('')}
+        ${_ubAnalysisCard(brands, date, actualsByDate, totRate)}
     </div>
 
     <div class="ub-note">
