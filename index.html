@@ -195,32 +195,32 @@
         <!-- KPI Cards -->
         <section id="kpi-section" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="kpi-card">
-                <div class="kpi-label"><i class="fas fa-eye text-indigo-500"></i> 총 노출수</div>
+                <div class="kpi-label"><i class="fas fa-eye text-indigo-500"></i> 노출 수 <span class="info-tip" tabindex="0" data-tip="광고가 사람들에게 보여진 총 횟수.">ⓘ</span></div>
                 <div class="kpi-value" id="kpi-impressions">-</div>
                 <div class="kpi-trend text-emerald-600" id="kpi-trend-impressions"><i class="fas fa-arrow-up"></i> 실시간</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label"><i class="fas fa-mouse-pointer text-blue-500"></i> 총 클릭수</div>
+                <div class="kpi-label"><i class="fas fa-mouse-pointer text-blue-500"></i> 클릭 수 <span class="info-tip" tabindex="0" data-tip="광고를 보고 실제로 누른 총 횟수.">ⓘ</span></div>
                 <div class="kpi-value" id="kpi-clicks">-</div>
                 <div class="kpi-trend text-emerald-600" id="kpi-trend-clicks"><i class="fas fa-arrow-up"></i> 실시간</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label"><i class="fas fa-percentage text-cyan-500"></i> 평균 CTR</div>
+                <div class="kpi-label"><i class="fas fa-percentage text-cyan-500"></i> 클릭률 (CTR) <span class="info-tip" tabindex="0" data-tip="CTR = 클릭 수 ÷ 노출 수 = 광고 본 사람 중 누른 비율. 소재가 시선을 끄는 정도.">ⓘ</span></div>
                 <div class="kpi-value" id="kpi-ctr">-</div>
                 <div class="kpi-trend text-slate-500" id="kpi-trend-ctr">소재 평균</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label"><i class="fas fa-won-sign text-rose-500"></i> 총 광고비</div>
+                <div class="kpi-label"><i class="fas fa-won-sign text-rose-500"></i> 광고비 <span class="info-tip" tabindex="0" data-tip="기간 동안 집행한 총 광고 비용(원화).">ⓘ</span></div>
                 <div class="kpi-value" id="kpi-spend">-</div>
                 <div class="kpi-trend text-slate-500" id="kpi-trend-spend">누적 집행</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label"><i class="fas fa-bullseye text-orange-500"></i> 전환수</div>
+                <div class="kpi-label"><i class="fas fa-bullseye text-orange-500"></i> 구매 건수 <span class="info-tip" tabindex="0" data-tip="광고를 통해 실제 구매(전환)가 일어난 건수.">ⓘ</span></div>
                 <div class="kpi-value" id="kpi-conversions">-</div>
                 <div class="kpi-trend text-emerald-600" id="kpi-trend-conversions"><i class="fas fa-arrow-up"></i> 실시간</div>
             </div>
             <div class="kpi-card kpi-highlight">
-                <div class="kpi-label"><i class="fas fa-chart-line text-white"></i> 평균 ROAS</div>
+                <div class="kpi-label"><i class="fas fa-chart-line text-white"></i> 광고 효율 (ROAS) <span class="info-tip" tabindex="0" data-tip="ROAS = 매출 ÷ 광고비. 300%면 광고비 1원으로 3원 벌었다는 뜻. 높을수록 좋아요.">ⓘ</span></div>
                 <div class="kpi-value text-white" id="kpi-roas">-</div>
                 <div class="kpi-trend text-white/80" id="kpi-trend-roas">매출 효율</div>
             </div>
@@ -650,7 +650,7 @@
                 <!-- 타겟 감정별 지표 차트 -->
                 <div class="chart-card">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="chart-title"><i class="fas fa-heart mr-2 text-rose-500"></i>타겟 감정별 평균 <span id="emotion-metric-lbl">ROAS</span></h3>
+                        <h3 class="chart-title"><i class="fas fa-heart mr-2 text-rose-500"></i>타겟 감정별 평균 <span id="emotion-metric-lbl">ROAS</span> <span class="info-tip" tabindex="0" data-tip="광고가 노린 감정(설렘·신뢰·불안 해소 등)별로 어떤 감정 소구가 잘 팔렸는지.">ⓘ</span></h3>
                         <div class="flex items-center gap-2">
                             <label class="text-xs text-slate-500">지표</label>
                             <select id="emotion-metric-select" class="insight-chart-metric-sel">
@@ -683,8 +683,8 @@
             <div class="chart-card mb-4">
                 <div class="flex items-center justify-between mb-3">
                     <div>
-                        <h3 class="chart-title"><i class="fas fa-th mr-2 text-indigo-500"></i>소구포인트 × 후킹 조합 성과 히트맵</h3>
-                        <p class="text-xs text-slate-500 mt-1">어떤 소구포인트와 후킹 조합이 가장 효과적인지 한눈에 확인</p>
+                        <h3 class="chart-title"><i class="fas fa-th mr-2 text-indigo-500"></i>강조 포인트 × 시선 끄는 방식 — 잘 맞는 조합 <span class="info-tip" tabindex="0" data-tip="어떤 '강조 포인트(소구점)'와 '시선 끄는 방식(후킹)'을 함께 썼을 때 가장 잘 팔렸는지 색이 진할수록 효율 좋음.">ⓘ</span></h3>
+                        <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 다음 소재에 쓰면 좋은 '강조점 + 표현방식' 조합 (진한 칸이 고효율)</p>
                     </div>
                     <select id="heatmap-metric-select" class="filter-select text-sm">
                         <option value="roas" selected>ROAS</option>
