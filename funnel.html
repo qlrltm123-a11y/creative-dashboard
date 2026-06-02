@@ -627,11 +627,15 @@ function renderFunnelCards(brand, data, prods) {
     const cD = dlt(agg262.cartRate, agg261?.cartRate);
     const bD = dlt(agg262.buyRate,  agg261?.buyRate);
     const cmpLabel = agg261 ? `vs 261Q ${rows262.length}일` : '';
-    // 유입 직전비 (261Q 동기간 대비 %)
-    const inflowD = (agg261 && agg261.inflow>0) ? (agg262.inflow-agg261.inflow)/agg261.inflow*100 : null;
-    const inflowBadge = inflowD!==null
-      ? `<div class="stage-delta ${dcls(inflowD)}">${inflowD>0?'+':''}${inflowD.toFixed(1)}%</div>`
+    // 직전비 건수 증감률 (261Q 동기간 대비 %) — 유입/장바구니/구매 공통
+    const cntChg = (cur, base) => (agg261 && base>0) ? (cur-base)/base*100 : null;
+    const cntBadge = (pct) => pct!==null
+      ? `<div class="stage-delta ${dcls(pct)}">${pct>0?'+':''}${pct.toFixed(1)}%</div>`
       : '<div class="stage-delta delta-neu">-</div>';
+    const inflowD = cntChg(agg262.inflow, agg261?agg261.inflow:0);
+    const cartCntD = cntChg(agg262.cart, agg261?agg261.cart:0);
+    const buyCntD  = cntChg(agg262.buy,  agg261?agg261.buy:0);
+    const inflowBadge = cntBadge(inflowD);
 
     grid.insertAdjacentHTML('beforeend',`
       <div class="funnel-card">
@@ -661,8 +665,8 @@ function renderFunnelCards(brand, data, prods) {
               <div class="stage-count">${n(agg262.cart)}건</div>
             </div>
             <div class="stage-right">
-              <div class="stage-rate" style="color:#818cf8">${f(agg262.cartRate)}</div>
-              <div class="stage-delta ${dcls(cD)}" title="${cmpLabel}">${fD(cD)}</div>
+              <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
+              ${cntBadge(cartCntD)}
             </div>
           </div>
           <div class="stage">
@@ -672,8 +676,8 @@ function renderFunnelCards(brand, data, prods) {
               <div class="stage-count">${n(agg262.buy)}건</div>
             </div>
             <div class="stage-right">
-              <div class="stage-rate" style="color:#a78bfa">${f(agg262.buyRate)}</div>
-              <div class="stage-delta ${dcls(bD)}" title="${cmpLabel}">${fD(bD)}</div>
+              <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
+              ${cntBadge(buyCntD)}
             </div>
           </div>
         </div>
