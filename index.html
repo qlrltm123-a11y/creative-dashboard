@@ -169,11 +169,6 @@
             </div>
             <div class="tab-group" data-group="운영">
                 <span class="group-label">🔥 운영</span>
-                <button class="section-tab" data-section="megawari">
-                    <i class="fas fa-fire"></i>
-                    <span class="label">메가와리</span>
-                    <span class="sub">일별 성과 · 카카오</span>
-                </button>
                 <button class="section-tab" data-section="gmv">
                     <i class="fas fa-gauge-high"></i>
                     <span class="label">GMV</span>
@@ -308,6 +303,13 @@
                     <span class="text-sm font-bold text-slate-800">성과 분석 필터</span>
                 </div>
                 <span class="mx-1 text-slate-300">|</span>
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-calendar-star text-amber-500 text-sm"></i>
+                    <span class="text-xs font-semibold text-slate-600">이벤트</span>
+                    <select id="performance-event-select" class="filter-select text-sm min-w-[150px]">
+                        <option value="">전체 이벤트</option>
+                    </select>
+                </div>
                 <div class="flex items-center gap-2">
                     <i class="fas fa-box-open text-indigo-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">제품</span>
@@ -729,20 +731,6 @@
         </div>
         <!-- ============ /SECTION: AI INSIGHTS ============ -->
 
-        <!-- ============ SECTION: 메가와리 리포트 ============ -->
-        <div class="section-panel" data-panel="megawari">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <i class="fas fa-fire text-orange-500"></i> 메가와리 일일 성과 리포트
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-0.5">이벤트 기간 일별 ROAS · 제품별 · 매체별 · 소재 효율 분석</p>
-                </div>
-            </div>
-            <div id="megawari-panel-body" class="mw-panel-body"></div>
-        </div>
-        <!-- ============ /SECTION: 메가와리 ============ -->
-
         <!-- ============ SECTION: 주간 업무 보고서 ============ -->
         <div class="section-panel" data-panel="weekly">
             <!-- 헤더 -->
@@ -1060,7 +1048,6 @@
     <script src="js/gmv-targets.js"></script>
     <script src="js/glossary.js"></script>
     <script src="js/compliance.js"></script>
-    <script src="js/megawari-report.js"></script>
     <script src="js/weekly-report.js"></script>
     <script src="js/unified-briefing.js"></script>
     <script src="js/ai-chat.js"></script>

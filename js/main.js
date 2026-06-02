@@ -10,6 +10,7 @@ let currentEvent  = '';   // ★ 전역 Event 필터 ('' = 전체, 시트 AA열)
 // ★ 섹션 단위 필터 (성과 분석 / AI 인사이트)
 let performanceProduct = '';   // 성과 분석 섹션 - 제품 필터
 let performanceCampaign = '';  // 성과 분석 섹션 - 캠페인 필터
+let performanceEvent = '';     // 성과 분석 섹션 - 이벤트 필터
 let aiProduct = '';            // AI 인사이트 섹션 - 제품 필터
 let aiCampaign = '';           // AI 인사이트 섹션 - 캠페인 필터
 let winningProduct = '';       // ★ 위닝 요소 인사이트 - 제품 필터 (개요 탭)
@@ -87,7 +88,6 @@ async function loadData() {
 window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
     invalidatePerformancePoolCache();
-    if (typeof window._invalidateMwCache === 'function') window._invalidateMwCache();
     if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache();
 
     // 통합 iframe(퍼널/GMV)에 전역 브랜드 변경 전파 (이미 로드된 경우만)
@@ -138,8 +138,6 @@ window.updateDashboard = function() {
         renderProductPerformance();
     } else if (_currentSection === 'ai') {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
-    } else if (_currentSection === 'megawari') {
-        if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
     } else if (_currentSection === 'weekly') {
         if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
     }
@@ -325,6 +323,15 @@ function bindEvents() {
     const debouncedRefreshAi = debounce(refreshAiSection, 120);
 
     // ★ 성과 분석 섹션 통합 필터
+    const perfEventSel = document.getElementById('performance-event-select');
+    if (perfEventSel) {
+        perfEventSel.addEventListener('change', () => {
+            performanceEvent = perfEventSel.value || '';
+            invalidatePerformancePoolCache();
+            populatePerformanceFilterOptions(); // 이벤트 바뀌면 제품 목록 갱신
+            debouncedRefreshPerf();
+        });
+    }
     const perfProdSel = document.getElementById('performance-product-select');
     if (perfProdSel) {
         perfProdSel.addEventListener('change', () => {
@@ -347,9 +354,12 @@ function bindEvents() {
         perfResetBtn.addEventListener('click', () => {
             performanceProduct = '';
             performanceCampaign = '';
+            performanceEvent = '';
             if (perfProdSel) perfProdSel.value = '';
             if (perfCampSel) perfCampSel.value = '';
+            if (perfEventSel) perfEventSel.value = '';
             invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
+            populatePerformanceFilterOptions();
             syncHiddenPerformanceSelects();
             debouncedRefreshPerf();
         });
@@ -435,7 +445,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { overview: true, unified: false, performance: false, ai: false, megawari: false, weekly: false, funnel: false, gmv: false };
+let _renderedSections = { overview: true, unified: false, performance: false, ai: false, weekly: false, funnel: false, gmv: false };
 let _currentSection = 'overview';
 
 function switchSection(sectionName) {
@@ -472,8 +482,6 @@ function switchSection(sectionName) {
                 renderPlatformCreativeMatrix();
             } else if (sectionName === 'ai') {
                 if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
-            } else if (sectionName === 'megawari') {
-                if (typeof window.renderMegawariPanel === 'function') window.renderMegawariPanel();
             } else if (sectionName === 'weekly') {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
             } else if (sectionName === 'funnel' || sectionName === 'gmv') {
@@ -548,6 +556,9 @@ function getBrandCreatives(scope) {
     }
     // ★ 섹션 단위 필터 (scope = 'performance' | 'ai')
     if (scope === 'performance') {
+        if (performanceEvent) {
+            list = list.filter(c => (c.event || '').trim() === performanceEvent);
+        }
         if (performanceProduct) {
             list = list.filter(c => (c.product || '').trim() === performanceProduct);
         }
@@ -779,8 +790,20 @@ function getSectionCampaignList() {
 function populatePerformanceFilterOptions() {
     const prodSel = document.getElementById('performance-product-select');
     const campSel = document.getElementById('performance-campaign-select');
+    const eventSel = document.getElementById('performance-event-select');
     const products = getSectionProductList();
     const campaigns = getSectionCampaignList();
+
+    // 이벤트 옵션 (현재 브랜드 풀에서 distinct)
+    if (eventSel) {
+        const base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+        const events = [...new Set(base.map(c => (c.event||'').trim()).filter(Boolean))].sort();
+        const cur = performanceEvent;
+        eventSel.innerHTML = '<option value="">전체 이벤트</option>' +
+            events.map(e => `<option value="${e.replace(/"/g,'&quot;')}">${e}</option>`).join('');
+        if (cur && events.includes(cur)) eventSel.value = cur;
+        else { eventSel.value = ''; performanceEvent = ''; }
+    }
 
     if (prodSel) {
         const cur = performanceProduct;
@@ -915,10 +938,6 @@ function updateDashboard() {
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
     }
-    if (_renderedSections.megawari && typeof window.renderMegawariPanel === 'function') {
-        window._mwSelectedDate = null; // 브랜드 바뀌면 날짜 초기화
-        window.renderMegawariPanel();
-    }
 }
 
 // ★ ROAS outlier 필터: 광고비가 너무 적은 행은 비교에서 제외 (환율 환산 후 원화 기준)
@@ -1027,7 +1046,7 @@ window.invalidatePerformancePoolCache = invalidatePerformancePoolCache;
 
 function getPerformancePool() {
     // 캐시 키 (platform/retail 포함 — 매체 필터 변경 시 재계산 필요)
-    const cacheKey = `${currentBrand}|${currentPlatform}|${currentRetail}|${currentEvent}|${performanceProduct}|${performanceCampaign}`;
+    const cacheKey = `${currentBrand}|${currentPlatform}|${currentRetail}|${currentEvent}|${performanceEvent}|${performanceProduct}|${performanceCampaign}`;
     if (_performancePoolCache && _performancePoolCache.key === cacheKey) {
         return _performancePoolCache.value;
     }
