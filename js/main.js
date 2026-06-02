@@ -13,6 +13,7 @@ let performanceCampaign = '';  // 성과 분석 섹션 - 캠페인 필터
 let performanceEvent = '';     // 성과 분석 섹션 - 이벤트 필터
 let aiProduct = '';            // AI 인사이트 섹션 - 제품 필터
 let aiCampaign = '';           // AI 인사이트 섹션 - 캠페인 필터
+let aiEvent = '';              // AI 인사이트 섹션 - 이벤트 필터
 let winningProduct = '';       // ★ 위닝 요소 인사이트 - 제품 필터 (개요 탭)
 let appealRightMetric = 'ctr'; // 소구포인트 우측 컬럼 지표: 'ctr' | 'atc_rate'
 let charts = {};
@@ -365,6 +366,14 @@ function bindEvents() {
     }
 
     // ★ AI 인사이트 섹션 통합 필터
+    const aiEventSel = document.getElementById('ai-event-select');
+    if (aiEventSel) {
+        aiEventSel.addEventListener('change', () => {
+            aiEvent = aiEventSel.value || '';
+            populateAiFilterOptions(); // 이벤트 바뀌면 제품 목록 갱신
+            debouncedRefreshAi();
+        });
+    }
     const aiProdSel = document.getElementById('ai-product-select');
     if (aiProdSel) {
         aiProdSel.addEventListener('change', () => {
@@ -385,8 +394,11 @@ function bindEvents() {
         aiResetBtn.addEventListener('click', () => {
             aiProduct = '';
             aiCampaign = '';
+            aiEvent = '';
             if (aiProdSel) aiProdSel.value = '';
             if (aiCampSel) aiCampSel.value = '';
+            if (aiEventSel) aiEventSel.value = '';
+            populateAiFilterOptions();
             syncHiddenAiSelect();
             debouncedRefreshAi();
         });
@@ -564,6 +576,9 @@ function getBrandCreatives(scope) {
             list = list.filter(c => matchCampaign(c, performanceCampaign));
         }
     } else if (scope === 'ai') {
+        if (aiEvent) {
+            list = list.filter(c => (c.event || '').trim() === aiEvent);
+        }
         if (aiProduct) {
             list = list.filter(c => (c.product || '').trim() === aiProduct);
         }
@@ -837,8 +852,23 @@ function populatePerformanceFilterOptions() {
 function populateAiFilterOptions() {
     const prodSel = document.getElementById('ai-product-select');
     const campSel = document.getElementById('ai-campaign-select');
-    const products = getSectionProductList();
+    const eventSel = document.getElementById('ai-event-select');
+    // AI 제품 목록 = 브랜드 풀 (+ aiEvent 선택 시 해당 이벤트 제품만)
+    let aiBase = getBrandCreatives();
+    if (aiEvent) aiBase = aiBase.filter(c => (c.event || '').trim() === aiEvent);
+    const products = Array.from(new Set(aiBase.map(c => (c.product||'').trim()).filter(Boolean))).sort();
     const campaigns = getSectionCampaignList();
+
+    // 이벤트 옵션
+    if (eventSel) {
+        const base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+        const events = [...new Set(base.map(c => (c.event||'').trim()).filter(Boolean))].sort();
+        const cur = aiEvent;
+        eventSel.innerHTML = '<option value="">전체 이벤트</option>' +
+            events.map(e => `<option value="${e.replace(/"/g,'&quot;')}">${e}</option>`).join('');
+        if (cur && events.includes(cur)) eventSel.value = cur;
+        else { eventSel.value=''; aiEvent=''; }
+    }
 
     if (prodSel) {
         const cur = aiProduct;
