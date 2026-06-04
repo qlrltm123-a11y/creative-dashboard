@@ -1263,7 +1263,7 @@ function updateKPIs() {
     }
 
     // CTR/CVR/ROAS는 비율(ratio) 기준 → 표시 시 ×100
-    // ★ 가중평균 CTR = 전체 clicks / 전체 impressions (단순 평균보다 정확)
+    // ★ 가중평균 클릭률 = 전체 clicks / 전체 impressions (단순 평균보다 정확)
     const avgCtrRatio = impressions > 0 ? (clicks / impressions) : 0;
     const roasRatio   = spend > 0 ? (revenue / spend) : 0;
 
@@ -1520,7 +1520,7 @@ function renderScatterChart() {
 
     const ctx = document.getElementById('scatterChart');
     if (!ctx) return;
-    // ★ 4사분면 가이드라인 플러그인 — 평균 CTR 수직선 + 평균 ROAS(또는 노출수) 수평선
+    // ★ 4사분면 가이드라인 플러그인 — 평균 클릭률 수직선 + 평균 ROAS(또는 노출수) 수평선
     const quadrantPlugin = {
         id: 'scatterQuadrant',
         afterDraw(chart) {
@@ -1555,7 +1555,7 @@ function renderScatterChart() {
             c.setLineDash([]);
             c.font = '9px sans-serif';
             c.fillStyle = 'rgba(100,116,139,0.75)';
-            c.fillText(`평균 CTR ${avgX.toFixed(2)}%`, xPx + 4, top + 12);
+            c.fillText(`평균 클릭률 ${avgX.toFixed(2)}%`, xPx + 4, top + 12);
             const yLabel = noConv ? `평균 노출 ${Math.round(avgY).toLocaleString()}` : `평균 ROAS ${Math.round(avgY)}%`;
             c.fillText(yLabel, left + 4, yPx - 4);
             c.restore();
@@ -1601,8 +1601,8 @@ function renderScatterChart() {
                 }
             },
             scales: {
-                x: { title: { display: true, text: 'CTR (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } },
-                y: { title: { display: true, text: noConv ? '노출수' : 'ROAS (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
+                x: { title: { display: true, text: '클릭률 (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } },
+                y: { title: { display: true, text: noConv ? '노출 수' : '광고효율 (%)', font: { size: 11 } }, ticks: { font: { size: 10 } } }
             }
         }
     });
@@ -1840,7 +1840,7 @@ function renderSaturationChart() {
             scales: {
                 x: { type: 'linear', title: { display: true, text: '누적 광고비 (₩, 효율 높은 소재부터)', font: { size: 11 } },
                      ticks: { font: { size: 10 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? Math.round(v/1000)+'K' : v } },
-                y: { title: { display: true, text: 'ROAS (%)', font: { size: 11 } }, ticks: { font: { size: 10 } }, beginAtZero: true }
+                y: { title: { display: true, text: '광고효율 (%)', font: { size: 11 } }, ticks: { font: { size: 10 } }, beginAtZero: true }
             }
         }
     });
@@ -2606,11 +2606,11 @@ function renderTopPlatformCombos(enriched, metric, container) {
     }
 
     const metricCfg = {
-        roas:         { label: 'ROAS',       format: v => Math.round((v || 0) * 100) + '%' },
-        ctr:          { label: 'CTR',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
-        cvr:          { label: 'CVR',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        roas:         { label: '광고효율(ROAS)',       format: v => Math.round((v || 0) * 100) + '%' },
+        ctr:          { label: '클릭률(CTR)',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        cvr:          { label: '구매전환율(CVR)',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
         revenue:      { label: '매출',        format: v => '₩' + formatNumber(v || 0) },
-        atc_rate:     { label: 'ATC율',       format: v => ((v || 0) * 100).toFixed(2) + '%' },
+        atc_rate:     { label: '장바구니 담기율',       format: v => ((v || 0) * 100).toFixed(2) + '%' },
         cost_per_atc: { label: 'Cost/ATC',   format: v => '₩' + formatNumber(Math.round(v || 0)) },
     }[metric] || { label: metric, format: v => v };
 
@@ -2698,11 +2698,11 @@ function renderPlatformMatrixHeatmap(enriched, platformTotals, appealTotals, met
     enriched.forEach(c => map.set(`${c.platform}::${c.appeal}`, c));
 
     const metricCfg = {
-        roas:         { label: 'ROAS',      format: v => Math.round((v||0)*100)+'%',           short: v => Math.round((v||0)*100)+'%',        lowerBetter: false },
-        ctr:          { label: 'CTR',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
-        cvr:          { label: 'CVR',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        roas:         { label: '광고효율(ROAS)',      format: v => Math.round((v||0)*100)+'%',           short: v => Math.round((v||0)*100)+'%',        lowerBetter: false },
+        ctr:          { label: '클릭률(CTR)',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        cvr:          { label: '구매전환율(CVR)',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
         revenue:      { label: '매출',       format: v => '₩'+formatNumber(v||0),               short: v => '₩'+formatNumber(v||0),            lowerBetter: false },
-        atc_rate:     { label: 'ATC율',      format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
+        atc_rate:     { label: '장바구니 담기율',      format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
         cost_per_atc: { label: 'Cost/ATC',  format: v => '₩'+formatNumber(Math.round(v||0)),   short: v => '₩'+formatNumber(Math.round(v||0)), lowerBetter: true  },
     }[metric] || { label: metric, format: v => v, short: v => v, lowerBetter: false };
 
@@ -2983,18 +2983,18 @@ function renderAppealInsight() {
             if (metric === 'atc_rate') {
                 wVal       = w.atc_rate || 0;
                 mainStatVal = `${(wVal * 100).toFixed(2)}%`;
-                mainStatLbl = '평균 ATC율';
+                mainStatLbl = '평균 장바구니율';
                 subInfo     = `ATC ${formatNumber(w.add_to_cart)}건 · 노출 ${formatNumber(w.impressions)}`;
             } else if (metric === 'ctr') {
                 wVal       = w.ctr || 0;
                 mainStatVal = `${(wVal * 100).toFixed(2)}%`;
-                mainStatLbl = '평균 CTR';
+                mainStatLbl = '평균 클릭률';
                 subInfo     = `노출 ${formatNumber(w.impressions)}`;
             } else {
                 // roas
                 wVal       = w.roas || 0;
                 mainStatVal = `${Math.round(wVal * 100)}%`;
-                mainStatLbl = '평균 ROAS';
+                mainStatLbl = '평균 광고효율';
                 subInfo     = `광고비 ₩${formatNumber(w.spend)}`;
             }
             const lift    = avgBase > 0 ? ((wVal / avgBase - 1) * 100) : 0;
@@ -3139,10 +3139,10 @@ function renderAppealInsight() {
     const rightMetricBtns = `
         <div class="appeal-metric-tabs">
             <button class="appeal-metric-tab${appealRightMetric === 'ctr' ? ' active' : ''}" data-metric="ctr">
-                <i class="fas fa-chart-line"></i> CTR
+                <i class="fas fa-chart-line"></i> 클릭률(CTR)
             </button>
             ${hasCartData ? `<button class="appeal-metric-tab${appealRightMetric === 'atc_rate' ? ' active' : ''}" data-metric="atc_rate">
-                <i class="fas fa-cart-shopping"></i> ATC율
+                <i class="fas fa-cart-shopping"></i> 장바구니율(ATC)
             </button>` : ''}
         </div>`;
 
@@ -3826,15 +3826,15 @@ function populateProductOptions() {
 
 // 정렬 기준별 라벨/등급 기준
 const METRIC_CONFIG = {
-    roas:         { label: 'ROAS',          format: v => Math.round((v||0) * 100) + '%',        higherIsBetter: true },
-    ctr:          { label: 'CTR',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
-    cvr:          { label: 'CVR',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    roas:         { label: '광고효율(ROAS)',          format: v => Math.round((v||0) * 100) + '%',        higherIsBetter: true },
+    ctr:          { label: '클릭률(CTR)',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    cvr:          { label: '구매전환율(CVR)',           format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
     revenue:      { label: '매출',           format: v => '₩' + formatNumber(v||0),             higherIsBetter: true },
     conversions:  { label: '전환수',         format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
     impressions:  { label: '노출수',         format: v => formatNumber(v||0),                   higherIsBetter: true },
     // 장바구니 최적화 지표
-    atc_rate:     { label: 'ATC율',          format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
-    add_to_cart:  { label: 'ATC 건수',       format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
+    atc_rate:     { label: '장바구니 담기율',          format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
+    add_to_cart:  { label: '장바구니 담기 건수',       format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
     cost_per_atc: { label: 'Cost per ATC',  format: v => '₩' + formatNumber(Math.round(v||0)), higherIsBetter: false },
 };
 

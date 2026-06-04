@@ -14,7 +14,7 @@ const chartMetrics = {
 
 const INSIGHT_METRIC_CFG = {
     roas: {
-        key: 'roas', label: 'ROAS', unitLabel: '(%)', lowerBetter: false,
+        key: 'roas', label: '광고효율(ROAS)', unitLabel: '(%)', lowerBetter: false,
         hue: 265, sat: '75%', minPad: 30,
         fmtVal:  v => Math.round(v * 100),
         fmtTick: v => v + '%',
@@ -22,7 +22,7 @@ const INSIGHT_METRIC_CFG = {
         fmtDev:  dev => (dev >= 0 ? '+' : '') + Math.round(dev) + '%p',
     },
     ctr: {
-        key: 'ctr', label: 'CTR', unitLabel: '(%)', lowerBetter: false,
+        key: 'ctr', label: '클릭률(CTR)', unitLabel: '(%)', lowerBetter: false,
         hue: 195, sat: '78%', minPad: 0.3,
         fmtVal:  v => Number((v * 100).toFixed(2)),
         fmtTick: v => v + '%',
@@ -30,7 +30,7 @@ const INSIGHT_METRIC_CFG = {
         fmtDev:  dev => (dev >= 0 ? '+' : '') + Number(dev).toFixed(2) + '%p',
     },
     cvr: {
-        key: 'cvr', label: 'CVR', unitLabel: '(%)', lowerBetter: false,
+        key: 'cvr', label: '구매전환율(CVR)', unitLabel: '(%)', lowerBetter: false,
         hue: 350, sat: '75%', minPad: 0.3,
         fmtVal:  v => Number((v * 100).toFixed(2)),
         fmtTick: v => v + '%',
@@ -46,7 +46,7 @@ const INSIGHT_METRIC_CFG = {
         fmtDev:  dev => (dev >= 0 ? '+' : '-') + '₩' + Math.round(Math.abs(dev)).toLocaleString(),
     },
     atc_rate: {
-        key: 'atc_rate', label: 'ATC율', unitLabel: '(%)', lowerBetter: false,
+        key: 'atc_rate', label: '장바구니 담기율', unitLabel: '(%)', lowerBetter: false,
         hue: 145, sat: '65%', minPad: 0.3,
         fmtVal:  v => Number((v * 100).toFixed(2)),
         fmtTick: v => v + '%',
@@ -1541,8 +1541,8 @@ function renderAppealFunnelChart(list) {
                 tooltip: { callbacks: { label: t => { const d = t.raw._d; return [`"${d.keyword}"`, `CTR ${(d.ctr*100).toFixed(2)}%  CVR ${(d.cvr*100).toFixed(2)}%`, `ROAS ${Math.round(d.roas*100)}%  소재 ${d.count}개`]; } } }
             },
             scales: {
-                x: { title: { display: true, text: 'CTR (%)' }, ticks: { callback: v => v + '%' } },
-                y: { title: { display: true, text: 'CVR (%)' }, ticks: { callback: v => v + '%' } }
+                x: { title: { display: true, text: '클릭률 (%)' }, ticks: { callback: v => v + '%' } },
+                y: { title: { display: true, text: '구매전환율 (%)' }, ticks: { callback: v => v + '%' } }
             }
         },
         plugins: [{
@@ -1555,7 +1555,7 @@ function renderAppealFunnelChart(list) {
                 c.beginPath(); c.moveTo(xMid, top); c.lineTo(xMid, bottom); c.stroke();
                 c.beginPath(); c.moveTo(left, yMid); c.lineTo(right, yMid); c.stroke();
                 c.setLineDash([]); c.font = '10px sans-serif'; c.fillStyle = 'rgba(100,116,139,0.7)';
-                c.fillText('CTR·CVR 모두 우수 ★', xMid + 6, top + 14);
+                c.fillText('클릭·구매전환 모두 우수 ★', xMid + 6, top + 14);
                 c.fillText('클릭↑ 전환↓', xMid + 6, bottom - 8);
                 c.textAlign = 'right';
                 c.fillText('전환↑ 클릭↓', xMid - 6, top + 14);
