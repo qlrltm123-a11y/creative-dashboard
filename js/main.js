@@ -4507,9 +4507,19 @@ function openModal(id, preloadedCreative) {
 
     const startDate = c.start_date ? new Date(c.start_date).toLocaleDateString('ko-KR') : '-';
 
-    // AI 분석 결과 처리
-    const appealList = normalizeArrayField(c.appeal_points);
-    const hookList = normalizeArrayField(c.hook_type);
+    // AI 분석 결과 처리 (소구포인트·후킹 유사 중복 제거)
+    const _dedup = (arr, thresh) => {
+        if (!arr || arr.length <= 1) return arr || [];
+        // insights.js의 deduplicateKeywordItems 사용 가능 시 활용, 없으면 단순 정규화 비교
+        if (typeof deduplicateKeywordItems === 'function') {
+            const dummy = arr.map((k, i) => ({ keyword: k, roas: arr.length - i, spend: 1 }));
+            return deduplicateKeywordItems(dummy, thresh || 0.65).map(d => d.keyword);
+        }
+        // 폴백: 완전 일치 중복만 제거
+        return [...new Set(arr)];
+    };
+    const appealList = _dedup(normalizeArrayField(c.appeal_points), 0.65);
+    const hookList   = _dedup(normalizeArrayField(c.hook_type), 0.6);
     const emotionList = normalizeArrayField(c.target_emotion);
 
     const aiSectionHtml = (appealList.length || hookList.length || emotionList.length || c.key_message_kr)
@@ -4555,23 +4565,23 @@ function openModal(id, preloadedCreative) {
                 ${aiSectionHtml}
                 <div class="modal-metrics">
                     <div class="metric-box">
-                        <div class="label">노출수</div>
+                        <div class="label">노출 수</div>
                         <div class="value">${formatNumber(c.impressions)}</div>
                     </div>
                     <div class="metric-box">
-                        <div class="label">클릭수</div>
+                        <div class="label">클릭 수</div>
                         <div class="value">${formatNumber(c.clicks)}</div>
                     </div>
                     <div class="metric-box">
-                        <div class="label">CTR</div>
+                        <div class="label">클릭률(CTR)</div>
                         <div class="value">${((c.ctr || 0) * 100).toFixed(2)}%</div>
                     </div>
                     <div class="metric-box">
-                        <div class="label">전환수</div>
+                        <div class="label">구매 건수</div>
                         <div class="value">${formatNumber(c.conversions)}</div>
                     </div>
                     <div class="metric-box">
-                        <div class="label">CVR</div>
+                        <div class="label">구매전환율</div>
                         <div class="value">${((c.cvr || 0) * 100).toFixed(2)}%</div>
                     </div>
                     <div class="metric-box" title="${c.spend_jpy ? '원본: ¥' + formatNumber(c.spend_jpy) : ''}">
