@@ -390,7 +390,6 @@ function render(brand) {
   renderFunnelCards(brand, data, prods);
   renderDeltaCards(brand, data, prods);
   renderTrendCharts(brand, data, prods);
-  renderCmpCharts(brand, data, prods);
 }
 
 function buildPanelHTML(brand) {
@@ -400,7 +399,6 @@ function buildPanelHTML(brand) {
       <button class="inner-tab" onclick="switchInner('${b}','snapshot',this)">⬡ 제품별 현황</button>
       <button class="inner-tab" onclick="switchInner('${b}','delta',this)">↕ 어제 대비 변화</button>
       <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 일별 추이</button>
-      <button class="inner-tab" onclick="switchInner('${b}','compare',this)">⊞ 작년 동기 비교</button>
     </div>`;
   return `
     <div id="inner-${brand}-summary">
@@ -438,10 +436,6 @@ function buildPanelHTML(brand) {
         ${_funnelMetricToggle(brand)}
       </div>
       <div class="trend-grid" id="trend-${brand}"></div>
-    </div>
-    <div id="inner-${brand}-compare" style="display:none">
-      <div class="sec-label">같은 영업일 기준 · 이번 시즌(262Q) vs 작년 동기(261Q)</div>
-      <div class="cmp-grid" id="cmp-${brand}"></div>
     </div>
     ${tabsFn(brand)}`;
 }
@@ -864,7 +858,7 @@ function renderCmpCharts(brand, data, prods) {
 let _activeInner = 'summary';
 function switchInner(brand, tab, btn) {
   _activeInner = tab;
-  ['summary','snapshot','delta','trend','compare'].forEach(t=>{
+  ['summary','snapshot','delta','trend'].forEach(t=>{
     const el=document.getElementById(`inner-${brand}-${t}`);
     if(el) el.style.display=t===tab?'':'none';
   });
@@ -874,12 +868,12 @@ function switchInner(brand, tab, btn) {
 // 지표 토글 후 패널 재렌더 시 활성 inner 탭 복원
 function _restoreInner(brand) {
   const tab = _activeInner || 'summary';
-  ['summary','snapshot','delta','trend','compare'].forEach(t=>{
+  ['summary','snapshot','delta','trend'].forEach(t=>{
     const el=document.getElementById(`inner-${brand}-${t}`);
     if(el) el.style.display=t===tab?'':'none';
   });
   const btns = document.querySelectorAll(`#itabs-${brand} .inner-tab`);
-  const idx = ['summary','snapshot','delta','trend','compare'].indexOf(tab);
+  const idx = ['summary','snapshot','delta','trend'].indexOf(tab);
   btns.forEach(b=>b.classList.remove('active'));
   if (btns[idx]) btns[idx].classList.add('active');
 }
