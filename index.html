@@ -182,20 +182,21 @@
             </div>
         </nav>
 
-        <!-- ============ SECTION: OVERVIEW (탭 제거됨 · DOM은 호환 유지, 숨김) ============ -->
-        <div class="section-panel" data-panel="overview">
-        <!-- 첫 방문 안내 배너 (1회) -->
+        <!-- 첫 방문 안내 배너 (1회, 모든 탭 공통) -->
         <div id="intro-banner" class="intro-banner" style="display:none">
             <div class="intro-banner-body">
                 <div class="intro-banner-title">👋 처음이신가요? 30초 사용법</div>
                 <div class="intro-banner-text">
                     상단 <b>브랜드(BOH·WM·CG)</b>를 고르면 모든 화면이 그 브랜드로 바뀝니다 ·
-                    탭별로 <b>한눈에 요약 / 어떤 광고가 잘됐나 / 구매까지 단계 / 오늘 할 일</b>을 봅니다 ·
+                    탭별로 <b>어떤 광고가 잘됐나 / 구매까지 단계 / 잘 먹힌 표현 / 오늘 할 일</b>을 봅니다 ·
                     모르는 용어는 우측 상단 <b>「용어」</b> 버튼 또는 항목 옆 <b>ⓘ</b>에 마우스를 올리세요.
                 </div>
             </div>
             <button class="intro-banner-x" onclick="window._dismissIntro && window._dismissIntro()">알겠어요 ✕</button>
         </div>
+
+        <!-- ============ SECTION: OVERVIEW (탭 제거됨 · DOM은 호환 유지, 숨김) ============ -->
+        <div class="section-panel" data-panel="overview">
         <!-- KPI Cards -->
         <section id="kpi-section" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="kpi-card">
@@ -578,7 +579,7 @@
                         </span>
                         AI 소재 인사이트
                     </h2>
-                    <p class="text-xs text-slate-500 mt-1">Gemini AI가 분석한 소구포인트·후킹·감정 기반 효율 인사이트</p>
+                    <p class="text-xs text-slate-500 mt-1">💡 어떤 <b>강조 포인트·표현 방식·감정</b>이 잘 팔렸는지 분석해, 다음 광고 만들 때 참고하는 탭이에요</p>
                 </div>
                 <!-- 기존 단일 제품 필터(호환용 hidden) — 상단 통합 필터에서 제어 -->
                 <select id="ai-insights-product-select" class="hidden">

@@ -1986,7 +1986,7 @@ function renderRoasDiagnosis() {
     }).filter(r => r.spend > 0)
       .sort((a,b) => b.spend - a.spend).slice(0, 15);
 
-    if (!rows.length) { wrap.innerHTML = `<div class="text-center text-slate-400 text-sm py-8">데이터 없음</div>`; if(infoEl) infoEl.textContent=''; return; }
+    if (!rows.length) { wrap.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-filter text-2xl mb-2 block opacity-40"></i>해당 조건의 데이터가 없어요.<br><span class="text-xs">상단 브랜드·이벤트·제품 필터를 바꿔보세요.</span></div>`; if(infoEl) infoEl.textContent=''; return; }
     if (infoEl) infoEl.textContent = `제품 ${rows.length}개 · 브랜드 평균 대비`;
 
     const cell = (val, idx, key, isWeak) => {
@@ -4094,7 +4094,7 @@ function renderProductPerformance() {
 
     if (!dataArr.length) {
         if (summaryEl) summaryEl.innerHTML = '';
-        bestEl.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>데이터 없음</div>`;
+        bestEl.innerHTML = `<div class="text-center text-slate-400 text-sm py-8"><i class="fas fa-folder-open text-2xl mb-2"></i><br>해당 조건의 데이터가 없어요.<br><span class="text-xs">상단 브랜드·이벤트·제품 필터를 바꿔보세요.</span></div>`;
         return;
     }
 
