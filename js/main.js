@@ -1747,7 +1747,21 @@ function renderSpendScatterChart() {
                 const p = chart.data.datasets[els[0].datasetIndex].data[els[0].index];
                 if (p._id && typeof window.openModal === 'function') window.openModal(p._id);
             },
-            onHover: (evt, els, chart) => { chart.canvas.style.cursor = els.length ? 'pointer' : 'default'; },
+            onHover: (evt, els, chart) => {
+                if (els.length > 0) {
+                    const el = els[0];
+                    const p = chart.data.datasets[el.datasetIndex].data[el.index];
+                    const brand = p._brand;
+                    const c = spendScatterMap[brand]?.[p._idx];
+                    if (c) {
+                        showScatterPreview(c, evt.native || evt);
+                        chart.canvas.style.cursor = 'pointer';
+                        return;
+                    }
+                }
+                chart.canvas.style.cursor = 'default';
+                hideScatterPreview();
+            },
             scales: {
                 x: { title: { display: true, text: '광고비 (₩)', font: { size: 11 } },
                      ticks: { font: { size: 10 }, callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? Math.round(v/1000)+'K' : v } },
@@ -1757,6 +1771,7 @@ function renderSpendScatterChart() {
             }
         }
     });
+    if (ctx) ctx.onmouseleave = () => hideScatterPreview();
 }
 window.renderSpendScatterChart = renderSpendScatterChart;
 
