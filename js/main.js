@@ -127,9 +127,7 @@ window.updateDashboard = function() {
     updateCharts(); // renderWinningElements 포함
 
     // ⑤ 현재 활성 섹션만 렌더 (비활성 섹션은 절대 렌더하지 않음)
-    if (_currentSection === 'unified') {
-        if (typeof window.renderUnifiedBriefing === 'function') window.renderUnifiedBriefing();
-    } else if (_currentSection === 'performance') {
+    if (_currentSection === 'performance') {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
         renderSpendScatterChart();
@@ -456,7 +454,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { unified: false, performance: true, ai: false, weekly: false, funnel: false, gmv: false };
+let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false };
 let _currentSection = 'performance';   // 개요 탭 제거됨 → 기본 성과 분석
 
 function switchSection(sectionName) {
@@ -476,12 +474,7 @@ function switchSection(sectionName) {
         const panel = document.querySelector(`.section-panel[data-panel="${sectionName}"]`);
         if (panel) panel.classList.add('section-loading');
         requestAnimationFrame(() => {
-            if (sectionName === 'overview') {
-                // 브랜드 바뀐 뒤 개요로 돌아오면 위닝 요소 재렌더
-                if (typeof renderWinningElements === 'function') renderWinningElements();
-            } else if (sectionName === 'unified') {
-                if (typeof window.renderUnifiedBriefing === 'function') window.renderUnifiedBriefing();
-            } else if (sectionName === 'performance') {
+            if (sectionName === 'performance') {
                 renderPerformanceCriteriaBadge();
                 renderScatterChart();
                 renderSpendScatterChart();
