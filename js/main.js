@@ -292,14 +292,18 @@ function bindEvents() {
         productSortMetric.addEventListener('change', renderProductPerformance);
     }
 
-    // 갤러리 소구포인트 / 성과구간 필터
-    const galleryAppealSel = document.getElementById('gallery-appeal-select');
-    const galleryPerfTierSel = document.getElementById('gallery-perf-tier-select');
-    if (galleryAppealSel) {
-        galleryAppealSel.addEventListener('change', renderProductPerformance);
-    }
-    if (galleryPerfTierSel) {
-        galleryPerfTierSel.addEventListener('change', renderProductPerformance);
+    // BEST TOP5 갤러리 제품 필터 (성과 섹션 제품 스코프와 동기화)
+    const galleryProdSel = document.getElementById('gallery-product-select');
+    if (galleryProdSel) {
+        galleryProdSel.addEventListener('change', () => {
+            performanceProduct = galleryProdSel.value || '';
+            // 상단 통합 제품 필터와 동기화
+            const topProd = document.getElementById('performance-product-select');
+            if (topProd) topProd.value = performanceProduct;
+            invalidatePerformancePoolCache();
+            syncHiddenPerformanceSelects();
+            refreshPerformanceSection();
+        });
     }
 
     // (기존 개별 제품 셀렉트는 hidden으로 유지 — 섹션 통합 필터가 동기화)
@@ -334,6 +338,8 @@ function bindEvents() {
     if (perfProdSel) {
         perfProdSel.addEventListener('change', () => {
             performanceProduct = perfProdSel.value || '';
+            const gp = document.getElementById('gallery-product-select');
+            if (gp) gp.value = performanceProduct;   // 갤러리 셀렉트 동기화
             invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
             syncHiddenPerformanceSelects();
             debouncedRefreshPerf();
@@ -836,6 +842,13 @@ function populatePerformanceFilterOptions() {
             campSel.value = '';
             performanceCampaign = '';
         }
+    }
+    // BEST TOP5 갤러리 제품 필터 (성과 제품과 동일 목록·값)
+    const gProdSel = document.getElementById('gallery-product-select');
+    if (gProdSel) {
+        gProdSel.innerHTML = '<option value="">전체 제품</option>' +
+            products.map(p => `<option value="${p.replace(/"/g, '&quot;')}">${p}</option>`).join('');
+        gProdSel.value = (performanceProduct && products.includes(performanceProduct)) ? performanceProduct : '';
     }
     // 호환용 hidden 셀렉트 동기화
     syncHiddenPerformanceSelects();
