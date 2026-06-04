@@ -361,6 +361,56 @@ function normalizeKeywords(value) {
     return String(value).split(/[,、，·・]/).map(s => s.trim()).filter(Boolean);
 }
 
+// 소구포인트 키워드 유사도 기반 중복 제거
+// - 정규화: 공백·조사·접미사(형·적인·형의·맞춤) 제거 → 핵심 토큰 추출
+// - Jaccard 유사도 ≥ 0.65 → 같은 클러스터로 묶어 ROAS 높은 대표만 남김
+function deduplicateKeywordItems(items, similarityThreshold) {
+    if (!items || !items.length) return items;
+    const thresh = similarityThreshold || 0.65;
+
+    // 키워드 → 정규화 토큰 셋
+    const STOP = new Set(['의','에','을','를','이','가','은','는','과','와','및','등','로','으로',
+        '맞춤','맞춤형','맞춤의','형','형의','적인','를위한','위한','솔루션','제공','해결','개선',
+        '효과','기능','케어','관리','피부','스킨','뷰티','선택','구성','증정','혜택']);
+    const tokenize = (kw) => {
+        const s = kw.replace(/\s+/g, '').replace(/[,·、·・]/g, '');
+        // 2글자 이상 청크 슬라이딩
+        const chunks = new Set();
+        for (let i = 0; i < s.length - 1; i++) {
+            const bi = s.slice(i, i + 2);
+            if (bi.length === 2) chunks.add(bi);
+        }
+        // 공백 분리 단어 기반 토큰도 추가
+        kw.split(/\s+/).forEach(w => {
+            const c = w.replace(/[형의적인맞춤]/g, '').trim();
+            if (c.length >= 2 && !STOP.has(c)) chunks.add(c);
+        });
+        return chunks;
+    };
+    const jaccard = (a, b) => {
+        let inter = 0;
+        a.forEach(t => { if (b.has(t)) inter++; });
+        return inter / (a.size + b.size - inter);
+    };
+
+    // 대표 아이템 선정: ROAS 내림차순 정렬 후 유사 항목 흡수
+    const sorted = [...items].sort((a, b) => (b.roas || 0) - (a.roas || 0));
+    const representatives = [];
+    const absorbed = new Set();
+
+    sorted.forEach((item, i) => {
+        if (absorbed.has(i)) return;
+        const tokA = tokenize(item.keyword);
+        representatives.push(item);
+        sorted.forEach((other, j) => {
+            if (j <= i || absorbed.has(j)) return;
+            const tokB = tokenize(other.keyword);
+            if (jaccard(tokA, tokB) >= thresh) absorbed.add(j);
+        });
+    });
+    return representatives;
+}
+
 // 키워드별 성과 집계
 // ★ 통일된 선정 기준: 광고비 중앙값(median spend) 이상 소재만 집계 대상
 //    (구버전 INSIGHT_MIN_SPEND=1000 고정값 → 중앙값으로 변경)
@@ -424,7 +474,7 @@ function aggregateByKeyword(creatives, fieldName, opts) {
     });
 
     // 파생 지표 계산 — ROAS/CTR/CVR은 "비율" 단위 (표시 시 ×100)
-    return Array.from(map.values()).map(item => ({
+    const computed = Array.from(map.values()).map(item => ({
         ...item,
         roas:     item.spend > 0       ? (item.revenue / item.spend) : 0,
         ctr:      item.impressions > 0 ? (item.clicks / item.impressions) : 0,
@@ -432,6 +482,12 @@ function aggregateByKeyword(creatives, fieldName, opts) {
         cpa:      item.conversions > 0 ? Math.round(item.spend / item.conversions) : 0,
         atc_rate: item.clicks > 0      ? (item.add_to_cart / item.clicks) : 0,
     }));
+
+    // appeal_points에만 유사도 기반 중복 제거 적용 (소구포인트가 카테고리화되어 중복이 많음)
+    if (fieldName === 'appeal_points') {
+        return deduplicateKeywordItems(computed, 0.65);
+    }
+    return computed;
 }
 
 // AI 분석 데이터가 있는지 확인
