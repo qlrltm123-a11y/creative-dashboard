@@ -306,24 +306,23 @@
                 <div class="flex items-center gap-2">
                     <i class="fas fa-calendar-star text-amber-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">이벤트</span>
-                    <select id="performance-event-select" class="filter-select text-sm min-w-[150px]">
-                        <option value="">전체 이벤트</option>
-                    </select>
+                    <div id="ms-perf-event" class="ms-wrap" style="min-width:150px"></div>
                 </div>
                 <div class="flex items-center gap-2">
                     <i class="fas fa-box-open text-indigo-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">제품</span>
-                    <select id="performance-product-select" class="filter-select text-sm min-w-[160px]">
-                        <option value="">전체 제품</option>
-                    </select>
+                    <div id="ms-perf-product" class="ms-wrap" style="min-width:160px"></div>
                 </div>
                 <div class="flex items-center gap-2">
                     <i class="fas fa-bullhorn text-purple-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">캠페인</span>
-                    <select id="performance-campaign-select" class="filter-select text-sm min-w-[200px] max-w-[280px]">
-                        <option value="">전체 캠페인</option>
-                    </select>
+                    <div id="ms-perf-campaign" class="ms-wrap" style="min-width:200px"></div>
                 </div>
+                <span class="text-[11px] text-slate-400">복수 선택 가능</span>
+                <!-- 호환용 hidden 단일 셀렉트 (레거시 동기화) -->
+                <select id="performance-event-select" class="hidden"></select>
+                <select id="performance-product-select" class="hidden"></select>
+                <select id="performance-campaign-select" class="hidden"></select>
                 <button id="performance-filter-reset" class="ml-auto text-xs text-slate-500 hover:text-indigo-600 transition px-2 py-1 rounded hover:bg-white">
                     <i class="fas fa-rotate-left mr-1"></i>초기화
                 </button>
@@ -1020,6 +1019,7 @@
     <script src="js/generate_v2.js"></script>
     <script src="js/gmv-targets.js"></script>
     <script src="js/glossary.js"></script>
+    <script src="js/multiselect.js"></script>
     <script src="js/compliance.js"></script>
     <script src="js/weekly-report.js"></script>
     <script src="js/unified-briefing.js"></script>
