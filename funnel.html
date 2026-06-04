@@ -160,6 +160,11 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 .brand-trend-box h3{font-size:13px;font-weight:700;color:#334155;margin-bottom:14px}
 .brand-trend-wrap{position:relative;height:280px}
 
+/* ═══ 비마케터 안내 범례 ═══ */
+.funnel-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #c7d2fe;border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:12px;color:#475569}
+.funnel-legend .fl-title{font-weight:800;color:#4338ca}
+.funnel-legend .fl-step b{color:#334155}
+
 /* ═══ States ═══ */
 .brand-panel{display:none}.brand-panel.active{display:block}
 .loading-state{display:flex;align-items:center;gap:10px;padding:60px 0;color:#94a3b8;font-size:13px;justify-content:center}
@@ -174,8 +179,8 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
   <div class="logo">
     <div class="logo-icon">📈</div>
     <div>
-      <h1>퍼널 전환율 대시보드</h1>
-      <p>261Q vs 262Q · 브랜드별 제품 모니터링</p>
+      <h1>구매 여정(퍼널) 대시보드</h1>
+      <p>방문 → 장바구니 → 구매 단계별 전환 · 이번 시즌(262Q) vs 작년 동기(261Q)</p>
     </div>
   </div>
   <div class="header-right">
@@ -210,6 +215,13 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 </div>
 
 <main>
+  <!-- 비마케터 안내 범례 -->
+  <div class="funnel-legend">
+    <span class="fl-title">💡 이렇게 읽으세요</span>
+    <span class="fl-step"><b>방문(유입)</b> → <b style="color:#6366f1">장바구니</b> → <b style="color:#7c3aed">구매</b> 단계로 사람이 줄어듭니다.</span>
+    <span class="fl-step"><b>전환율</b> = 다음 단계로 넘어간 비율 (예: 장바구니율 = 방문 중 담은 비율)</span>
+    <span class="fl-step"><b>262Q</b> = 이번 시즌 · <b>261Q</b> = 작년 같은 기간(비교용)</span>
+  </div>
   <!-- Panels generated per brand -->
   <div id="panel-BOH" class="brand-panel active"></div>
   <div id="panel-WM"  class="brand-panel"></div>
@@ -385,14 +397,14 @@ function buildPanelHTML(brand) {
   const tabsFn = (b) => `
     <div class="inner-tabs" id="itabs-${b}">
       <button class="inner-tab active" onclick="switchInner('${b}','summary',this)">📋 현황 요약</button>
-      <button class="inner-tab" onclick="switchInner('${b}','snapshot',this)">⬡ 스냅샷</button>
-      <button class="inner-tab" onclick="switchInner('${b}','delta',this)">↕ 직전일 변동</button>
-      <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 트렌드</button>
-      <button class="inner-tab" onclick="switchInner('${b}','compare',this)">⊞ 261Q 비교</button>
+      <button class="inner-tab" onclick="switchInner('${b}','snapshot',this)">⬡ 제품별 현황</button>
+      <button class="inner-tab" onclick="switchInner('${b}','delta',this)">↕ 어제 대비 변화</button>
+      <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 일별 추이</button>
+      <button class="inner-tab" onclick="switchInner('${b}','compare',this)">⊞ 작년 동기 비교</button>
     </div>`;
   return `
     <div id="inner-${brand}-summary">
-      <div class="sec-label">${brand} 브랜드 현황 요약 · 262Q (vs 261Q 동기간)</div>
+      <div class="sec-label">${brand} 현황 요약 · 이번 시즌(262Q) vs 작년 동기(261Q)</div>
       <div class="kpi-row" id="kpi-${brand}"></div>
       <div class="brand-trend-box">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
@@ -403,32 +415,32 @@ function buildPanelHTML(brand) {
       </div>
       <div class="summary-cols">
         <div class="panel-box">
-          <h3>🏆 제품별 구매 전환율 랭킹 <span style="font-size:10px;color:#94a3b8;font-weight:500">· 262Q 누적</span></h3>
+          <h3>🏆 제품별 구매 전환율 순위 <span style="font-size:10px;color:#94a3b8;font-weight:500">· 장바구니→구매가 잘 되는 제품 순</span></h3>
           <div id="rank-${brand}"></div>
         </div>
         <div class="panel-box">
-          <h3>⚡ 직전일 대비 하이라이트</h3>
+          <h3>⚡ 어제 대비 눈에 띄는 변화</h3>
           <div id="hl-${brand}"></div>
         </div>
       </div>
     </div>
     <div id="inner-${brand}-snapshot" style="display:none">
-      <div class="sec-label">최신 실적 스냅샷 · 262Q (직전일 대비)</div>
+      <div class="sec-label">제품별 최신 현황 · 방문→장바구니→구매 단계별 (작년 동기 대비)</div>
       <div class="funnel-grid" id="funnel-${brand}"></div>
     </div>
     <div id="inner-${brand}-delta" style="display:none">
-      <div class="sec-label">262Q 직전일 대비 변동</div>
+      <div class="sec-label">제품별 어제 대비 변화 (장바구니율·구매율)</div>
       <div class="delta-grid" id="dcards-${brand}"></div>
     </div>
     <div id="inner-${brand}-trend" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <div class="sec-label" style="margin:0">일별 추이 · 막대=건수(우) 선=전환율(좌) · 실선 262Q 점선 261Q</div>
+        <div class="sec-label" style="margin:0">일별 추이 · 막대=건수 · 선=전환율 · 실선=이번 시즌, 점선=작년 동기</div>
         ${_funnelMetricToggle(brand)}
       </div>
       <div class="trend-grid" id="trend-${brand}"></div>
     </div>
     <div id="inner-${brand}-compare" style="display:none">
-      <div class="sec-label">동일 영업일 기준 · 262Q vs 261Q</div>
+      <div class="sec-label">같은 영업일 기준 · 이번 시즌(262Q) vs 작년 동기(261Q)</div>
       <div class="cmp-grid" id="cmp-${brand}"></div>
     </div>
     ${tabsFn(brand)}`;
