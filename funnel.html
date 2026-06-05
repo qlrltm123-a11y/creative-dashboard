@@ -180,7 +180,7 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
     <div class="logo-icon">📈</div>
     <div>
       <h1>구매 여정(퍼널) 대시보드</h1>
-      <p>방문 → 장바구니 → 구매 단계별 전환 · 이번 시즌(262Q) vs 작년 동기(261Q)</p>
+      <p>방문 → 장바구니 → 구매 단계별 전환 · 이번 시즌(262Q) vs 직전 시즌(261Q)</p>
     </div>
   </div>
   <div class="header-right">
@@ -440,7 +440,7 @@ function buildPanelHTML(brand) {
     </div>`;
   return `
     <div id="inner-${brand}-summary">
-      <div class="sec-label">${brand} 현황 요약 · 이번 시즌(262Q) vs 작년 동기(261Q)</div>
+      <div class="sec-label">${brand} 현황 요약 · 이번 시즌(262Q) vs 직전 시즌(261Q)</div>
       <div class="kpi-row" id="kpi-${brand}"></div>
       <div class="brand-trend-box">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
@@ -468,7 +468,7 @@ function buildPanelHTML(brand) {
       </div>
     </div>
     <div id="inner-${brand}-snapshot" style="display:none">
-      <div class="sec-label">제품별 최신 현황 · 방문→장바구니→구매 단계별 (작년 동기 대비)</div>
+      <div class="sec-label">제품별 최신 현황 · 방문→장바구니→구매 단계별 (직전 시즌 대비)</div>
       <div class="funnel-grid" id="funnel-${brand}"></div>
     </div>
     <div id="inner-${brand}-delta" style="display:none">
@@ -477,7 +477,7 @@ function buildPanelHTML(brand) {
     </div>
     <div id="inner-${brand}-trend" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <div class="sec-label" style="margin:0">일별 추이 · 막대=건수 · 선=전환율 · 실선=이번 시즌, 점선=작년 동기</div>
+        <div class="sec-label" style="margin:0">일별 추이 · 막대=건수 · 선=전환율 · 실선=이번 시즌, 점선=직전 시즌</div>
         ${_funnelMetricToggle(brand)}
       </div>
       <div class="trend-grid" id="trend-${brand}"></div>
@@ -529,42 +529,42 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-val">${n(agg262.inflow)}</div>
       <div class="kpi-sub">${days}일 · ~${lastDate}</div>
       ${inflowD!==null?badge(inflowD,'%'):''}
-      <div class="kpi-sub" style="margin-top:4px">261Q 작년 동기 ${n(agg261.inflow)}</div>
+      <div class="kpi-sub" style="margin-top:4px">261Q 직전 시즌 ${n(agg261.inflow)}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">🛒 장바구니수 (262Q 누적)</div>
       <div class="kpi-val" style="color:#6366f1">${n(agg262.cart)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.cart>0?(agg262.cart-agg261.cart)/agg261.cart*100:null;return d!==null?badge(d,'%'):'';})()}
-      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${n(agg261.cart)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
       <div class="kpi-label">💳 구매수 (262Q 누적)</div>
       <div class="kpi-val" style="color:#7c3aed">${n(agg262.buy)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.buy>0?(agg262.buy-agg261.buy)/agg261.buy*100:null;return d!==null?badge(d,'%'):'';})()}
-      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${n(agg261.buy)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">🛒 전체 장바구니 전환율 <span style="font-weight:500;color:#94a3b8">(유입→장바구니)</span></div>
       <div class="kpi-val" style="color:#4f46e5">${f(cr262)}</div>
       <div class="kpi-sub">${n(agg262.cart)}건</div>
       ${badge(dlt(cr262,cr261))}
-      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(cr261)} · ${n(agg261.cart)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(cr261)} · ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
       <div class="kpi-label">💳 전체 구매 전환율 <span style="font-weight:500;color:#94a3b8">(장바구니→구매)</span></div>
       <div class="kpi-val" style="color:#7c3aed">${f(br262)}</div>
       <div class="kpi-sub">${n(agg262.buy)}건</div>
       ${badge(dlt(br262,br261))}
-      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(br261)} · ${n(agg261.buy)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(br261)} · ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card green">
       <div class="kpi-label">전체 구매 전환 (유입→구매)</div>
       <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
       <div class="kpi-sub">${prods.length}개 제품</div>
       ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}
-      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(rate(agg261.buy,agg261.inflow))}</div>
+      <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(rate(agg261.buy,agg261.inflow))}</div>
     </div>`;
 
   // ── 브랜드 전체 추이 차트 ──
@@ -582,29 +582,29 @@ function renderSummaryTab(brand, data, prods) {
     _btDs.push({type:'bar',label:'장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
     _btDs.push({type:'bar',label:'구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
   } else if(_funnelMetric === 'inflow'){
-    // 유입수: 이번 시즌 + 작년 동기 비교
+    // 유입수: 이번 시즌 + 직전 시즌 비교
     _btDs.push({type:'bar',label:'이번 시즌 유입수',data:ser262.map(r=>r.inflow),backgroundColor:'#6366f1aa',yAxisID:'cnt',borderRadius:3,order:3});
-    _btDs.push({type:'bar',label:'작년 동기 유입수',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#94a3b866',yAxisID:'cnt',borderRadius:3,order:4});
+    _btDs.push({type:'bar',label:'직전 시즌 유입수',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#94a3b866',yAxisID:'cnt',borderRadius:3,order:4});
   } else if(_funnelMetric === 'cart'){
     _btDs.push({type:'bar',label:'이번 시즌 장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
-    _btDs.push({type:'bar',label:'작년 동기 장바구니수',data:pad(ser261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'66',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'직전 시즌 장바구니수',data:pad(ser261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'66',yAxisID:'cnt',borderRadius:3,order:3});
   } else if(_funnelMetric === 'buy'){
     _btDs.push({type:'bar',label:'이번 시즌 구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
-    _btDs.push({type:'bar',label:'작년 동기 구매수',data:pad(ser261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'66',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'직전 시즌 구매수',data:pad(ser261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'66',yAxisID:'cnt',borderRadius:3,order:3});
   }
   // 전환율 라인
   if(_funnelMetric === 'inflow'){
     // 유입수 필터: 유입→장바구니율 라인 표시
     _btDs.push({type:'line',label:'이번 시즌 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
-    _btDs.push({type:'line',label:'작년 동기 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    _btDs.push({type:'line',label:'직전 시즌 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   if(_showCart){
     _btDs.push({type:'line',label:'이번 시즌 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
-    _btDs.push({type:'line',label:'작년 동기 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    _btDs.push({type:'line',label:'직전 시즌 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   if(_showBuy){
     _btDs.push({type:'line',label:'이번 시즌 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
-    _btDs.push({type:'line',label:'작년 동기 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    _btDs.push({type:'line',label:'직전 시즌 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   charts[id] = new Chart(document.getElementById(`btrend-${brand}`),{
     data:{ labels, datasets:_btDs },
@@ -720,7 +720,7 @@ function renderFunnelCards(brand, data, prods) {
             <div class="stage-label" style="color:#94a3b8">유입</div>
             <div class="stage-mid">
               <div class="stage-bar-wrap"><div class="stage-bar bar-inflow" style="width:100%"></div></div>
-              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q 작년 동기 ${n(agg261.inflow)}</span>`:''}</div>
+              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q 직전 시즌 ${n(agg261.inflow)}</span>`:''}</div>
             </div>
             <div class="stage-right">
               <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
@@ -751,7 +751,7 @@ function renderFunnelCards(brand, data, prods) {
           </div>
         </div>
         ${agg261?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e1e2e;display:flex;gap:16px;font-size:11px;color:#555">
-          <span>작년 동기</span>
+          <span>직전 시즌</span>
           <span style="color:#666">🛒 ${f(agg261.cartRate)} · ${n(agg261.cart)}건</span>
           <span style="color:#666">💳 ${f(agg261.buyRate)} · ${n(agg261.buy)}건</span>
         </div>`:''}
@@ -895,7 +895,7 @@ function renderCmpCharts(brand, data, prods) {
     grid.insertAdjacentHTML('beforeend',`
       <div class="cmp-card">
         <div class="cc-title">${prod}</div>
-        <div class="cc-sub">🟣 이번 시즌 &nbsp; 🟠 작년 동기</div>
+        <div class="cc-sub">🟣 이번 시즌 &nbsp; 🟠 직전 시즌</div>
         <div class="cc-sub" style="color:#818cf8;margin:6px 0 4px">🛒 장바구니 전환율</div>
         <div class="cmp-chart-wrap"><canvas id="${idC}"></canvas></div>
         <div class="cc-sub" style="color:#a78bfa;margin:14px 0 4px">💳 구매 전환율</div>
@@ -1057,7 +1057,7 @@ function renderFunnelRank(brand) {
       </div>
       <div style="text-align:right;flex-shrink:0;min-width:80px">
         <div class="rank-rate" style="color:${m.color}">${m.fmt(val)}${badge}</div>
-        <div style="font-size:9px;color:#94a3b8">작년 동기 대비</div>
+        <div style="font-size:9px;color:#94a3b8">직전 시즌 대비</div>
       </div>
     </div>`;
   }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:8px">데이터 없음</div>';
