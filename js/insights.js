@@ -684,6 +684,58 @@ function renderAppealHookHeatmap(list) {
 }
 
 // 메인 렌더 함수
+/* ── 워킹 소구포인트 TOP 8 ──────────────────────────────────────
+   ROAS 높은 순 + 유사 중복 제거 후 시각적 랭킹 카드 렌더         */
+function _renderAppealTop(list) {
+    const wrap = document.getElementById('appealTopList');
+    const card = document.getElementById('appealTopCard');
+    if (!wrap) return;
+
+    // 소구포인트별 집계 (threshold 적용)
+    const raw = aggregateByKeyword(list, 'appeal_points', { threshold: currentInsightThreshold });
+    // 최소 소재 수 1개 이상, 이미 dedup 적용됨
+    const items = raw.filter(i => i.count >= 1).sort((a, b) => b.roas - a.roas).slice(0, 8);
+
+    if (!items.length) {
+        if (card) card.style.display = 'none';
+        return;
+    }
+    if (card) card.style.display = '';
+
+    const maxRoas = Math.max(...items.map(i => i.roas), 0.01);
+    const roasLabel = r => Math.round(r * 100) + '%';
+
+    // 티어 색상 (전체 평균 대비 상대적으로)
+    const avgRoas = items.reduce((s, i) => s + i.roas, 0) / items.length;
+    const tierColor = (r) => {
+        if (r >= avgRoas * 1.25) return { bar: '#22c55e', bg: '#f0fdf4', txt: '#15803d', label: '잘됨' };
+        if (r >= avgRoas * 0.85) return { bar: '#6366f1', bg: '#eef2ff', txt: '#4338ca', label: '양호' };
+        return { bar: '#f59e0b', bg: '#fffbeb', txt: '#b45309', label: '보통' };
+    };
+
+    wrap.innerHTML = items.map((item, i) => {
+        const tc = tierColor(item.roas);
+        const barW = Math.round(item.roas / maxRoas * 100);
+        const rankBg = i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#c87941' : '#e2e8f0';
+        const rankTxt = i <= 2 ? '#fff' : '#64748b';
+        return `
+        <div class="atop-row" style="background:${tc.bg};border-color:${tc.bar}30">
+            <div class="atop-rank" style="background:${rankBg};color:${rankTxt}">${i + 1}</div>
+            <div class="atop-main">
+                <div class="atop-name">${item.keyword}</div>
+                <div class="atop-bar-wrap">
+                    <div class="atop-bar" style="width:${barW}%;background:${tc.bar}"></div>
+                </div>
+            </div>
+            <div class="atop-meta">
+                <div class="atop-roas" style="color:${tc.txt}">${roasLabel(item.roas)}</div>
+                <div class="atop-count">${item.count}개 소재</div>
+                <span class="atop-badge" style="background:${tc.bar}20;color:${tc.txt}">${tc.label}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
 function renderAIInsights() {
     const section = document.getElementById('ai-insights-section');
     if (!section) return;
@@ -692,6 +744,9 @@ function renderAIInsights() {
     populateAIInsightsProductOptions();
 
     const list = getAIInsightsList();
+
+    // ── 워킹 소구포인트 TOP 8 렌더 ──────────────────────────────
+    _renderAppealTop(list);
 
     // 빈 상태 placeholder를 위한 컨테이너 헬퍼
     const clearChildren = (id) => {

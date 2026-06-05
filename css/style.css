@@ -5502,6 +5502,22 @@ body {
 .intro-banner-x:hover { background: #eef2ff; }
 
 /* ══════════════════════════════════════════════
+   워킹 소구포인트 TOP (.atop-*)
+══════════════════════════════════════════════ */
+.appeal-top-grid { display: flex; flex-direction: column; gap: 8px; }
+.atop-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 12px; transition: transform .12s, box-shadow .12s; }
+.atop-row:hover { transform: translateX(2px); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.atop-rank { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.atop-main { flex: 1; min-width: 0; }
+.atop-name { font-size: 13.5px; font-weight: 700; color: #1e293b; margin-bottom: 5px; }
+.atop-bar-wrap { height: 7px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+.atop-bar { height: 100%; border-radius: 4px; transition: width .5s; }
+.atop-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.atop-roas { font-size: 16px; font-weight: 800; line-height: 1; }
+.atop-count { font-size: 10px; color: #94a3b8; }
+.atop-badge { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+
+/* ══════════════════════════════════════════════
    복수 선택 드롭다운 (.ms)
 ══════════════════════════════════════════════ */
 .ms { position: relative; display: inline-block; }
