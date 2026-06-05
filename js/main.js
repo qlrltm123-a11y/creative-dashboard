@@ -842,10 +842,26 @@ function populateAiFilterOptions() {
     aiProducts  = aiProducts.filter(p => products.includes(p));
     aiCampaigns = aiCampaigns.filter(c => campaigns.includes(c));
 
-    // MS 위젯 갱신
-    if (window._aiMsEvent)    window._aiMsEvent.setOptions(events, aiEvents);
-    if (window._aiMsProduct)  window._aiMsProduct.setOptions(products, aiProducts);
-    if (window._aiMsCampaign) window._aiMsCampaign.setOptions(campaigns, aiCampaigns);
+    // MS 위젯 갱신 (위젯 미초기화 시 즉시 생성 시도)
+    const _tryInitMs = (id, key, placeholder, allLabel, onChange) => {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        if (!window[key] && typeof createMultiSelect === 'function')
+            window[key] = createMultiSelect(el, { placeholder, allLabel, onChange });
+        return window[key];
+    };
+    const msEv = _tryInitMs('ms-ai-event', '_aiMsEvent', '이벤트', '전체 이벤트', (sel) => {
+        aiEvents = sel; aiEvent = sel[0]||''; populateAiFilterOptions(); debouncedRefreshAi();
+    });
+    const msPr = _tryInitMs('ms-ai-product', '_aiMsProduct', '제품', '전체 제품', (sel) => {
+        aiProducts = sel; aiProduct = sel[0]||''; syncHiddenAiSelect(); debouncedRefreshAi();
+    });
+    const msCm = _tryInitMs('ms-ai-campaign', '_aiMsCampaign', '캠페인', '전체 캠페인', (sel) => {
+        aiCampaigns = sel; aiCampaign = sel[0]||''; debouncedRefreshAi();
+    });
+    if (msEv) msEv.setOptions(events, aiEvents);
+    if (msPr) msPr.setOptions(products, aiProducts);
+    if (msCm) msCm.setOptions(campaigns, aiCampaigns);
 
     // 호환용 hidden 셀렉트 동기화
     syncHiddenAiSelect();
