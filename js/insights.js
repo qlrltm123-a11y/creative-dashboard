@@ -694,12 +694,17 @@ function _renderAppealTop(list) {
     const card = document.getElementById('appealTopCard');
     if (!wrap) return;
 
-    // 소구포인트별 집계 (threshold 0 = 전체 포함, dedup 내부 적용)
-    const thr = currentInsightThreshold || 0;
-    const raw = aggregateByKeyword(list || [], 'appeal_points', { threshold: thr });
-    // ROAS > 0 이고 소재 1개 이상, 상위 8개
-    const items = (raw || []).filter(i => i.count >= 1 && i.roas > 0)
-        .sort((a, b) => b.roas - a.roas).slice(0, 8);
+    // ★ threshold=0 → 전체 소재 사용 (광고비 필터 제거)
+    //   중앙값 필터를 적용하면 소재가 1개씩만 남아 모두 같은 ROAS → 무의미
+    const raw = aggregateByKeyword(list || [], 'appeal_points', { threshold: 0 });
+
+    // 최소 2개 소재 이상 & ROAS > 0 인 항목만 신뢰할 수 있음
+    const valid = (raw || []).filter(i => i.count >= 2 && i.roas > 0);
+    const singleOnly = (raw || []).filter(i => i.count === 1 && i.roas > 0);
+
+    // 유효 데이터 없으면 1개짜리 포함해서 표시 (단, 신뢰도 낮음 표시)
+    const pool = valid.length >= 3 ? valid : [...valid, ...singleOnly];
+    const items = pool.sort((a, b) => b.roas - a.roas).slice(0, 8);
 
     if (!items.length) {
         if (card) card.style.display = 'none';
@@ -710,35 +715,55 @@ function _renderAppealTop(list) {
     const maxRoas = Math.max(...items.map(i => i.roas), 0.01);
     const roasLabel = r => Math.round(r * 100) + '%';
 
-    // 티어 색상 (전체 평균 대비 상대적으로)
-    const avgRoas = items.reduce((s, i) => s + i.roas, 0) / items.length;
-    const tierColor = (r) => {
-        if (r >= avgRoas * 1.25) return { bar: '#22c55e', bg: '#f0fdf4', txt: '#15803d', label: '잘됨' };
-        if (r >= avgRoas * 0.85) return { bar: '#6366f1', bg: '#eef2ff', txt: '#4338ca', label: '양호' };
+    // 티어: 전체 평균 대비 상대적 위치 (≥1.25× → 우수, 0.85~1.25 → 양호, 그 외 → 보통)
+    const weightedAvg = items.reduce((s, i) => s + i.roas * i.count, 0) /
+                        Math.max(items.reduce((s, i) => s + i.count, 0), 1);
+    const tierColor = (r, cnt) => {
+        if (cnt < 2) return { bar: '#94a3b8', bg: '#f8fafc', txt: '#64748b', label: '데이터 부족' };
+        if (r >= weightedAvg * 1.25) return { bar: '#22c55e', bg: '#f0fdf4', txt: '#15803d', label: '우수' };
+        if (r >= weightedAvg * 0.85) return { bar: '#6366f1', bg: '#eef2ff', txt: '#4338ca', label: '양호' };
         return { bar: '#f59e0b', bg: '#fffbeb', txt: '#b45309', label: '보통' };
     };
 
+    // 신뢰도 표시 (소재 수 기준)
+    const reliab = (cnt) => {
+        if (cnt >= 10) return { icon: '●●●', tip: '신뢰도 높음 (10개+)' };
+        if (cnt >= 4)  return { icon: '●●○', tip: '신뢰도 보통 (4~9개)' };
+        if (cnt >= 2)  return { icon: '●○○', tip: '신뢰도 낮음 (2~3개)' };
+        return             { icon: '○○○', tip: '데이터 부족 (1개, 참고용)' };
+    };
+
     wrap.innerHTML = items.map((item, i) => {
-        const tc = tierColor(item.roas);
+        const tc = tierColor(item.roas, item.count);
         const barW = Math.round(item.roas / maxRoas * 100);
+        const rel = reliab(item.count);
         const rankBg = i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#c87941' : '#e2e8f0';
         const rankTxt = i <= 2 ? '#fff' : '#64748b';
+        const diffVsAvg = weightedAvg > 0 ? Math.round((item.roas / weightedAvg - 1) * 100) : 0;
+        const diffStr = diffVsAvg >= 0 ? `+${diffVsAvg}%` : `${diffVsAvg}%`;
+        const diffCol = diffVsAvg >= 0 ? '#059669' : '#dc2626';
         return `
         <div class="atop-row" style="background:${tc.bg};border-color:${tc.bar}30">
             <div class="atop-rank" style="background:${rankBg};color:${rankTxt}">${i + 1}</div>
             <div class="atop-main">
-                <div class="atop-name">${item.keyword}</div>
+                <div class="atop-name">${item.keyword}
+                    <span style="font-size:9px;color:#94a3b8;font-weight:400;margin-left:4px" title="${rel.tip}">${rel.icon}</span>
+                </div>
                 <div class="atop-bar-wrap">
                     <div class="atop-bar" style="width:${barW}%;background:${tc.bar}"></div>
                 </div>
             </div>
             <div class="atop-meta">
-                <div class="atop-roas" style="color:${tc.txt}">${roasLabel(item.roas)}</div>
+                <div class="atop-roas" style="color:${tc.txt}">${roasLabel(item.roas)}
+                    <span style="font-size:10px;font-weight:600;color:${diffCol};margin-left:3px">(${diffStr})</span>
+                </div>
                 <div class="atop-count">${item.count}개 소재</div>
                 <span class="atop-badge" style="background:${tc.bar}20;color:${tc.txt}">${tc.label}</span>
             </div>
         </div>`;
-    }).join('');
+    }).join('') +
+    (valid.length < 3 ? `<div class="atop-notice">⚠️ 2개 이상 소재에서 확인된 항목이 부족합니다. 소구포인트 데이터를 더 쌓으면 신뢰도가 높아집니다.</div>` : '');
+
     } catch(e) {
         console.warn('[appealTop] 렌더 오류:', e);
         const wrap = document.getElementById('appealTopList');
