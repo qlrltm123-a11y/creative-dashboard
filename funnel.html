@@ -414,7 +414,14 @@ function buildPanelHTML(brand) {
       </div>
       <div class="summary-cols">
         <div class="panel-box">
-          <h3>🏆 제품별 구매 전환율 순위 <span style="font-size:10px;color:#94a3b8;font-weight:500">· 장바구니→구매가 잘 되는 제품 순</span></h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+            <h3 style="margin:0">🏆 제품별 볼륨 순위 <span style="font-size:10px;color:#94a3b8;font-weight:500" id="rank-sub-${brand}">· 주문수 기준</span></h3>
+            <div class="fm-toggle">
+              <button class="fm-btn active" onclick="setRankMetric('${brand}','buy',this)">주문수</button>
+              <button class="fm-btn" onclick="setRankMetric('${brand}','cart',this)">장바구니수</button>
+              <button class="fm-btn" onclick="setRankMetric('${brand}','inflow',this)">유입수</button>
+            </div>
+          </div>
           <div id="rank-${brand}"></div>
         </div>
         <div class="panel-box">
@@ -561,24 +568,20 @@ function renderSummaryTab(brand, data, prods) {
         cnt:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'건수',color:'#94a3b8',font:{size:9}}}}}
   });
 
-  // ── 제품별 구매 전환율 랭킹 (262Q 누적) ──
-  const ranking = prods.map(p=>{
+  // ── 제품별 볼륨 순위 (262Q 누적) — 주문수·장바구니수·유입수 ──
+  const _rankData = prods.map(p=>{
     const rows = data['262Q'][p]||[];
     if(!rows.length) return null;
     const a = aggregate(rows);
-    return {prod:p, buyRate:a.buyRate, buy:a.buy};
-  }).filter(Boolean).sort((a,b)=>(b.buyRate||0)-(a.buyRate||0));
-  const maxBuyRate = Math.max(...ranking.map(r=>r.buyRate||0),1);
-  document.getElementById(`rank-${brand}`).innerHTML = ranking.map((r,i)=>`
-    <div class="rank-row">
-      <div class="rank-num">${i+1}</div>
-      <div class="rank-name" title="${r.prod}">${r.prod}</div>
-      <div class="rank-bar-wrap">
-        <div class="rank-bar-track"><div class="rank-bar" style="width:${((r.buyRate||0)/maxBuyRate*100).toFixed(0)}%"></div></div>
-        <div style="font-size:9px;color:#94a3b8">${n(r.buy)}건</div>
-      </div>
-      <div class="rank-rate">${f(r.buyRate)}</div>
-    </div>`).join('');
+    return {prod:p, buy:a.buy||0, cart:a.cart||0, inflow:a.inflow||0,
+            buyRate:a.buyRate, cartRate:a.cartRate};
+  }).filter(Boolean);
+  // 브랜드별 랭킹 데이터 저장
+  if(!window._funnelRankData) window._funnelRankData={};
+  window._funnelRankData[brand] = _rankData;
+  if(!window._funnelRankMetric) window._funnelRankMetric={};
+  if(!window._funnelRankMetric[brand]) window._funnelRankMetric[brand]='buy';
+  renderFunnelRank(brand);
 
   // ── 직전일 대비 하이라이트 ──
   const movers = prods.map(p=>{
@@ -933,6 +936,50 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadBrand(init);
   // 자동 새로고침 비활성화 - '시트 갱신' 버튼으로만 갱신
 });
+
+// ── 제품별 볼륨 순위 렌더 ────────────────────────────────────────
+function renderFunnelRank(brand) {
+  const el = document.getElementById(`rank-${brand}`);
+  const sub = document.getElementById(`rank-sub-${brand}`);
+  if(!el) return;
+  const data = window._funnelRankData?.[brand] || [];
+  const metric = window._funnelRankMetric?.[brand] || 'buy';
+
+  const metaMap = {
+    buy:    { label:'주문수',    sub:'주문 많은 제품 순', color:'#7c3aed', fmt: v=>`${n(v)}건`,  aux: (r)=>`장바구니 ${n(r.cart)}건 · 전환 ${f(r.buyRate)}` },
+    cart:   { label:'장바구니수', sub:'장바구니 많은 제품 순', color:'#6366f1', fmt: v=>`${n(v)}건`, aux: (r)=>`주문 ${n(r.buy)}건 · 전환 ${f(r.buyRate)}` },
+    inflow: { label:'유입수',    sub:'유입 많은 제품 순', color:'#94a3b8', fmt: v=>`${n(v)}건`,  aux: (r)=>`장바구니 ${n(r.cart)}건 · 주문 ${n(r.buy)}건` },
+  };
+  const m = metaMap[metric];
+  if(sub) sub.textContent = `· ${m.sub}`;
+
+  const sorted = [...data].sort((a,b)=>(b[metric]||0)-(a[metric]||0));
+  const maxVal = Math.max(...sorted.map(r=>r[metric]||0), 1);
+
+  el.innerHTML = sorted.map((r,i)=>{
+    const val = r[metric]||0;
+    const barW = (val/maxVal*100).toFixed(0);
+    return `
+    <div class="rank-row" style="grid-template-columns:20px 1fr 1fr auto">
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-name" title="${r.prod}">${r.prod}</div>
+      <div class="rank-bar-wrap">
+        <div class="rank-bar-track"><div class="rank-bar" style="width:${barW}%;background:${m.color}"></div></div>
+        <div style="font-size:9px;color:#94a3b8;margin-top:2px">${m.aux(r)}</div>
+      </div>
+      <div class="rank-rate" style="color:${m.color};min-width:54px">${m.fmt(val)}</div>
+    </div>`;
+  }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:8px">데이터 없음</div>';
+}
+
+function setRankMetric(brand, metric, btn) {
+  if(!window._funnelRankMetric) window._funnelRankMetric={};
+  window._funnelRankMetric[brand] = metric;
+  // 버튼 active 토글
+  btn.closest('.fm-toggle').querySelectorAll('.fm-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFunnelRank(brand);
+}
 </script>
 </body>
 </html>
