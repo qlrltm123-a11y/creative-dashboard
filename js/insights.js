@@ -388,9 +388,11 @@ function deduplicateKeywordItems(items, similarityThreshold) {
         return chunks;
     };
     const jaccard = (a, b) => {
+        if (!a.size || !b.size) return 0;
         let inter = 0;
         a.forEach(t => { if (b.has(t)) inter++; });
-        return inter / (a.size + b.size - inter);
+        const denom = a.size + b.size - inter;
+        return denom > 0 ? inter / denom : 0;
     };
 
     // 대표 아이템 선정: ROAS 내림차순 정렬 후 유사 항목 흡수
@@ -687,14 +689,17 @@ function renderAppealHookHeatmap(list) {
 /* ── 워킹 소구포인트 TOP 8 ──────────────────────────────────────
    ROAS 높은 순 + 유사 중복 제거 후 시각적 랭킹 카드 렌더         */
 function _renderAppealTop(list) {
+    try {
     const wrap = document.getElementById('appealTopList');
     const card = document.getElementById('appealTopCard');
     if (!wrap) return;
 
-    // 소구포인트별 집계 (threshold 적용)
-    const raw = aggregateByKeyword(list, 'appeal_points', { threshold: currentInsightThreshold });
-    // 최소 소재 수 1개 이상, 이미 dedup 적용됨
-    const items = raw.filter(i => i.count >= 1).sort((a, b) => b.roas - a.roas).slice(0, 8);
+    // 소구포인트별 집계 (threshold 0 = 전체 포함, dedup 내부 적용)
+    const thr = currentInsightThreshold || 0;
+    const raw = aggregateByKeyword(list || [], 'appeal_points', { threshold: thr });
+    // ROAS > 0 이고 소재 1개 이상, 상위 8개
+    const items = (raw || []).filter(i => i.count >= 1 && i.roas > 0)
+        .sort((a, b) => b.roas - a.roas).slice(0, 8);
 
     if (!items.length) {
         if (card) card.style.display = 'none';
@@ -734,6 +739,13 @@ function _renderAppealTop(list) {
             </div>
         </div>`;
     }).join('');
+    } catch(e) {
+        console.warn('[appealTop] 렌더 오류:', e);
+        const wrap = document.getElementById('appealTopList');
+        if (wrap) wrap.innerHTML = '';
+        const card = document.getElementById('appealTopCard');
+        if (card) card.style.display = 'none';
+    }
 }
 
 function renderAIInsights() {
