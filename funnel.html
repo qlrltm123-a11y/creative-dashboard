@@ -244,7 +244,7 @@ let charts = {};
 let _funnelMetric = 'both';
 function _funnelMetricToggle(brand) {
   const opt = (v, label) => `<button class="fm-btn${_funnelMetric===v?' active':''}" onclick="setFunnelMetric('${v}')">${label}</button>`;
-  return `<div class="fm-toggle">${opt('both','전체')}${opt('cart','장바구니율')}${opt('buy','구매율')}</div>`;
+  return `<div class="fm-toggle">${opt('both','전체')}${opt('inflow','유입수')}${opt('cart','장바구니율')}${opt('buy','구매율')}</div>`;
 }
 function setFunnelMetric(v) {
   _funnelMetric = v;
@@ -812,9 +812,16 @@ function renderTrendCharts(brand, data, prods) {
       </div>`);
     const labels = (d262.length>=d261.length?d262:d261).map(r=>r.date);
     const pad = (arr,len) => { const a=[...arr]; while(a.length<len) a.push(null); return a; };
-    const _showCart = _funnelMetric === 'both' || _funnelMetric === 'cart';
-    const _showBuy  = _funnelMetric === 'both' || _funnelMetric === 'buy';
+    const _showInflow = _funnelMetric === 'both' || _funnelMetric === 'inflow';
+    const _showCart   = _funnelMetric === 'both' || _funnelMetric === 'cart';
+    const _showBuy    = _funnelMetric === 'both' || _funnelMetric === 'buy';
+    const CI = { inflow:'#94a3b8', inflow261:'#cbd5e1' }; // 유입 색상
     const _tDs = [];
+    // 유입수 막대
+    if(_showInflow){
+      _tDs.push({type:'bar',label:'262Q 유입수',data:pad(d262.map(r=>r.inflow),labels.length),backgroundColor:CI.inflow+'88',yAxisID:'count',borderRadius:3,order:5});
+      _tDs.push({type:'bar',label:'261Q 유입수',data:pad(d261.map(r=>r.inflow),labels.length),backgroundColor:CI.inflow261+'99',yAxisID:'count',borderRadius:3,order:6});
+    }
     if(_showCart){
       _tDs.push({type:'bar',label:'262Q 장바구니수',data:pad(d262.map(r=>r.cart),labels.length),backgroundColor:C262.cart+'66',yAxisID:'count',borderRadius:3,order:3});
       _tDs.push({type:'bar',label:'261Q 장바구니수',data:pad(d261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'55',yAxisID:'count',borderRadius:3,order:4});
@@ -822,6 +829,11 @@ function renderTrendCharts(brand, data, prods) {
     if(_showBuy){
       _tDs.push({type:'bar',label:'262Q 구매수',data:pad(d262.map(r=>r.buy),labels.length),backgroundColor:C262.buy+'66',yAxisID:'count',borderRadius:3,order:3});
       _tDs.push({type:'bar',label:'261Q 구매수',data:pad(d261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'55',yAxisID:'count',borderRadius:3,order:4});
+    }
+    // 전환율 라인 (유입 필터 시 유입→장바구니율 표시)
+    if(_showInflow && _funnelMetric === 'inflow'){
+      _tDs.push({type:'line',label:'262Q 장바구니율',data:pad(d262.map(r=>r.cartRate),labels.length),borderColor:C262.cart,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+      _tDs.push({type:'line',label:'261Q 장바구니율',data:pad(d261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,backgroundColor:'transparent',borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
     }
     if(_showCart){
       _tDs.push({type:'line',label:'262Q 장바구니율',data:pad(d262.map(r=>r.cartRate),labels.length),borderColor:C262.cart,backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
