@@ -368,19 +368,24 @@ function deduplicateKeywordItems(items, similarityThreshold) {
     if (!items || !items.length) return items;
     const thresh = similarityThreshold || 0.65;
 
-    // 키워드 → 정규화 토큰 셋
+    // ★ 성능: dedup 전에 ROAS 상위 50개만 처리 (O(n²) 입력 제한)
+    const DEDUP_LIMIT = 50;
+    const sorted = [...items].sort((a, b) => (b.roas || 0) - (a.roas || 0));
+    const limited = sorted.slice(0, DEDUP_LIMIT);
+    const rest    = sorted.slice(DEDUP_LIMIT); // 나머지는 dedup 없이 그대로
+
     const STOP = new Set(['의','에','을','를','이','가','은','는','과','와','및','등','로','으로',
         '맞춤','맞춤형','맞춤의','형','형의','적인','를위한','위한','솔루션','제공','해결','개선',
         '효과','기능','케어','관리','피부','스킨','뷰티','선택','구성','증정','혜택']);
+
+    // ★ 성능: 토큰 사전 계산 (반복 tokenize 제거)
     const tokenize = (kw) => {
         const s = kw.replace(/\s+/g, '').replace(/[,·、·・]/g, '');
-        // 2글자 이상 청크 슬라이딩
         const chunks = new Set();
         for (let i = 0; i < s.length - 1; i++) {
             const bi = s.slice(i, i + 2);
             if (bi.length === 2) chunks.add(bi);
         }
-        // 공백 분리 단어 기반 토큰도 추가
         kw.split(/\s+/).forEach(w => {
             const c = w.replace(/[형의적인맞춤]/g, '').trim();
             if (c.length >= 2 && !STOP.has(c)) chunks.add(c);
@@ -395,22 +400,25 @@ function deduplicateKeywordItems(items, similarityThreshold) {
         return denom > 0 ? inter / denom : 0;
     };
 
-    // 대표 아이템 선정: ROAS 내림차순 정렬 후 유사 항목 흡수
-    const sorted = [...items].sort((a, b) => (b.roas || 0) - (a.roas || 0));
+    // 토큰 캐시 (중복 계산 방지)
+    const tokenCache = new Map();
+    const getTokens = (kw) => {
+        if (!tokenCache.has(kw)) tokenCache.set(kw, tokenize(kw));
+        return tokenCache.get(kw);
+    };
+
     const representatives = [];
     const absorbed = new Set();
-
-    sorted.forEach((item, i) => {
+    limited.forEach((item, i) => {
         if (absorbed.has(i)) return;
-        const tokA = tokenize(item.keyword);
+        const tokA = getTokens(item.keyword);
         representatives.push(item);
-        sorted.forEach((other, j) => {
+        limited.forEach((other, j) => {
             if (j <= i || absorbed.has(j)) return;
-            const tokB = tokenize(other.keyword);
-            if (jaccard(tokA, tokB) >= thresh) absorbed.add(j);
+            if (jaccard(tokA, getTokens(other.keyword)) >= thresh) absorbed.add(j);
         });
     });
-    return representatives;
+    return [...representatives, ...rest];
 }
 
 // 키워드별 성과 집계
@@ -485,10 +493,8 @@ function aggregateByKeyword(creatives, fieldName, opts) {
         atc_rate: item.clicks > 0      ? (item.add_to_cart / item.clicks) : 0,
     }));
 
-    // appeal_points에만 유사도 기반 중복 제거 적용 (소구포인트가 카테고리화되어 중복이 많음)
-    if (fieldName === 'appeal_points') {
-        return deduplicateKeywordItems(computed, 0.65);
-    }
+    // ★ dedup은 _renderAppealTop에서만 명시적으로 호출
+    //   여기서 자동 적용하면 차트·테이블 렌더마다 O(n²) 실행되어 UI 블로킹 발생
     return computed;
 }
 
@@ -694,9 +700,11 @@ function _renderAppealTop(list) {
     const card = document.getElementById('appealTopCard');
     if (!wrap) return;
 
-    // ★ threshold=0 → 전체 소재 사용 (광고비 필터 제거)
-    //   중앙값 필터를 적용하면 소재가 1개씩만 남아 모두 같은 ROAS → 무의미
-    const raw = aggregateByKeyword(list || [], 'appeal_points', { threshold: 0 });
+    // ★ threshold=0 → 전체 소재 사용 + 유사도 dedup 명시 적용
+    const raw = deduplicateKeywordItems(
+        aggregateByKeyword(list || [], 'appeal_points', { threshold: 0 }),
+        0.65
+    );
 
     // 최소 2개 소재 이상 & ROAS > 0 인 항목만 신뢰할 수 있음
     const valid = (raw || []).filter(i => i.count >= 2 && i.roas > 0);
@@ -782,8 +790,9 @@ function renderAIInsights() {
 
     const list = getAIInsightsList();
 
-    // ── 워킹 소구포인트 TOP 8 렌더 ──────────────────────────────
-    _renderAppealTop(list);
+    // ── 워킹 소구포인트 TOP 8 렌더 (비동기 — UI 블로킹 방지) ──
+    const _listSnap = list.slice(); // 참조 스냅샷
+    setTimeout(() => _renderAppealTop(_listSnap), 0);
 
     // 빈 상태 placeholder를 위한 컨테이너 헬퍼
     const clearChildren = (id) => {
