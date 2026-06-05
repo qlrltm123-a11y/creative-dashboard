@@ -2917,15 +2917,37 @@ function renderAppealInsight() {
     allRoas.forEach(item => { item._tokens = extractTokens(item.keyword); });
     allCtr.forEach(item =>  { item._tokens = extractTokens(item.keyword); });
 
-    function buildWinners(all, sortKey) {
-        const minThree = all.filter(x => (x.pickedCount || 0) >= 3);
-        const minTwo   = all.filter(x => (x.pickedCount || 0) >= 2);
-        const candidates = minThree.length >= 3 ? minThree : minTwo.length >= 3 ? minTwo : all;
-        return pickDiverse([...candidates].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0)), 5);
+    // ── 전환수·광고비 중앙값 계산 (신뢰도 기준) ──────────────────
+    function calcMedian(arr) {
+        if (!arr.length) return 0;
+        const s = [...arr].sort((a, b) => a - b);
+        return s.length % 2 === 0 ? (s[s.length/2-1] + s[s.length/2]) / 2 : s[Math.floor(s.length/2)];
     }
-    const roasWinners = buildWinners(allRoas, 'roas');
+    const cvMedianRoas  = calcMedian(allRoas.map(x => x.conversions || 0));
+    const spendMedianRoas = calcMedian(allRoas.map(x => x.spend || 0));
+    const cvMedianCtr   = calcMedian(allCtr.map(x => x.conversions || 0));
+    const spendMedianCtr  = calcMedian(allCtr.map(x => x.spend || 0));
+
+    function buildWinners(all, sortKey, cvMed, spendMed) {
+        // ★ 1순위: 전환수 AND 광고비 모두 중앙값 이상 (가장 신뢰)
+        const highConf = all.filter(x => (x.conversions||0) >= cvMed && (x.spend||0) >= spendMed && (x.pickedCount||0) >= 2);
+        // 2순위: 전환수 또는 광고비 중 하나 이상 + 소재 2개 이상
+        const midConf  = all.filter(x => ((x.conversions||0) >= cvMed || (x.spend||0) >= spendMed) && (x.pickedCount||0) >= 2);
+        // 3순위: 소재 3개 이상 (기존 방식)
+        const minThree = all.filter(x => (x.pickedCount||0) >= 3);
+        const minTwo   = all.filter(x => (x.pickedCount||0) >= 2);
+
+        // 후보군: 신뢰도 높은 그룹부터, 5개 확보 가능한 수준으로 선택
+        const candidates = highConf.length >= 3 ? highConf
+            : midConf.length >= 3 ? midConf
+            : minThree.length >= 3 ? minThree
+            : minTwo.length >= 3 ? minTwo : all;
+
+        return pickDiverse([...candidates].sort((a, b) => (b[sortKey]||0) - (a[sortKey]||0)), 5);
+    }
+    const roasWinners = buildWinners(allRoas, 'roas', cvMedianRoas, spendMedianRoas);
     const ctrSortKey  = ctrCartMode ? 'atc_rate' : 'ctr';
-    const ctrWinners  = buildWinners(allCtr, ctrSortKey);
+    const ctrWinners  = buildWinners(allCtr, ctrSortKey, cvMedianCtr, spendMedianCtr);
     const winners = roasWinners; // aiGuide는 ROAS 기준 사용
 
     // 4) "다음에 이렇게 만들자" 추천 조합 — winner 소구 + 같은 소재의 후킹/감정 추출
