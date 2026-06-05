@@ -248,7 +248,44 @@ function _funnelMetricToggle(brand) {
 }
 function setFunnelMetric(v) {
   _funnelMetric = v;
-  if (brandData[currentBrand]) { render(currentBrand); _restoreInner(currentBrand); }
+  if (!brandData[currentBrand]) return;
+  const b = currentBrand;
+
+  // 트렌드 탭(일별 추이)은 renderTrendCharts만 부분 재렌더 (전체 render 불필요)
+  if (_activeInner === 'trend') {
+    const grid = document.getElementById(`trend-${b}`);
+    if (grid) {
+      // 기존 차트 파괴
+      Object.keys(charts).filter(k=>k.startsWith(b+'_t_')).forEach(k=>{charts[k].destroy();delete charts[k];});
+      grid.innerHTML = '';
+      const data = brandData[b];
+      const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
+      renderTrendCharts(b, data, prods);
+    }
+    // 토글 버튼 active 상태 갱신
+    document.querySelectorAll(`#inner-${b}-trend .fm-btn, #inner-${b}-summary .fm-btn`).forEach(btn => {
+      const metric = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+      btn.classList.toggle('active', metric === v);
+    });
+    return;
+  }
+
+  // 현황 요약의 브랜드 일별 추이도 부분 재렌더
+  if (_activeInner === 'summary') {
+    const id = `${b}_btrend`;
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    const data = brandData[b];
+    const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
+    renderSummaryTab(b, data, prods);
+    document.querySelectorAll(`#inner-${b}-summary .fm-btn`).forEach(btn => {
+      const metric = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+      btn.classList.toggle('active', metric === v);
+    });
+    return;
+  }
+
+  // 그 외 탭에서 누른 경우 전체 재렌더
+  render(b); _restoreInner(b);
 }
 
 // ── 기본 시트 URL (링크 공유 시 자동 로드) ──────────────────────────────────────
