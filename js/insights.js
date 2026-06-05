@@ -692,71 +692,70 @@ function renderAppealHookHeatmap(list) {
 }
 
 // 메인 렌더 함수
-/* ── 워킹 소구포인트 TOP 8 ──────────────────────────────────────
-   ROAS 높은 순 + 유사 중복 제거 후 시각적 랭킹 카드 렌더         */
+/* ── 워킹 소구포인트 TOP 5 ──────────────────────────────────────
+   ROAS 높은 순, CV 건수 중앙값·평균값 기반 신뢰도 판정            */
 function _renderAppealTop(list) {
     try {
     const wrap = document.getElementById('appealTopList');
     const card = document.getElementById('appealTopCard');
     if (!wrap) return;
 
-    // ★ threshold=0 → 전체 소재 사용 + 유사도 dedup 명시 적용
+    // 전체 소재 기준 집계 + 유사 중복 제거
     const raw = deduplicateKeywordItems(
-        aggregateByKeyword(list || [], 'appeal_points', { threshold: 0 }),
-        0.65
-    );
+        aggregateByKeyword(list || [], 'appeal_points', { threshold: 0 }), 0.65);
+    const all = (raw || []).filter(i => i.roas > 0);
+    if (!all.length) { if (card) card.style.display = 'none'; return; }
 
-    // 최소 2개 소재 이상 & ROAS > 0 인 항목만 신뢰할 수 있음
-    const valid = (raw || []).filter(i => i.count >= 2 && i.roas > 0);
-    const singleOnly = (raw || []).filter(i => i.count === 1 && i.roas > 0);
+    // ── CV(전환) 건수 기반 통계 기준치 산출 ──────────────────────
+    const cvArr = all.map(i => i.conversions || 0).sort((a, b) => a - b);
+    const cvMedian = cvArr.length % 2 === 0
+        ? (cvArr[cvArr.length/2 - 1] + cvArr[cvArr.length/2]) / 2
+        : cvArr[Math.floor(cvArr.length/2)];
+    const cvAvg = cvArr.reduce((s,v)=>s+v,0) / Math.max(cvArr.length,1);
+    // 보수적 기준: 중앙값과 평균의 낮은 쪽 (더 많이 요구)
+    const cvThresh = Math.max(Math.min(cvMedian, cvAvg), 1);
 
-    // 유효 데이터 없으면 1개짜리 포함해서 표시 (단, 신뢰도 낮음 표시)
-    const pool = valid.length >= 3 ? valid : [...valid, ...singleOnly];
-    const items = pool.sort((a, b) => b.roas - a.roas).slice(0, 8);
+    // 신뢰도: CV 건수가 기준치 대비 얼마나 충족했는지
+    const credib = (cv) => {
+        if (cv >= cvThresh * 2) return { lv:3, icon:'★★★', txt:'높음',  tip:`전환 ${Math.round(cv)}건 (기준 ${Math.round(cvThresh)}건의 2배+)` };
+        if (cv >= cvThresh)     return { lv:2, icon:'★★☆', txt:'보통',  tip:`전환 ${Math.round(cv)}건 (기준치 충족)` };
+        if (cv > 0)             return { lv:1, icon:'★☆☆', txt:'낮음',  tip:`전환 ${Math.round(cv)}건 (기준 ${Math.round(cvThresh)}건 미달)` };
+        return                         { lv:0, icon:'☆☆☆', txt:'참고용', tip:'전환 데이터 없음' };
+    };
 
-    if (!items.length) {
-        if (card) card.style.display = 'none';
-        return;
-    }
+    // ROAS 내림차순 TOP 5
+    const items = all.sort((a, b) => b.roas - a.roas).slice(0, 5);
     if (card) card.style.display = '';
 
     const maxRoas = Math.max(...items.map(i => i.roas), 0.01);
     const roasLabel = r => Math.round(r * 100) + '%';
 
-    // 티어: 전체 평균 대비 상대적 위치 (≥1.25× → 우수, 0.85~1.25 → 양호, 그 외 → 보통)
-    const weightedAvg = items.reduce((s, i) => s + i.roas * i.count, 0) /
-                        Math.max(items.reduce((s, i) => s + i.count, 0), 1);
-    const tierColor = (r, cnt) => {
-        if (cnt < 2) return { bar: '#94a3b8', bg: '#f8fafc', txt: '#64748b', label: '데이터 부족' };
-        if (r >= weightedAvg * 1.25) return { bar: '#22c55e', bg: '#f0fdf4', txt: '#15803d', label: '우수' };
-        if (r >= weightedAvg * 0.85) return { bar: '#6366f1', bg: '#eef2ff', txt: '#4338ca', label: '양호' };
-        return { bar: '#f59e0b', bg: '#fffbeb', txt: '#b45309', label: '보통' };
+    // ROAS 티어: 전체 CV 가중 평균 대비
+    const poolAvgRoas = all.reduce((s,i)=>s+i.roas*(i.conversions||1),0) /
+                        Math.max(all.reduce((s,i)=>s+(i.conversions||1),0),1);
+    const tierColor = (r, cv) => {
+        if (cv <= 0) return { bar:'#cbd5e1', bg:'#f8fafc', txt:'#94a3b8' };
+        if (r >= poolAvgRoas*1.25) return { bar:'#22c55e', bg:'#f0fdf4', txt:'#15803d' };
+        if (r >= poolAvgRoas*0.85) return { bar:'#6366f1', bg:'#eef2ff', txt:'#4338ca' };
+        return                            { bar:'#f59e0b', bg:'#fffbeb', txt:'#b45309' };
     };
 
-    // 신뢰도 표시 (소재 수 기준)
-    const reliab = (cnt) => {
-        if (cnt >= 10) return { icon: '●●●', tip: '신뢰도 높음 (10개+)' };
-        if (cnt >= 4)  return { icon: '●●○', tip: '신뢰도 보통 (4~9개)' };
-        if (cnt >= 2)  return { icon: '●○○', tip: '신뢰도 낮음 (2~3개)' };
-        return             { icon: '○○○', tip: '데이터 부족 (1개, 참고용)' };
-    };
+    const statNote = `신뢰 기준: CV 중앙값 <b>${Math.round(cvMedian)}건</b> · 평균 <b>${Math.round(cvAvg)}건</b> → 낮은 쪽 ${Math.round(cvThresh)}건 이상 = 신뢰 보통+`;
+    const rankBgs = ['#f59e0b','#94a3b8','#c87941','#e2e8f0','#e2e8f0'];
 
-    wrap.innerHTML = items.map((item, i) => {
-        const tc = tierColor(item.roas, item.count);
+    wrap.innerHTML = `<div class="atop-stat-note">${statNote}</div>` +
+    items.map((item, i) => {
+        const cr = credib(item.conversions || 0);
+        const tc = tierColor(item.roas, item.conversions || 0);
         const barW = Math.round(item.roas / maxRoas * 100);
-        const rel = reliab(item.count);
-        const rankBg = i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#c87941' : '#e2e8f0';
-        const rankTxt = i <= 2 ? '#fff' : '#64748b';
-        const diffVsAvg = weightedAvg > 0 ? Math.round((item.roas / weightedAvg - 1) * 100) : 0;
+        const diffVsAvg = poolAvgRoas > 0 ? Math.round((item.roas/poolAvgRoas-1)*100) : 0;
         const diffStr = diffVsAvg >= 0 ? `+${diffVsAvg}%` : `${diffVsAvg}%`;
         const diffCol = diffVsAvg >= 0 ? '#059669' : '#dc2626';
         return `
         <div class="atop-row" style="background:${tc.bg};border-color:${tc.bar}30">
-            <div class="atop-rank" style="background:${rankBg};color:${rankTxt}">${i + 1}</div>
+            <div class="atop-rank" style="background:${rankBgs[i]||'#e2e8f0'};color:${i<=2?'#fff':'#64748b'}">${i+1}</div>
             <div class="atop-main">
-                <div class="atop-name">${item.keyword}
-                    <span style="font-size:9px;color:#94a3b8;font-weight:400;margin-left:4px" title="${rel.tip}">${rel.icon}</span>
-                </div>
+                <div class="atop-name">${item.keyword}</div>
                 <div class="atop-bar-wrap">
                     <div class="atop-bar" style="width:${barW}%;background:${tc.bar}"></div>
                 </div>
@@ -765,12 +764,11 @@ function _renderAppealTop(list) {
                 <div class="atop-roas" style="color:${tc.txt}">${roasLabel(item.roas)}
                     <span style="font-size:10px;font-weight:600;color:${diffCol};margin-left:3px">(${diffStr})</span>
                 </div>
-                <div class="atop-count">${item.count}개 소재</div>
-                <span class="atop-badge" style="background:${tc.bar}20;color:${tc.txt}">${tc.label}</span>
+                <div class="atop-count" title="${cr.tip}">${cr.icon} CV ${Math.round(item.conversions||0)}건</div>
+                <span class="atop-badge" style="background:${tc.bar}20;color:${tc.txt}">신뢰 ${cr.txt}</span>
             </div>
         </div>`;
-    }).join('') +
-    (valid.length < 3 ? `<div class="atop-notice">⚠️ 2개 이상 소재에서 확인된 항목이 부족합니다. 소구포인트 데이터를 더 쌓으면 신뢰도가 높아집니다.</div>` : '');
+    }).join('');
 
     } catch(e) {
         console.warn('[appealTop] 렌더 오류:', e);
@@ -790,9 +788,6 @@ function renderAIInsights() {
 
     const list = getAIInsightsList();
 
-    // ── 워킹 소구포인트 TOP 8 렌더 (비동기 — UI 블로킹 방지) ──
-    const _listSnap = list.slice(); // 참조 스냅샷
-    setTimeout(() => _renderAppealTop(_listSnap), 0);
 
     // 빈 상태 placeholder를 위한 컨테이너 헬퍼
     const clearChildren = (id) => {
