@@ -946,9 +946,15 @@ function renderFunnelRank(brand) {
   const metric = window._funnelRankMetric?.[brand] || 'buy';
 
   const metaMap = {
-    buy:    { label:'주문수',    sub:'주문 많은 제품 순', color:'#7c3aed', fmt: v=>`${n(v)}건`,  aux: (r)=>`장바구니 ${n(r.cart)}건 · 전환 ${f(r.buyRate)}` },
-    cart:   { label:'장바구니수', sub:'장바구니 많은 제품 순', color:'#6366f1', fmt: v=>`${n(v)}건`, aux: (r)=>`주문 ${n(r.buy)}건 · 전환 ${f(r.buyRate)}` },
-    inflow: { label:'유입수',    sub:'유입 많은 제품 순', color:'#94a3b8', fmt: v=>`${n(v)}건`,  aux: (r)=>`장바구니 ${n(r.cart)}건 · 주문 ${n(r.buy)}건` },
+    buy:    { label:'주문수',    sub:'주문 많은 제품 순', color:'#7c3aed',
+              fmt: v=>`${n(v)}건`,
+              aux: (r)=>`장바구니 ${n(r.cart)}건 · <b>장바구니→주문 전환 ${f(r.buyRate)}</b>` },
+    cart:   { label:'장바구니수', sub:'장바구니 많은 제품 순', color:'#6366f1',
+              fmt: v=>`${n(v)}건`,
+              aux: (r)=>`유입 ${n(r.inflow)}건 · <b>유입→장바구니 전환 ${f(r.cartRate)}</b>` },
+    inflow: { label:'유입수',    sub:'유입 많은 제품 순', color:'#94a3b8',
+              fmt: v=>`${n(v)}건`,
+              aux: (r)=>`장바구니 ${n(r.cart)}건 · 주문 ${n(r.buy)}건` },
   };
   const m = metaMap[metric];
   if(sub) sub.textContent = `· ${m.sub}`;
@@ -965,7 +971,7 @@ function renderFunnelRank(brand) {
       <div class="rank-name" title="${r.prod}">${r.prod}</div>
       <div class="rank-bar-wrap">
         <div class="rank-bar-track"><div class="rank-bar" style="width:${barW}%;background:${m.color}"></div></div>
-        <div style="font-size:9px;color:#94a3b8;margin-top:2px">${m.aux(r)}</div>
+        <div style="font-size:9.5px;color:#64748b;margin-top:2px">${m.aux(r)}</div>
       </div>
       <div class="rank-rate" style="color:${m.color};min-width:54px">${m.fmt(val)}</div>
     </div>`;
