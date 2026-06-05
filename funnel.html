@@ -607,11 +607,22 @@ function renderSummaryTab(brand, data, prods) {
 
   // ── 제품별 볼륨 순위 (262Q 누적) — 주문수·장바구니수·유입수 ──
   const _rankData = prods.map(p=>{
-    const rows = data['262Q'][p]||[];
-    if(!rows.length) return null;
-    const a = aggregate(rows);
-    return {prod:p, buy:a.buy||0, cart:a.cart||0, inflow:a.inflow||0,
-            buyRate:a.buyRate, cartRate:a.cartRate};
+    const rows262 = data['262Q'][p]||[];
+    if(!rows262.length) return null;
+    const a = aggregate(rows262);
+    // 261Q 동기간(같은 영업일 수) 비교
+    const rows261 = data['261Q'][p]||[];
+    const a1 = rows261.length ? aggregate(rows261.slice(0, rows262.length)) : null;
+    // 직전비 (261Q 대비 %)
+    const chgPct = (cur, prev) => (prev && prev > 0) ? (cur - prev) / prev * 100 : null;
+    return {
+      prod: p,
+      buy: a.buy||0, cart: a.cart||0, inflow: a.inflow||0,
+      buyRate: a.buyRate, cartRate: a.cartRate,
+      buy_chg:    chgPct(a.buy||0,    a1?.buy),
+      cart_chg:   chgPct(a.cart||0,   a1?.cart),
+      inflow_chg: chgPct(a.inflow||0, a1?.inflow),
+    };
   }).filter(Boolean);
   // 브랜드별 랭킹 데이터 저장
   if(!window._funnelRankData) window._funnelRankData={};
@@ -999,9 +1010,20 @@ function renderFunnelRank(brand) {
   const sorted = [...data].sort((a,b)=>(b[metric]||0)-(a[metric]||0));
   const maxVal = Math.max(...sorted.map(r=>r[metric]||0), 1);
 
+  // 직전비 배지 헬퍼
+  const chgBadge = (pct) => {
+    if(pct === null || pct === undefined) return '';
+    const sign = pct >= 0 ? '+' : '';
+    const col = pct >= 0 ? '#059669' : '#dc2626';
+    const arrow = pct >= 0 ? '▲' : '▼';
+    return `<span style="font-size:9.5px;font-weight:700;color:${col};margin-left:5px">${arrow}${sign}${Math.round(pct)}%</span>`;
+  };
+  const chgKey = { buy:'buy_chg', cart:'cart_chg', inflow:'inflow_chg' };
+
   el.innerHTML = sorted.map((r,i)=>{
     const val = r[metric]||0;
     const barW = (val/maxVal*100).toFixed(0);
+    const badge = chgBadge(r[chgKey[metric]]);
     return `
     <div class="rank-row" style="grid-template-columns:20px 1fr 1fr auto">
       <div class="rank-num">${i+1}</div>
@@ -1010,7 +1032,10 @@ function renderFunnelRank(brand) {
         <div class="rank-bar-track"><div class="rank-bar" style="width:${barW}%;background:${m.color}"></div></div>
         <div style="font-size:9.5px;color:#64748b;margin-top:2px">${m.aux(r)}</div>
       </div>
-      <div class="rank-rate" style="color:${m.color};min-width:54px">${m.fmt(val)}</div>
+      <div style="text-align:right;flex-shrink:0;min-width:80px">
+        <div class="rank-rate" style="color:${m.color}">${m.fmt(val)}${badge}</div>
+        <div style="font-size:9px;color:#94a3b8">작년 동기 대비</div>
+      </div>
     </div>`;
   }).join('') || '<div style="color:#94a3b8;font-size:12px;padding:8px">데이터 없음</div>';
 }
