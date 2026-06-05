@@ -1103,21 +1103,37 @@ function _renderInsightBarChart(chartKey, canvasId, list, fieldName, maxItems, m
 
     const cfg = INSIGHT_METRIC_CFG[metric] || INSIGHT_METRIC_CFG.roas;
     const key = cfg.key;
-    const sortFn = cfg.lowerBetter
-        ? (a, b) => (a[key] || 0) - (b[key] || 0)
-        : (a, b) => (b[key] || 0) - (a[key] || 0);
     const validFilter = d => (d[key] || 0) > 0;
 
+    // ★ 전환수 우선 정렬: CV 중앙값 이상이면 "신뢰 그룹", 그 안에서 선택 지표 정렬
+    //   같은 신뢰 그룹 내에서는 ROAS(또는 선택 지표) 내림차순
+    const _cvSort = (all) => {
+        const cvs = all.map(d => d.conversions || 0).sort((a,b)=>a-b);
+        const cvMed = cvs.length ? (cvs.length%2===0
+            ? (cvs[cvs.length/2-1]+cvs[cvs.length/2])/2
+            : cvs[Math.floor(cvs.length/2)]) : 0;
+        return [...all].sort((a, b) => {
+            const aHigh = (a.conversions||0) >= cvMed;
+            const bHigh = (b.conversions||0) >= cvMed;
+            // 신뢰 그룹 차이: 신뢰높음 먼저
+            if (aHigh !== bHigh) return aHigh ? -1 : 1;
+            // 같은 그룹 내: 선택 지표 정렬
+            return cfg.lowerBetter
+                ? (a[key]||0) - (b[key]||0)
+                : (b[key]||0) - (a[key]||0);
+        });
+    };
+
     const _threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
-    let data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
-        .filter(a => a.count >= 3 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+    let data = _cvSort(aggregateByKeyword(list, fieldName, { threshold: _threshold })
+        .filter(a => a.count >= 3 && validFilter(a))).slice(0, maxItems);
     if (data.length < 5) {
-        data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
-            .filter(a => a.count >= 2 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+        data = _cvSort(aggregateByKeyword(list, fieldName, { threshold: _threshold })
+            .filter(a => a.count >= 2 && validFilter(a))).slice(0, maxItems);
     }
     if (data.length < 5) {
-        data = aggregateByKeyword(list, fieldName, { threshold: _threshold })
-            .filter(a => a.count >= 1 && validFilter(a)).sort(sortFn).slice(0, maxItems);
+        data = _cvSort(aggregateByKeyword(list, fieldName, { threshold: _threshold })
+            .filter(a => a.count >= 1 && validFilter(a))).slice(0, maxItems);
     }
 
     if (!data.length) {
@@ -1500,11 +1516,15 @@ function renderAppealWordCloud(list) {
     const metric = _wordcloudMetric;
     const metricCfg = METRIC_LABEL_MAP[metric] || METRIC_LABEL_MAP.revenue;
 
-    // 3) 선택 지표 기준 정렬 → 상위 20개 (군집은 멤버 누적이라 ≥3 자동 충족)
-    const clustered = clusterAppealKeywords(rawData)
-        .filter(d => (d[metric] || 0) > 0 && d.count >= 3)
-        .sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
-        .slice(0, 20);
+    // 3) 전환수 우선 → 선택 지표 정렬 → 상위 20개
+    const _wcArr = clusterAppealKeywords(rawData).filter(d => (d[metric]||0) > 0 && d.count >= 3);
+    const _cvs = _wcArr.map(d=>d.conversions||0).sort((a,b)=>a-b);
+    const _cvMed = _cvs.length ? (_cvs.length%2===0 ? (_cvs[_cvs.length/2-1]+_cvs[_cvs.length/2])/2 : _cvs[Math.floor(_cvs.length/2)]) : 0;
+    const clustered = _wcArr.sort((a,b)=>{
+        const ah=(a.conversions||0)>=_cvMed, bh=(b.conversions||0)>=_cvMed;
+        if(ah!==bh) return ah?-1:1;
+        return (b[metric]||0)-(a[metric]||0);
+    }).slice(0, 20);
 
     if (!clustered.length) {
         container.innerHTML = `<div class="text-center text-slate-400 text-sm py-12">${metricCfg.label} 데이터 없음</div>`;
