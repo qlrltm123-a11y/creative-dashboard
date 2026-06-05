@@ -529,42 +529,42 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-val">${n(agg262.inflow)}</div>
       <div class="kpi-sub">${days}일 · ~${lastDate}</div>
       ${inflowD!==null?badge(inflowD,'%'):''}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.inflow)}</div>
+      <div class="kpi-sub" style="margin-top:4px">261Q 작년 동기 ${n(agg261.inflow)}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">🛒 장바구니수 (262Q 누적)</div>
       <div class="kpi-val" style="color:#6366f1">${n(agg262.cart)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.cart>0?(agg262.cart-agg261.cart)/agg261.cart*100:null;return d!==null?badge(d,'%'):'';})()}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.cart)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
       <div class="kpi-label">💳 구매수 (262Q 누적)</div>
       <div class="kpi-val" style="color:#7c3aed">${n(agg262.buy)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.buy>0?(agg262.buy-agg261.buy)/agg261.buy*100:null;return d!==null?badge(d,'%'):'';})()}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${n(agg261.buy)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">🛒 전체 장바구니 전환율 <span style="font-weight:500;color:#94a3b8">(유입→장바구니)</span></div>
       <div class="kpi-val" style="color:#4f46e5">${f(cr262)}</div>
       <div class="kpi-sub">${n(agg262.cart)}건</div>
       ${badge(dlt(cr262,cr261))}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${f(cr261)} · ${n(agg261.cart)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(cr261)} · ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
       <div class="kpi-label">💳 전체 구매 전환율 <span style="font-weight:500;color:#94a3b8">(장바구니→구매)</span></div>
       <div class="kpi-val" style="color:#7c3aed">${f(br262)}</div>
       <div class="kpi-sub">${n(agg262.buy)}건</div>
       ${badge(dlt(br262,br261))}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${f(br261)} · ${n(agg261.buy)}건</div>
+      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(br261)} · ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card green">
       <div class="kpi-label">전체 구매 전환 (유입→구매)</div>
       <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
       <div class="kpi-sub">${prods.length}개 제품</div>
       ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}
-      <div class="kpi-sub" style="margin-top:4px">261Q ${f(rate(agg261.buy,agg261.inflow))}</div>
+      <div class="kpi-sub" style="margin-top:4px">작년 동기 ${f(rate(agg261.buy,agg261.inflow))}</div>
     </div>`;
 
   // ── 브랜드 전체 추이 차트 ──
@@ -709,7 +709,7 @@ function renderFunnelCards(brand, data, prods) {
             <div class="stage-label" style="color:#94a3b8">유입</div>
             <div class="stage-mid">
               <div class="stage-bar-wrap"><div class="stage-bar bar-inflow" style="width:100%"></div></div>
-              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q ${n(agg261.inflow)}</span>`:''}</div>
+              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q 작년 동기 ${n(agg261.inflow)}</span>`:''}</div>
             </div>
             <div class="stage-right">
               <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
@@ -740,7 +740,7 @@ function renderFunnelCards(brand, data, prods) {
           </div>
         </div>
         ${agg261?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e1e2e;display:flex;gap:16px;font-size:11px;color:#555">
-          <span>261Q 동기간</span>
+          <span>작년 동기</span>
           <span style="color:#666">🛒 ${f(agg261.cartRate)} · ${n(agg261.cart)}건</span>
           <span style="color:#666">💳 ${f(agg261.buyRate)} · ${n(agg261.buy)}건</span>
         </div>`:''}
@@ -884,7 +884,7 @@ function renderCmpCharts(brand, data, prods) {
     grid.insertAdjacentHTML('beforeend',`
       <div class="cmp-card">
         <div class="cc-title">${prod}</div>
-        <div class="cc-sub">🟣 262Q &nbsp; 🟠 261Q</div>
+        <div class="cc-sub">🟣 이번 시즌 &nbsp; 🟠 작년 동기</div>
         <div class="cc-sub" style="color:#818cf8;margin:6px 0 4px">🛒 장바구니 전환율</div>
         <div class="cmp-chart-wrap"><canvas id="${idC}"></canvas></div>
         <div class="cc-sub" style="color:#a78bfa;margin:14px 0 4px">💳 구매 전환율</div>

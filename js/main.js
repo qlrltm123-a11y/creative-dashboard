@@ -1103,11 +1103,12 @@ function buildPerformanceCriteriaBadge() {
                 <i class="fas fa-filter"></i>
                 <span>${scopeBits.join(' · ')}</span>
                 <span class="perf-criteria-divider">·</span>
-                <span>중앙값 광고비 <b>₩${formatNumber(Math.round(pool.medianSpend))}</b> 이상 <b>${pool.qualifiedCount}개</b> 소재</span>
+                <span>광고비 상위 50% 이상 집행된 <b>${pool.qualifiedCount}개</b> 소재 기준</span>
+                <span class="info-tip" tabindex="0" data-tip="너무 적은 광고비가 집행된 소재는 통계적으로 신뢰하기 어려워 제외합니다. 기준: 광고비 중앙값 ₩${formatNumber(Math.round(pool.medianSpend))} 이상.">ⓘ</span>
             </div>
             <div class="perf-criteria-sub">
                 <i class="fas fa-info-circle"></i>
-                <span>아래 모든 컨텐츠는 동일한 기준으로 선정됩니다 · ad_name 단위 매체 종합 합산 · 광고비 중앙값/₩10,000 이상 · 브로드 Meta·TikTok 제외(전환 미측정) · Single One 계열 포함</span>
+                <span>아래 모든 분석은 동일한 소재 기준으로 계산됩니다</span>
             </div>
         </div>
     `;

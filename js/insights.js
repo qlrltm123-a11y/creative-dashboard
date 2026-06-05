@@ -918,9 +918,9 @@ function renderInsightThresholdBadge() {
         const formatNum = (typeof window.formatNumber === 'function') ? window.formatNumber : (n => n.toLocaleString());
         badge.innerHTML = `
             <i class="fas fa-filter"></i>
-            <span>선정 기준: 광고비 중앙값 <b>₩${formatNum(med)}</b> 이상 소재만 분석</span>
+            <span>광고비 상위 50% 이상 소재만 분석 <span class="info-tip" tabindex="0" style="font-size:9px" data-tip="너무 적은 광고비 소재는 우연일 수 있어 제외합니다. 기준 광고비: ₩${formatNum(thr)} 이상.">ⓘ</span></span>
             <span class="ai-threshold-divider">·</span>
-            <span class="ai-threshold-sub">적용 임계값 <b>₩${formatNum(thr)}</b></span>
+            <span class="ai-threshold-sub">기준 광고비 <b>₩${formatNum(thr)}</b></span>
         `;
         badge.style.display = '';
     } else {
