@@ -540,17 +540,16 @@
                 <div class="flex items-center gap-2">
                     <i class="fas fa-box-open text-purple-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">제품</span>
-                    <select id="ai-product-select" class="filter-select text-sm min-w-[160px]">
-                        <option value="">전체 제품</option>
-                    </select>
+                    <div id="ms-ai-product" class="ms-wrap" style="min-width:160px"></div>
                 </div>
                 <div class="flex items-center gap-2">
                     <i class="fas fa-bullhorn text-pink-500 text-sm"></i>
                     <span class="text-xs font-semibold text-slate-600">캠페인</span>
-                    <select id="ai-campaign-select" class="filter-select text-sm min-w-[200px] max-w-[280px]">
-                        <option value="">전체 캠페인</option>
-                    </select>
+                    <div id="ms-ai-campaign" class="ms-wrap" style="min-width:190px"></div>
                 </div>
+                <span class="text-[11px] text-slate-400">복수 선택 가능</span>
+                <select id="ai-product-select" class="hidden"></select>
+                <select id="ai-campaign-select" class="hidden"></select>
                 <button id="ai-filter-reset" class="ml-auto text-xs text-slate-500 hover:text-purple-600 transition px-2 py-1 rounded hover:bg-white">
                     <i class="fas fa-rotate-left mr-1"></i>초기화
                 </button>
@@ -573,16 +572,6 @@
                 <select id="ai-insights-product-select" class="hidden">
                     <option value="__all__">전체 제품</option>
                 </select>
-            </div>
-
-            <!-- ★ 워킹 소구포인트 TOP 8 -->
-            <div class="chart-card mb-5" id="appealTopCard">
-                <div class="flex items-center justify-between mb-1">
-                    <h3 class="chart-title"><i class="fas fa-ranking-star mr-2 text-amber-500"></i>지금 잘 먹히는 강조 포인트 <span class="info-tip" tabindex="0" data-tip="광고 효율(ROAS)이 높은 순으로 정렬. 비슷한 의미는 하나로 합쳐서 보여줘요. 초록=매우 잘됨, 파랑=잘됨, 노랑=보통.">ⓘ</span></h3>
-                    <span class="text-xs text-slate-400">유사 키워드 통합 · ROAS 높은 순</span>
-                </div>
-                <p class="text-xs text-slate-500 mb-4">💡 <b>이걸로 알 수 있는 것</b>: 다음 광고에 써야 할 강조 포인트 순위. 초록일수록 지금 잘 팔리는 메시지예요.</p>
-                <div id="appealTopList" class="appeal-top-grid"></div>
             </div>
 
             <!-- 브랜드 교차 인사이트 -->

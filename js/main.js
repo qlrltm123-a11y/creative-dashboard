@@ -16,9 +16,10 @@ let performanceEvents = [];
 function _pfHas(arr, val) { return !arr.length || arr.includes((val || '').trim()); }
 // 캐시키/표시용 직렬화
 function _pfKey() { return `${performanceEvents.join('+')}|${performanceProducts.join('+')}|${performanceCampaigns.join('+')}`; }
-let aiProduct = '';            // AI 인사이트 섹션 - 제품 필터
-let aiCampaign = '';           // AI 인사이트 섹션 - 캠페인 필터
-let aiEvent = '';              // AI 인사이트 섹션 - 이벤트 필터
+// AI 인사이트 섹션 — 복수 선택 배열 (단일 legacy 변수도 유지)
+let aiProducts = [];  let aiProduct = '';
+let aiCampaigns = []; let aiCampaign = '';
+let aiEvents = [];    let aiEvent = '';
 let winningProduct = '';       // ★ 위닝 요소 인사이트 - 제품 필터 (개요 탭)
 let appealRightMetric = 'ctr'; // 소구포인트 우측 컬럼 지표: 'ctr' | 'atc_rate'
 let charts = {};
@@ -178,6 +179,17 @@ function bindEvents() {
             performanceEvents = [];
             aiProduct = '';
             aiCampaign = '';
+            aiEvent = '';
+            aiEvents = [];
+            aiProducts = [];
+            aiCampaigns = [];
+            // MS 위젯 리셋
+            if (window._perfMsEvent)    window._perfMsEvent.setSelected([]);
+            if (window._perfMsProduct)  window._perfMsProduct.setSelected([]);
+            if (window._perfMsCampaign) window._perfMsCampaign.setSelected([]);
+            if (window._aiMsEvent)      window._aiMsEvent.setSelected([]);
+            if (window._aiMsProduct)    window._aiMsProduct.setSelected([]);
+            if (window._aiMsCampaign)   window._aiMsCampaign.setSelected([]);
             invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
             updateDashboard();
         });
@@ -371,39 +383,34 @@ function bindEvents() {
         });
     }
 
-    // ★ AI 인사이트 섹션 통합 필터
-    const aiEventSel = document.getElementById('ai-event-select');
-    if (aiEventSel) {
-        aiEventSel.addEventListener('change', () => {
-            aiEvent = aiEventSel.value || '';
-            populateAiFilterOptions(); // 이벤트 바뀌면 제품 목록 갱신
+    // ★ AI 인사이트 섹션 통합 필터 (복수 선택 MS 위젯)
+    const aiEventSel = document.getElementById('ai-event-select'); // legacy hidden
+    const _msAiEv = document.getElementById('ms-ai-event');
+    const _msAiPr = document.getElementById('ms-ai-product');
+    const _msAiCm = document.getElementById('ms-ai-campaign');
+    if (typeof createMultiSelect === 'function') {
+        if (_msAiEv) window._aiMsEvent = createMultiSelect(_msAiEv, { placeholder:'이벤트', allLabel:'전체 이벤트', onChange: (sel) => {
+            aiEvents = sel; aiEvent = sel[0] || '';
+            populateAiFilterOptions(); debouncedRefreshAi();
+        }});
+        if (_msAiPr) window._aiMsProduct = createMultiSelect(_msAiPr, { placeholder:'제품', allLabel:'전체 제품', onChange: (sel) => {
+            aiProducts = sel; aiProduct = sel[0] || '';
+            syncHiddenAiSelect(); debouncedRefreshAi();
+        }});
+        if (_msAiCm) window._aiMsCampaign = createMultiSelect(_msAiCm, { placeholder:'캠페인', allLabel:'전체 캠페인', onChange: (sel) => {
+            aiCampaigns = sel; aiCampaign = sel[0] || '';
             debouncedRefreshAi();
-        });
-    }
-    const aiProdSel = document.getElementById('ai-product-select');
-    if (aiProdSel) {
-        aiProdSel.addEventListener('change', () => {
-            aiProduct = aiProdSel.value || '';
-            syncHiddenAiSelect();
-            debouncedRefreshAi();
-        });
-    }
-    const aiCampSel = document.getElementById('ai-campaign-select');
-    if (aiCampSel) {
-        aiCampSel.addEventListener('change', () => {
-            aiCampaign = aiCampSel.value || '';
-            debouncedRefreshAi();
-        });
+        }});
     }
     const aiResetBtn = document.getElementById('ai-filter-reset');
     if (aiResetBtn) {
         aiResetBtn.addEventListener('click', () => {
-            aiProduct = '';
-            aiCampaign = '';
-            aiEvent = '';
-            if (aiProdSel) aiProdSel.value = '';
-            if (aiCampSel) aiCampSel.value = '';
-            if (aiEventSel) aiEventSel.value = '';
+            aiProducts = []; aiProduct = '';
+            aiCampaigns = []; aiCampaign = '';
+            aiEvents = []; aiEvent = '';
+            if (window._aiMsEvent)    window._aiMsEvent.setSelected([]);
+            if (window._aiMsProduct)  window._aiMsProduct.setSelected([]);
+            if (window._aiMsCampaign) window._aiMsCampaign.setSelected([]);
             populateAiFilterOptions();
             syncHiddenAiSelect();
             debouncedRefreshAi();
@@ -571,15 +578,9 @@ function getBrandCreatives(scope) {
         if (performanceProducts.length) list = list.filter(c => _pfHas(performanceProducts, c.product));
         if (performanceCampaigns.length) list = list.filter(c => performanceCampaigns.some(cp => matchCampaign(c, cp)));
     } else if (scope === 'ai') {
-        if (aiEvent) {
-            list = list.filter(c => (c.event || '').trim() === aiEvent);
-        }
-        if (aiProduct) {
-            list = list.filter(c => (c.product || '').trim() === aiProduct);
-        }
-        if (aiCampaign) {
-            list = list.filter(c => matchCampaign(c, aiCampaign));
-        }
+        if (aiEvents.length)    list = list.filter(c => _pfHas(aiEvents, c.event));
+        if (aiProducts.length)  list = list.filter(c => _pfHas(aiProducts, c.product));
+        if (aiCampaigns.length) list = list.filter(c => aiCampaigns.some(cp => matchCampaign(c, cp)));
     }
     return list;
 }
@@ -826,51 +827,27 @@ function populatePerformanceFilterOptions() {
     syncHiddenPerformanceSelects();
 }
 
-// AI 인사이트 섹션 필터 옵션 채우기
+// AI 인사이트 섹션 필터 옵션 채우기 (복수 선택 MS 위젯)
 function populateAiFilterOptions() {
-    const prodSel = document.getElementById('ai-product-select');
-    const campSel = document.getElementById('ai-campaign-select');
-    const eventSel = document.getElementById('ai-event-select');
-    // AI 제품 목록 = 브랜드 풀 (+ aiEvent 선택 시 해당 이벤트 제품만)
-    let aiBase = getBrandCreatives();
-    if (aiEvent) aiBase = aiBase.filter(c => (c.event || '').trim() === aiEvent);
-    const products = Array.from(new Set(aiBase.map(c => (c.product||'').trim()).filter(Boolean))).sort();
+    const base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
+    const events = [...new Set(base.map(c => (c.event||'').trim()).filter(Boolean))].sort();
+
+    // 이벤트 선택에 따라 제품 목록 좁힘
+    const filteredBase = aiEvents.length ? base.filter(c => _pfHas(aiEvents, c.event)) : base;
+    const products = Array.from(new Set(filteredBase.map(c => (c.product||'').trim()).filter(Boolean))).sort();
     const campaigns = getSectionCampaignList();
 
-    // 이벤트 옵션
-    if (eventSel) {
-        const base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
-        const events = [...new Set(base.map(c => (c.event||'').trim()).filter(Boolean))].sort();
-        const cur = aiEvent;
-        eventSel.innerHTML = '<option value="">전체 이벤트</option>' +
-            events.map(e => `<option value="${e.replace(/"/g,'&quot;')}">${e}</option>`).join('');
-        if (cur && events.includes(cur)) eventSel.value = cur;
-        else { eventSel.value=''; aiEvent=''; }
-    }
+    // 선택값 중 더 이상 없는 항목 정리
+    aiEvents    = aiEvents.filter(e => events.includes(e));
+    aiProducts  = aiProducts.filter(p => products.includes(p));
+    aiCampaigns = aiCampaigns.filter(c => campaigns.includes(c));
 
-    if (prodSel) {
-        const cur = aiProduct;
-        prodSel.innerHTML = '<option value="">전체 제품</option>' +
-            products.map(p => `<option value="${p.replace(/"/g, '&quot;')}">${p}</option>`).join('');
-        if (cur && products.includes(cur)) {
-            prodSel.value = cur;
-        } else {
-            prodSel.value = '';
-            aiProduct = '';
-        }
-    }
-    if (campSel) {
-        const cur = aiCampaign;
-        campSel.innerHTML = '<option value="">전체 캠페인</option>' +
-            campaigns.map(c => `<option value="${c.replace(/"/g, '&quot;')}">${c}</option>`).join('');
-        if (cur && campaigns.includes(cur)) {
-            campSel.value = cur;
-        } else {
-            campSel.value = '';
-            aiCampaign = '';
-        }
-    }
-    // 호환용 hidden 셀렉트 동기화 (ai-insights-product-select)
+    // MS 위젯 갱신
+    if (window._aiMsEvent)    window._aiMsEvent.setOptions(events, aiEvents);
+    if (window._aiMsProduct)  window._aiMsProduct.setOptions(products, aiProducts);
+    if (window._aiMsCampaign) window._aiMsCampaign.setOptions(campaigns, aiCampaigns);
+
+    // 호환용 hidden 셀렉트 동기화
     syncHiddenAiSelect();
 }
 
