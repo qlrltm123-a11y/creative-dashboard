@@ -572,28 +572,39 @@ function renderSummaryTab(brand, data, prods) {
   const pad = (arr,len)=>{const a=[...arr];while(a.length<len)a.push(null);return a;};
   const id = `${brand}_btrend`;
   if(charts[id]) charts[id].destroy();
-  const _showCart = _funnelMetric === 'both' || _funnelMetric === 'cart';
-  const _showBuy  = _funnelMetric === 'both' || _funnelMetric === 'buy';
+  const _showInflow = _funnelMetric === 'both' || _funnelMetric === 'inflow';
+  const _showCart   = _funnelMetric === 'both' || _funnelMetric === 'cart';
+  const _showBuy    = _funnelMetric === 'both' || _funnelMetric === 'buy';
   const _btDs = [];
-  // 막대(건수): 전체=유입·장바구니수·구매수 / 장바구니율=장바구니수 / 구매율=구매수
+  // 막대(건수)
   if(_funnelMetric === 'both'){
-    _btDs.push({type:'bar',label:'유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'유입',data:ser262.map(r=>r.inflow),backgroundColor:'#94a3b8aa',yAxisID:'cnt',borderRadius:3,order:5});
     _btDs.push({type:'bar',label:'장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
     _btDs.push({type:'bar',label:'구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
+  } else if(_funnelMetric === 'inflow'){
+    // 유입수: 이번 시즌 + 작년 동기 비교
+    _btDs.push({type:'bar',label:'이번 시즌 유입수',data:ser262.map(r=>r.inflow),backgroundColor:'#6366f1aa',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'작년 동기 유입수',data:pad(ser261.map(r=>r.inflow),labels.length),backgroundColor:'#94a3b866',yAxisID:'cnt',borderRadius:3,order:4});
   } else if(_funnelMetric === 'cart'){
-    _btDs.push({type:'bar',label:'262Q 장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
-    _btDs.push({type:'bar',label:'261Q 장바구니수',data:pad(ser261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'66',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'이번 시즌 장바구니수',data:ser262.map(r=>r.cart),backgroundColor:C262.cart+'88',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'작년 동기 장바구니수',data:pad(ser261.map(r=>r.cart),labels.length),backgroundColor:C261.cart+'66',yAxisID:'cnt',borderRadius:3,order:3});
   } else if(_funnelMetric === 'buy'){
-    _btDs.push({type:'bar',label:'262Q 구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
-    _btDs.push({type:'bar',label:'261Q 구매수',data:pad(ser261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'66',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'이번 시즌 구매수',data:ser262.map(r=>r.buy),backgroundColor:C262.buy+'88',yAxisID:'cnt',borderRadius:3,order:3});
+    _btDs.push({type:'bar',label:'작년 동기 구매수',data:pad(ser261.map(r=>r.buy),labels.length),backgroundColor:C261.buy+'66',yAxisID:'cnt',borderRadius:3,order:3});
+  }
+  // 전환율 라인
+  if(_funnelMetric === 'inflow'){
+    // 유입수 필터: 유입→장바구니율 라인 표시
+    _btDs.push({type:'line',label:'이번 시즌 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+    _btDs.push({type:'line',label:'작년 동기 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   if(_showCart){
-    _btDs.push({type:'line',label:'262Q 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
-    _btDs.push({type:'line',label:'261Q 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    _btDs.push({type:'line',label:'이번 시즌 장바구니율',data:ser262.map(r=>r.cartRate),borderColor:C262.cart,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+    _btDs.push({type:'line',label:'작년 동기 장바구니율',data:pad(ser261.map(r=>r.cartRate),labels.length),borderColor:C261.cart,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   if(_showBuy){
-    _btDs.push({type:'line',label:'262Q 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
-    _btDs.push({type:'line',label:'261Q 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
+    _btDs.push({type:'line',label:'이번 시즌 구매율',data:ser262.map(r=>r.buyRate),borderColor:C262.buy,borderWidth:2.5,pointRadius:3,tension:.35,yAxisID:'rate',order:1});
+    _btDs.push({type:'line',label:'작년 동기 구매율',data:pad(ser261.map(r=>r.buyRate),labels.length),borderColor:C261.buy,borderWidth:1.5,borderDash:[4,4],pointRadius:2,tension:.35,yAxisID:'rate',order:2});
   }
   charts[id] = new Chart(document.getElementById(`btrend-${brand}`),{
     data:{ labels, datasets:_btDs },
