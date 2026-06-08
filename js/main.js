@@ -4084,8 +4084,12 @@ function _getPerfData() {
     if (performanceProducts.length) data = data.filter(c => _pfHas(performanceProducts, c.product));
 
     const isAllPlatform = !currentPlatform;
+    // 전환 추적 매체만 필터 후 → 소재명(ad_name) 기준 매체 종합 통합
+    // 같은 소재가 Single One Meta + TikTok으로 분리된 행을 하나로 합산
     const dataForRanking = isAllPlatform ? filterTrackedOnly(data) : data;
-    const aggregated = (typeof aggregateByAdName === 'function') ? aggregateByAdName(dataForRanking) : dataForRanking;
+    const aggregated = (typeof aggregateByAdName === 'function')
+        ? aggregateByAdName(dataForRanking)
+        : dataForRanking;
 
     _perfPerfCache = { key: cacheKey, src, data: aggregated, isAllPlatform };
     return _perfPerfCache;
@@ -4210,25 +4214,29 @@ function renderProductPerformance() {
                 : (a[metric] || 0) - (b[metric] || 0))  // 나머지: 낮을수록 나쁨
             .slice(0, 5);
 
-        // BEST와 완전히 분리: BEST에 없는 소재만 + 풀 평균 이하인 소재만
-        const bestIds = new Set(best.map(c => c.id));
+        // ★ BEST와 완전 분리: id 또는 ad_name 어느 쪽이라도 겹치면 제외
+        const bestIds    = new Set(best.map(c => c.id));
+        const bestNames  = new Set(best.map(c => (c.ad_name || c.creative_name || '').trim().toLowerCase()));
+        const isInBest   = c => bestIds.has(c.id) ||
+            bestNames.has((c.ad_name || c.creative_name || '').trim().toLowerCase());
+
         const poolAvgMetric = pool.length
             ? pool.reduce((s, c) => s + (c[metric] || 0), 0) / pool.length : 0;
 
-        // 1순위: BEST에 없고 평균 이하(ROAS 기준)인 소재
+        // 1순위: BEST에 없고 평균 이하(저효율)인 소재
         const worstBelowAvg = worst.filter(c =>
-            !bestIds.has(c.id) &&
+            !isInBest(c) &&
             (sortAsc
-                ? (c[metric] || 0) >= poolAvgMetric   // cost_per_atc: 평균 이상 = 나쁨
-                : (c[metric] || 0) <= poolAvgMetric)); // 나머지: 평균 이하 = 나쁨
+                ? (c[metric] || 0) >= poolAvgMetric
+                : (c[metric] || 0) <= poolAvgMetric));
 
         // 2순위: BEST에만 없는 소재 (평균 무관)
-        const worstNotBest = worst.filter(c => !bestIds.has(c.id));
+        const worstNotBest = worst.filter(c => !isInBest(c));
 
-        // 소재가 부족해 겹치면 WORST 미표시 (빈 상태로)
+        // 완전 겹치면 WORST 비우고 안내
         const worstFinal = worstBelowAvg.length ? worstBelowAvg
             : worstNotBest.length ? worstNotBest
-            : []; // BEST와 완전 겹치면 비움
+            : [];
 
         if (worstSummaryEl) {
             worstSummaryEl.innerHTML = `<span class="text-xs text-slate-400">WORST TOP 5 · ${worstPool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${isAllPlatform ? '<span class="text-[10px] text-indigo-400 ml-1">· 전환 추적 매체 종합 합산</span>' : ''}</span>`;
