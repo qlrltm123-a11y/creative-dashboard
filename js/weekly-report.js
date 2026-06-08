@@ -782,34 +782,46 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     if (!sections || sections.includes('products')) {
         byProduct.forEach(pd => {
             html += `<h3>📦 ${pd.product} — 광고비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)}</h3>`;
-            // TOP 5 — 세로 카드 5열
-            html += `<table style="width:100%;border-collapse:separate;border-spacing:6px 0"><tbody><tr style="vertical-align:top">`;
+            // TOP 5 — 이미지 행 + 지표 행 분리 테이블
+            const tdBase = `border:1px solid #e2e8f0;padding:6px 8px;text-align:center;font-size:11px;`;
+            const thBase = `border:1px solid #e2e8f0;padding:6px 8px;background:#f8fafc;font-size:11px;font-weight:600;color:#64748b;text-align:left;white-space:nowrap;`;
+            html += `<table style="width:100%;border-collapse:collapse"><tbody>`;
+            // 행1: 소재 이미지
+            html += `<tr><td style="${thBase}"></td>`;
             pd.top5.forEach((c, i) => {
                 const rankBg  = i === 0 ? '#fbbf24' : '#e2e8f0';
                 const rankClr = i === 0 ? '#78350f' : '#64748b';
-                const imgHtml = c.thumb
-                    ? `<img src="${toThumb(c.thumb)}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:6px 6px 0 0;display:block">`
-                    : `<div style="width:100%;height:110px;background:#f1f5f9;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:22px">🖼</div>`;
-                html += `<td style="width:20%;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0;background:#f8fafc">
+                const thumb   = toThumb(c.thumb);
+                const imgHtml = thumb
+                    ? `<img src="${thumb}" alt="" style="width:100%;max-height:130px;object-fit:cover;border-radius:6px;display:block">`
+                    : `<div style="width:100%;height:100px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:20px">🖼</div>`;
+                html += `<td style="${tdBase}vertical-align:top;padding:6px">
                     <div style="position:relative">
                         ${imgHtml}
-                        <span style="position:absolute;top:5px;left:5px;background:${rankBg};color:${rankClr};font-size:10px;font-weight:800;width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center">${i+1}</span>
+                        <span style="position:absolute;top:4px;left:4px;background:${rankBg};color:${rankClr};font-size:9px;font-weight:800;width:18px;height:18px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center">${i+1}</span>
                     </div>
-                    <div style="padding:7px 8px">
-                        <div style="font-size:9px;font-weight:600;color:#1e293b;word-break:break-all;margin-bottom:5px;line-height:1.3">${c.name}</div>
-                        ${c.platform ? `<div style="font-size:9px;color:#94a3b8;margin-bottom:3px">${c.platform}</div>` : ''}
-                        <div style="font-size:10px;font-weight:700;color:#7c3aed">ROAS ${_wrR(c.roas)}</div>
-                        <div style="font-size:9px;color:#059669;font-weight:600">주문 ${_wrN(c.conv||0)}건</div>
-                        <div style="font-size:9px;color:#2563eb">CTR ${_wrP(c.ctr)}</div>
-                        <div style="font-size:9px;color:#334155">${_wrW(c.spend)}</div>
-                    </div>
+                    <div style="font-size:9px;font-weight:600;color:#1e293b;word-break:break-all;margin-top:5px;line-height:1.3;text-align:left">${c.name}</div>
+                    ${c.platform ? `<div style="font-size:9px;color:#94a3b8;text-align:left">${c.platform}</div>` : ''}
                 </td>`;
             });
-            // 5개 미만이면 빈 셀로 채움
-            for (let i = pd.top5.length; i < 5; i++) {
-                html += `<td style="width:20%"></td>`;
-            }
-            html += `</tr></tbody></table>`;
+            for (let i = pd.top5.length; i < 5; i++) html += `<td style="${tdBase}"></td>`;
+            html += `</tr>`;
+            // 행2~5: 지표
+            const metrics = [
+                { label: '광고비', fn: c => _wrW(c.spend),       color: '#334155' },
+                { label: 'CTR',   fn: c => _wrP(c.ctr),          color: '#2563eb' },
+                { label: '매출',   fn: c => _wrW(c.rev),          color: '#059669' },
+                { label: 'ROAS',  fn: c => _wrR(c.roas),         color: '#7c3aed' },
+            ];
+            metrics.forEach(m => {
+                html += `<tr><td style="${thBase}">${m.label}</td>`;
+                pd.top5.forEach(c => {
+                    html += `<td style="${tdBase}font-weight:600;color:${m.color}">${m.fn(c)}</td>`;
+                });
+                for (let i = pd.top5.length; i < 5; i++) html += `<td style="${tdBase}"></td>`;
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
             // 소구/후킹/메시지요소/키워드 인사이트
             const hasInsight = pd.topAppeals.length || pd.topHooks.length || (pd.topPhrases&&pd.topPhrases.length) || pd.topKeywords.length;
             if (hasInsight) {
@@ -847,41 +859,51 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
         });
     }
 
-    /* 소재별 (이미지 포함) — 5열 세로 카드 */
+    /* 소재별 (이미지 포함) — 이미지 행 + 지표 행 분리, 5열씩 */
     if (!sections || sections.includes('creatives')) {
         html += `<h3>🎨 소재별 성과 TOP ${byCreative.length}</h3>`;
-        // 5개씩 행으로 분할
+        const tdB = `border:1px solid #e2e8f0;padding:6px 8px;text-align:center;font-size:11px;`;
+        const thB = `border:1px solid #e2e8f0;padding:6px 8px;background:#f8fafc;font-size:11px;font-weight:600;color:#64748b;text-align:left;white-space:nowrap;`;
+        const cMets = [
+            { label: '광고비', fn: c => _wrW(c.spend),  color: '#334155' },
+            { label: 'CTR',   fn: c => _wrP(c.ctr),     color: '#2563eb' },
+            { label: '매출',   fn: c => _wrW(c.rev),     color: '#059669' },
+            { label: 'ROAS',  fn: c => _wrR(c.roas),    color: '#7c3aed' },
+        ];
         for (let rowStart = 0; rowStart < byCreative.length; rowStart += 5) {
             const rowItems = byCreative.slice(rowStart, rowStart + 5);
-            html += `<table style="width:100%;border-collapse:separate;border-spacing:6px 6px;margin-bottom:0"><tbody><tr style="vertical-align:top">`;
+            html += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><tbody>`;
+            // 이미지 행
+            html += `<tr><td style="${thB}"></td>`;
             rowItems.forEach((c, j) => {
                 const i = rowStart + j;
                 const rankBg  = i === 0 ? '#fbbf24' : '#e2e8f0';
                 const rankClr = i === 0 ? '#78350f' : '#64748b';
                 const thumb   = toThumb(c.thumb);
                 const imgHtml = thumb
-                    ? `<img src="${thumb}" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:6px 6px 0 0;display:block">`
-                    : `<div style="width:100%;height:110px;background:#f1f5f9;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:22px">🖼</div>`;
-                html += `<td style="width:20%;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;padding:0;background:#f8fafc">
+                    ? `<img src="${thumb}" alt="" style="width:100%;max-height:130px;object-fit:cover;border-radius:6px;display:block">`
+                    : `<div style="width:100%;height:100px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:20px">🖼</div>`;
+                html += `<td style="${tdB}vertical-align:top;padding:6px">
                     <div style="position:relative">
                         ${imgHtml}
-                        <span style="position:absolute;top:5px;left:5px;background:${rankBg};color:${rankClr};font-size:10px;font-weight:800;width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center">${i+1}</span>
+                        <span style="position:absolute;top:4px;left:4px;background:${rankBg};color:${rankClr};font-size:9px;font-weight:800;width:18px;height:18px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center">${i+1}</span>
                     </div>
-                    <div style="padding:7px 8px">
-                        <div style="font-size:9px;font-weight:600;color:#1e293b;word-break:break-all;margin-bottom:4px;line-height:1.3">${c.name}</div>
-                        ${c.platform ? `<div style="font-size:9px;color:#94a3b8;margin-bottom:3px">${c.platform}${c.product ? ' · ' + c.product : ''}</div>` : ''}
-                        <div style="font-size:10px;font-weight:700;color:#7c3aed">ROAS ${_wrR(c.roas)}</div>
-                        ${c.conv > 0 ? `<div style="font-size:9px;color:#059669;font-weight:600">전환 ${_wrN(c.conv)}건</div>` : ''}
-                        <div style="font-size:9px;color:#2563eb">CTR ${_wrP(c.ctr)}</div>
-                        <div style="font-size:9px;color:#334155">${_wrW(c.spend)}</div>
-                    </div>
+                    <div style="font-size:9px;font-weight:600;color:#1e293b;word-break:break-all;margin-top:5px;line-height:1.3;text-align:left">${c.name}</div>
+                    ${c.platform ? `<div style="font-size:9px;color:#94a3b8;text-align:left">${c.platform}${c.product ? ' · '+c.product : ''}</div>` : ''}
                 </td>`;
             });
-            // 빈 셀 채움
-            for (let k = rowItems.length; k < 5; k++) {
-                html += `<td style="width:20%"></td>`;
-            }
-            html += `</tr></tbody></table>`;
+            for (let k = rowItems.length; k < 5; k++) html += `<td style="${tdB}"></td>`;
+            html += `</tr>`;
+            // 지표 행
+            cMets.forEach(m => {
+                html += `<tr><td style="${thB}">${m.label}</td>`;
+                rowItems.forEach(c => {
+                    html += `<td style="${tdB}font-weight:600;color:${m.color}">${m.fn(c)}</td>`;
+                });
+                for (let k = rowItems.length; k < 5; k++) html += `<td style="${tdB}"></td>`;
+                html += `</tr>`;
+            });
+            html += `</tbody></table>`;
         }
     }
 
