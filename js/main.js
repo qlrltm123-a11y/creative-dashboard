@@ -4072,7 +4072,8 @@ function median(arr) {
 // 동일 필터 상태 + 동일 allCreatives 참조면 재집계 생략
 let _perfPerfCache = null;
 function _getPerfData() {
-    const cacheKey = `${currentBrand}|${currentPlatform}|${currentEvent}|${performanceProducts.join('+')}`;
+    // 캐시키에 모든 필터 변수 포함 (performanceEvents 누락 버그 수정)
+    const cacheKey = `${currentBrand}|${currentPlatform}|${currentEvent}|${performanceEvents.join('+')}|${performanceProducts.join('+')}`;
     const src = window.allCreatives || allCreatives || [];
     if (_perfPerfCache && _perfPerfCache.key === cacheKey && _perfPerfCache.src === src) {
         return _perfPerfCache;
@@ -4081,11 +4082,11 @@ function _getPerfData() {
     if (currentBrand && currentBrand !== 'ALL') data = data.filter(c => c.brand === currentBrand);
     if (currentPlatform) data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
     if (currentEvent)   data = data.filter(c => (c.event    || '').toString().trim() === currentEvent);
+    if (performanceEvents.length) data = data.filter(c => _pfHas(performanceEvents, c.event));
     if (performanceProducts.length) data = data.filter(c => _pfHas(performanceProducts, c.product));
 
     const isAllPlatform = !currentPlatform;
-    // 전환 추적 매체만 필터 후 → 소재명(ad_name) 기준 매체 종합 통합
-    // 같은 소재가 Single One Meta + TikTok으로 분리된 행을 하나로 합산
+    // ★ 전환 추적 매체만 → 소재명(ad_name) 기준 매체 종합 통합 (Single One Meta+TikTok → 1행)
     const dataForRanking = isAllPlatform ? filterTrackedOnly(data) : data;
     const aggregated = (typeof aggregateByAdName === 'function')
         ? aggregateByAdName(dataForRanking)
