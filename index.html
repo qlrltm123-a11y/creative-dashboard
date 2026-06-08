@@ -116,6 +116,11 @@
                     <span class="label">퍼널</span>
                     <span class="sub">유입→구매 전환</span>
                 </button>
+                <button class="section-tab" data-section="kr">
+                    <i class="fas fa-flag"></i>
+                    <span class="label">KR 소재</span>
+                    <span class="sub">한국 촬영 소재</span>
+                </button>
             </div>
             <div class="tab-group" data-group="제작">
                 <span class="group-label">✨ 제작</span>
@@ -745,6 +750,45 @@
                     data-src="funnel.html" loading="lazy"></iframe>
         </div>
         <!-- ============ /SECTION: 퍼널 ============ -->
+
+        <!-- ============ SECTION: KR 소재 ============ -->
+        <div class="section-panel" data-panel="kr">
+
+            <!-- 헤더 -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-flag text-rose-500"></i> KR 소재 목록
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">파일명에 <code class="bg-slate-100 px-1 rounded">(KR)</code> 포함된 소재만 모았습니다</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="kr-count-badge" class="text-xs bg-rose-100 text-rose-700 font-bold px-3 py-1 rounded-full"></span>
+                    <input id="kr-search" type="text" placeholder="소재명 검색..." class="filter-select text-sm" style="min-width:200px">
+                    <select id="kr-sort" class="filter-select text-sm">
+                        <option value="roas">ROAS 높은순</option>
+                        <option value="ctr">CTR 높은순</option>
+                        <option value="cvr">CVR 높은순</option>
+                        <option value="conversions">전환수 높은순</option>
+                        <option value="spend">광고비 높은순</option>
+                        <option value="name">소재명순</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 통계 요약 카드 -->
+            <div id="kr-summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
+
+            <!-- 소재 카드 그리드 -->
+            <div id="kr-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+            <!-- 빈 상태 -->
+            <div id="kr-empty" class="hidden text-center py-16 text-slate-400">
+                <i class="fas fa-flag text-4xl mb-3 opacity-30"></i>
+                <p class="text-sm">(KR) 소재가 없거나 검색 결과가 없습니다</p>
+            </div>
+        </div>
+        <!-- ============ /SECTION: KR 소재 ============ -->
 
         <!-- ============ SECTION: GMV 시뮬레이터 (iframe 통합) ============ -->
         <div class="section-panel" data-panel="gmv">

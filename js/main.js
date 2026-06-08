@@ -469,7 +469,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false };
+let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false, kr: false };
 let _currentSection = 'performance';   // 개요 탭 제거됨 → 기본 성과 분석
 
 function switchSection(sectionName) {
@@ -502,6 +502,8 @@ function switchSection(sectionName) {
                 if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
             } else if (sectionName === 'weekly') {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
+            } else if (sectionName === 'kr') {
+                renderKRSection();
             } else if (sectionName === 'funnel' || sectionName === 'gmv') {
                 // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드) + 전역 브랜드 전달
                 const frame = document.getElementById(sectionName + '-frame');
@@ -5018,3 +5020,157 @@ function formatKpiCount(num) {
 window.formatKoreanShort = formatKoreanShort;
 window.formatKpiCurrency = formatKpiCurrency;
 window.formatKpiCount = formatKpiCount;
+
+// ============================
+// 🇰🇷 KR 소재 섹션
+// 파일명에 (KR) 포함된 소재만 별도 정리
+// ============================
+function renderKRSection() {
+    const grid    = document.getElementById('kr-grid');
+    const empty   = document.getElementById('kr-empty');
+    const badge   = document.getElementById('kr-count-badge');
+    const summary = document.getElementById('kr-summary-cards');
+    if (!grid) return;
+
+    // 전체 raw 데이터에서 (KR) 소재 필터
+    const allData = window.allCreatives || [];
+    let krData = allData.filter(c => {
+        const name = (c.ad_name || c.creative_name || c.id || '').toString();
+        return name.includes('(KR)');
+    });
+
+    // 브랜드 필터 적용
+    const brand = (typeof getCurrentBrand === 'function') ? getCurrentBrand() : (window.currentBrand || '');
+    if (brand && brand !== 'ALL') {
+        krData = krData.filter(c => (c.brand || '').toUpperCase() === brand.toUpperCase());
+    }
+
+    // ad_name 기준으로 집계 (매체 통합)
+    const aggregated = typeof aggregateByAdName === 'function' ? aggregateByAdName([...krData]) : krData;
+
+    // 검색어 필터
+    const searchVal = (document.getElementById('kr-search')?.value || '').toLowerCase().trim();
+    const filtered = searchVal
+        ? aggregated.filter(c => (c.ad_name || c.creative_name || '').toLowerCase().includes(searchVal))
+        : aggregated;
+
+    // 정렬
+    const sortKey = document.getElementById('kr-sort')?.value || 'roas';
+    const sorted = [...filtered].sort((a, b) => {
+        if (sortKey === 'name') return (a.ad_name || '').localeCompare(b.ad_name || '');
+        return (b[sortKey] || 0) - (a[sortKey] || 0);
+    });
+
+    // 배지
+    if (badge) badge.textContent = `총 ${sorted.length}개 소재`;
+
+    // 요약 카드
+    if (summary && sorted.length) {
+        const avg = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0) / sorted.length;
+        const sum = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0);
+        const avgRoas = avg('roas'), avgCtr = avg('ctr'), totalCv = sum('conversions'), totalSpend = sum('spend');
+        summary.innerHTML = [
+            { label: '평균 ROAS', val: avgRoas.toFixed(2) + 'x', icon: 'fa-chart-line', color: 'text-indigo-600' },
+            { label: '평균 CTR',  val: (avgCtr * 100).toFixed(2) + '%', icon: 'fa-mouse-pointer', color: 'text-blue-600' },
+            { label: '총 전환수', val: Math.round(totalCv).toLocaleString(), icon: 'fa-shopping-cart', color: 'text-emerald-600' },
+            { label: '총 광고비', val: '¥' + Math.round(totalSpend).toLocaleString(), icon: 'fa-yen-sign', color: 'text-amber-600' },
+        ].map(s => `
+            <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center ${s.color}">
+                    <i class="fas ${s.icon}"></i>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-500">${s.label}</div>
+                    <div class="text-base font-bold text-slate-900">${s.val}</div>
+                </div>
+            </div>`).join('');
+    }
+
+    // 빈 상태
+    if (!sorted.length) {
+        grid.innerHTML = '';
+        grid.classList.add('hidden');
+        empty?.classList.remove('hidden');
+        return;
+    }
+    grid.classList.remove('hidden');
+    empty?.classList.add('hidden');
+
+    // 소재 카드 렌더
+    grid.innerHTML = sorted.map(c => {
+        const name    = c.ad_name || c.creative_name || c.id || '';
+        const roas    = (c.roas || 0).toFixed(2);
+        const ctr     = ((c.ctr || 0) * 100).toFixed(2);
+        const cvr     = ((c.cvr || 0) * 100).toFixed(2);
+        const cv      = Math.round(c.conversions || 0).toLocaleString();
+        const spend   = '¥' + Math.round(c.spend || 0).toLocaleString();
+        const isVideo = c.media_type === 'video';
+
+        // 썸네일
+        const rawThumb = c.thumbnail_url || c.media_url || '';
+        const fallback = `<div style="width:100%;height:160px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#94a3b8;font-size:2rem"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
+        let thumbHtml;
+        if (!rawThumb) {
+            thumbHtml = fallback;
+        } else if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(rawThumb) && typeof window.buildDriveImgHtml === 'function') {
+            thumbHtml = window.buildDriveImgHtml(rawThumb, {
+                className: 'kr-thumb',
+                alt: name,
+                finalFallbackHtml: fallback,
+            });
+        } else {
+            thumbHtml = `<img src="${rawThumb}" alt="${name}" loading="lazy"
+                class="kr-thumb" style="width:100%;height:160px;object-fit:cover;border-radius:8px;"
+                onerror="this.outerHTML='${fallback.replace(/'/g,"\\'")}'" >`;
+        }
+
+        // 소구포인트 칩
+        const appeals = typeof normalizeArrayField === 'function' ? normalizeArrayField(c.appeal_points).slice(0, 3) : [];
+        const appealHtml = appeals.length
+            ? appeals.map(a => `<span class="rank-appeal-chip">${a}</span>`).join('')
+            : '<span class="text-xs text-slate-400">분석 전</span>';
+
+        // ROAS 색상
+        const roasColor = parseFloat(roas) >= 3 ? 'text-emerald-600' : parseFloat(roas) >= 1.5 ? 'text-amber-600' : 'text-rose-500';
+
+        // 플랫폼 배지
+        const platforms = c._platforms ? [...c._platforms].join(' · ') : (c.platform || '');
+
+        return `
+        <div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
+            <div class="mb-3">${thumbHtml}</div>
+            <div class="text-xs font-bold text-slate-800 mb-1 leading-snug break-all">${name}</div>
+            ${platforms ? `<div class="text-xs text-slate-400 mb-2"><i class="fas fa-broadcast-tower mr-1"></i>${platforms}</div>` : ''}
+            <div class="flex flex-wrap gap-1 mb-3">${appealHtml}</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-slate-50 rounded-lg p-2">
+                    <div class="text-slate-400 mb-0.5">ROAS</div>
+                    <div class="font-bold ${roasColor}">${roas}x</div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-2">
+                    <div class="text-slate-400 mb-0.5">CTR</div>
+                    <div class="font-bold text-blue-600">${ctr}%</div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-2">
+                    <div class="text-slate-400 mb-0.5">전환수</div>
+                    <div class="font-bold text-slate-700">${cv}</div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-2">
+                    <div class="text-slate-400 mb-0.5">광고비</div>
+                    <div class="font-bold text-slate-700">${spend}</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+window.renderKRSection = renderKRSection;
+
+// KR 탭 검색/정렬 이벤트 (DOMContentLoaded 후 1회 등록)
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('kr-search')?.addEventListener('input', () => {
+        if (typeof renderKRSection === 'function') renderKRSection();
+    });
+    document.getElementById('kr-sort')?.addEventListener('change', () => {
+        if (typeof renderKRSection === 'function') renderKRSection();
+    });
+});
