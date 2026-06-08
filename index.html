@@ -86,47 +86,13 @@
                     <span class="brand-dot bg-amber-500"></span>CG
                 </button>
 
-                <!-- ★ 매체(Platform) 필터 — 브랜드별 가용 매체로 동적 구성 -->
-                <div id="platform-filter-wrap" class="platform-filter-wrap">
-                    <label for="platform-select" class="platform-filter-label">
-                        <i class="fas fa-bullhorn"></i> 매체
-                    </label>
-                    <select id="platform-select" class="platform-filter-select">
-                        <option value="">전체 매체</option>
-                    </select>
-                    <span id="platform-count" class="platform-filter-count"></span>
-                    <button id="platform-filter-reset" class="platform-filter-reset" title="매체 필터 초기화" type="button">
-                        <i class="fas fa-rotate-left"></i>
-                    </button>
-                </div>
-
-                <!-- ★ Retail 채널 필터 -->
-                <div id="retail-filter-wrap" class="platform-filter-wrap hidden">
-                    <label for="retail-select" class="platform-filter-label">
-                        <i class="fas fa-store"></i> Retail
-                    </label>
-                    <select id="retail-select" class="platform-filter-select">
-                        <option value="">전체</option>
-                    </select>
-                    <span id="retail-count" class="platform-filter-count"></span>
-                    <button id="retail-filter-reset" class="platform-filter-reset" title="Retail 필터 초기화" type="button">
-                        <i class="fas fa-rotate-left"></i>
-                    </button>
-                </div>
-
-                <!-- ★ Event 필터 (시트 AA열) -->
-                <div id="event-filter-wrap" class="platform-filter-wrap hidden">
-                    <label for="event-select" class="platform-filter-label">
-                        <i class="fas fa-calendar-star"></i> 이벤트
-                    </label>
-                    <select id="event-select" class="platform-filter-select">
-                        <option value="">전체</option>
-                    </select>
-                    <span id="event-count" class="platform-filter-count"></span>
-                    <button id="event-filter-reset" class="platform-filter-reset" title="이벤트 필터 초기화" type="button">
-                        <i class="fas fa-rotate-left"></i>
-                    </button>
-                </div>
+                <!-- 필터 제거됨 (hidden select는 JS 호환용으로 유지) -->
+                <select id="platform-select" class="hidden"><option value="">전체 매체</option></select>
+                <span id="platform-count" class="hidden"></span>
+                <select id="retail-select" class="hidden"><option value="">전체</option></select>
+                <span id="retail-count" class="hidden"></span>
+                <select id="event-select" class="hidden"><option value="">전체</option></select>
+                <span id="event-count" class="hidden"></span>
 
                 <!-- ★ 전역 캠페인 필터는 제거됨 (섹션별 통합 필터로 대체) -->
                 <select id="campaign-select" class="hidden">
