@@ -144,6 +144,8 @@ window.updateDashboard = function() {
         if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
     } else if (_currentSection === 'weekly') {
         if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
+    } else if (_currentSection === 'kr') {
+        renderKRSection();
     }
     // overview: updateKPIs + updateCharts 만으로 충분 (renderProductPerformance 불필요)
 
@@ -5048,18 +5050,35 @@ function renderKRSection() {
     // ad_name 기준으로 집계 (매체 통합)
     const aggregated = typeof aggregateByAdName === 'function' ? aggregateByAdName([...krData]) : krData;
 
-    // 사이즈만 다른 중복 제거 (1080x1080, 1920x1080 등 해상도 부분 제거 후 같으면 1개만)
-    const _stripSize = name => name
-        .replace(/_\d{3,4}x\d{3,4}/g, '')   // _1080x1080, _1920x1080 등
-        .replace(/_\d+:\d+/g, '')             // _9:16 등 비율
-        .replace(/__+/g, '_')                 // 연속 _ 정리
-        .replace(/_+$/, '')                   // 끝 _ 제거
-        .toLowerCase().trim();
+    // 인플루언서 기준 중복 제거
+    // 파일명에서 -EDIT 앞 세그먼트의 첫 번째 토큰을 인플루언서 키로 사용
+    // 예) MARIE-Collagen-EDIT → MARIE, MARIE-3D-EDIT → MARIE (동일인)
+    //     momota-kaho-EDIT → momota-kaho (하이픈명은 전체 유지)
+    const _extractInfluKey = name => {
+        // -EDIT 앞 부분 추출
+        const beforeEdit = name.replace(/-EDIT.*/i, '');
+        // 마지막 _ 이후 세그먼트
+        const seg = beforeEdit.split('_').pop() || '';
+        // (KR) 등 국가 태그 제거
+        const clean = seg.replace(/^\(.*?\)/, '');
+        // 토큰 분리
+        const tokens = clean.split('-').filter(Boolean);
+        // 두 번째 토큰이 숫자/약어(2자 이하 또는 숫자 포함)면 첫 토큰만
+        // 그 외엔 두 토큰까지 유지 (momota-kaho 같은 2파트 이름)
+        if (tokens.length >= 2) {
+            const second = tokens[1];
+            if (/\d/.test(second) || second.length <= 2) {
+                return (beforeEdit.split('_').slice(0, -1).join('_') + '_' + tokens[0]).toLowerCase();
+            }
+            return (beforeEdit.split('_').slice(0, -1).join('_') + '_' + tokens[0] + '-' + tokens[1]).toLowerCase();
+        }
+        return beforeEdit.toLowerCase();
+    };
 
     const sizeDeduped = [];
     const seenKeys = new Set();
     aggregated.forEach(c => {
-        const key = _stripSize(c.ad_name || c.creative_name || c.id || '');
+        const key = _extractInfluKey(c.ad_name || c.creative_name || c.id || '');
         if (!seenKeys.has(key)) {
             seenKeys.add(key);
             sizeDeduped.push(c);
