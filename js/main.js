@@ -5051,34 +5051,44 @@ function renderKRSection() {
     const aggregated = typeof aggregateByAdName === 'function' ? aggregateByAdName([...krData]) : krData;
 
     // 인플루언서 기준 중복 제거
-    // 파일명에서 -EDIT 앞 세그먼트의 첫 번째 토큰을 인플루언서 키로 사용
-    // 예) MARIE-Collagen-EDIT → MARIE, MARIE-3D-EDIT → MARIE (동일인)
-    //     momota-kaho-EDIT → momota-kaho (하이픈명은 전체 유지)
-    const _extractInfluKey = name => {
-        // -EDIT 앞 부분 추출
+    // 규칙: 파일명에서 제품명 + "-EDIT" 직전 첫 번째 하이픈 토큰이 인플루언서명
+    // ymmty30-EDIT        → ymmty30
+    // ymmty30-EDIT-2      → ymmty30  (EDIT 이후 숫자 무시)
+    // MARIE-Collagen-EDIT → MARIE    (첫 토큰)
+    // MARIE-3D-EDIT       → MARIE    (첫 토큰)
+    // momota-kaho-EDIT    → momota-kaho (두 번째 토큰이 소문자 이름이면 유지)
+    // (KR)KangYeJin-EDIT  → KangYeJin  ((KR) 제거)
+    const _influKey = name => {
+        // 1) -EDIT 바로 앞까지만 남김 (EDIT-2, EDIT_VID 등 이후 전부 제거)
         const beforeEdit = name.replace(/-EDIT.*/i, '');
-        // 마지막 _ 이후 세그먼트
-        const seg = beforeEdit.split('_').pop() || '';
-        // (KR) 등 국가 태그 제거
-        const clean = seg.replace(/^\(.*?\)/, '');
-        // 토큰 분리
+        // 2) 마지막 _ 세그먼트 = 인플루언서 세그먼트
+        const parts  = beforeEdit.split('_');
+        const product = parts.slice(1, -1).join('_').toLowerCase(); // 제품군 (date 제외)
+        const seg    = parts[parts.length - 1] || '';
+        // 3) (KR), (JP) 등 국가 태그 제거
+        const clean  = seg.replace(/^\([^)]*\)/, '');
+        // 4) 하이픈 분리 후 인플루언서명 결정
         const tokens = clean.split('-').filter(Boolean);
-        // 두 번째 토큰이 숫자/약어(2자 이하 또는 숫자 포함)면 첫 토큰만
-        // 그 외엔 두 토큰까지 유지 (momota-kaho 같은 2파트 이름)
-        if (tokens.length >= 2) {
+        let influName;
+        if (tokens.length <= 1) {
+            influName = tokens[0] || clean;
+        } else {
             const second = tokens[1];
-            if (/\d/.test(second) || second.length <= 2) {
-                return (beforeEdit.split('_').slice(0, -1).join('_') + '_' + tokens[0]).toLowerCase();
+            // 두 번째 토큰이 숫자 포함, 대문자 시작 상품명, 2자 이하 약어 → 첫 토큰만
+            if (/\d/.test(second) || /^[A-Z]/.test(second) || second.length <= 2) {
+                influName = tokens[0];
+            } else {
+                // 소문자 연속 이름 (momota-kaho 등) → 두 토큰 유지
+                influName = tokens[0] + '-' + tokens[1];
             }
-            return (beforeEdit.split('_').slice(0, -1).join('_') + '_' + tokens[0] + '-' + tokens[1]).toLowerCase();
         }
-        return beforeEdit.toLowerCase();
+        return (product + '|' + influName).toLowerCase();
     };
 
     const sizeDeduped = [];
     const seenKeys = new Set();
     aggregated.forEach(c => {
-        const key = _extractInfluKey(c.ad_name || c.creative_name || c.id || '');
+        const key = _influKey(c.ad_name || c.creative_name || c.id || '');
         if (!seenKeys.has(key)) {
             seenKeys.add(key);
             sizeDeduped.push(c);
