@@ -5048,11 +5048,29 @@ function renderKRSection() {
     // ad_name 기준으로 집계 (매체 통합)
     const aggregated = typeof aggregateByAdName === 'function' ? aggregateByAdName([...krData]) : krData;
 
+    // 사이즈만 다른 중복 제거 (1080x1080, 1920x1080 등 해상도 부분 제거 후 같으면 1개만)
+    const _stripSize = name => name
+        .replace(/_\d{3,4}x\d{3,4}/g, '')   // _1080x1080, _1920x1080 등
+        .replace(/_\d+:\d+/g, '')             // _9:16 등 비율
+        .replace(/__+/g, '_')                 // 연속 _ 정리
+        .replace(/_+$/, '')                   // 끝 _ 제거
+        .toLowerCase().trim();
+
+    const sizeDeduped = [];
+    const seenKeys = new Set();
+    aggregated.forEach(c => {
+        const key = _stripSize(c.ad_name || c.creative_name || c.id || '');
+        if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            sizeDeduped.push(c);
+        }
+    });
+
     // 검색어 필터
     const searchVal = (document.getElementById('kr-search')?.value || '').toLowerCase().trim();
     const filtered = searchVal
-        ? aggregated.filter(c => (c.ad_name || c.creative_name || '').toLowerCase().includes(searchVal))
-        : aggregated;
+        ? sizeDeduped.filter(c => (c.ad_name || c.creative_name || '').toLowerCase().includes(searchVal))
+        : sizeDeduped;
 
     // 정렬
     const sortKey = document.getElementById('kr-sort')?.value || 'roas';
