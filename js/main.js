@@ -5194,9 +5194,17 @@ function renderKRSection() {
         // 플랫폼 배지
         const platforms = c._platforms ? [...c._platforms].join(' · ') : (c.platform || '');
 
+        // 드라이브 링크 (media_url 우선, 없으면 thumbnail_url)
+        const driveUrl = c.media_url || c.thumbnail_url || '';
+
         return `
-        <div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
-            <div class="mb-3">${thumbHtml}</div>
+        <a ${driveUrl ? `href="${driveUrl}" target="_blank" rel="noopener"` : ''}
+           class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow block ${driveUrl ? 'cursor-pointer hover:border-violet-400' : ''}"
+           style="text-decoration:none;color:inherit">
+            <div class="mb-3 relative">
+                ${thumbHtml}
+                ${driveUrl ? `<div class="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1"><i class="fas fa-external-link-alt"></i>Drive</div>` : ''}
+            </div>
             <div class="text-xs font-bold text-slate-800 mb-1 leading-snug break-all">${name}</div>
             ${platforms ? `<div class="text-xs text-slate-400 mb-2"><i class="fas fa-broadcast-tower mr-1"></i>${platforms}</div>` : ''}
             <div class="flex flex-wrap gap-1 mb-3">${appealHtml}</div>
@@ -5218,7 +5226,7 @@ function renderKRSection() {
                     <div class="font-bold text-slate-700">${spend}</div>
                 </div>
             </div>
-        </div>`;
+        </a>`;
     }).join('');
 }
 window.renderKRSection = renderKRSection;
