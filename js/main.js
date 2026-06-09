@@ -5039,8 +5039,8 @@ function renderKRSection() {
         return /-EDIT/i.test(name);
     });
 
-    // 브랜드 필터 적용
-    const brand = (typeof getCurrentBrand === 'function') ? getCurrentBrand() : (window.currentBrand || '');
+    // 브랜드 필터 적용 (currentBrand 전역 변수 직접 참조 — 탭 전환 시 항상 최신값)
+    const brand = typeof currentBrand !== 'undefined' ? currentBrand : (window.currentBrand || '');
     if (brand && brand !== 'ALL') {
         krData = krData.filter(c => (c.brand || '').toUpperCase() === brand.toUpperCase());
     }
@@ -5068,12 +5068,19 @@ function renderKRSection() {
     if (summary && sorted.length) {
         const avg = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0) / sorted.length;
         const sum = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0);
+        const fx = typeof getFxRate === 'function' ? getFxRate() : 9.5;
         const avgRoas = avg('roas'), avgCtr = avg('ctr'), totalCv = sum('conversions'), totalSpend = sum('spend');
+        const totalSpendKrw = Math.round(totalSpend * fx);
+        const spendStr = totalSpendKrw >= 100000000
+            ? '₩' + (totalSpendKrw / 100000000).toFixed(1) + '억'
+            : totalSpendKrw >= 10000
+            ? '₩' + (totalSpendKrw / 10000).toFixed(0) + '만'
+            : '₩' + totalSpendKrw.toLocaleString();
         summary.innerHTML = [
             { label: '평균 ROAS', val: avgRoas.toFixed(2) + 'x', icon: 'fa-chart-line', color: 'text-indigo-600' },
             { label: '평균 CTR',  val: (avgCtr * 100).toFixed(2) + '%', icon: 'fa-mouse-pointer', color: 'text-blue-600' },
             { label: '총 전환수', val: Math.round(totalCv).toLocaleString(), icon: 'fa-shopping-cart', color: 'text-emerald-600' },
-            { label: '총 광고비', val: '¥' + Math.round(totalSpend).toLocaleString(), icon: 'fa-yen-sign', color: 'text-amber-600' },
+            { label: '총 광고비', val: spendStr, icon: 'fa-won-sign', color: 'text-amber-600' },
         ].map(s => `
             <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center ${s.color}">
@@ -5098,12 +5105,16 @@ function renderKRSection() {
 
     // 소재 카드 렌더
     grid.innerHTML = sorted.map(c => {
+        const fx2     = typeof getFxRate === 'function' ? getFxRate() : 9.5;
         const name    = c.ad_name || c.creative_name || c.id || '';
         const roas    = (c.roas || 0).toFixed(2);
         const ctr     = ((c.ctr || 0) * 100).toFixed(2);
         const cvr     = ((c.cvr || 0) * 100).toFixed(2);
         const cv      = Math.round(c.conversions || 0).toLocaleString();
-        const spend   = '¥' + Math.round(c.spend || 0).toLocaleString();
+        const spendKrw = Math.round((c.spend || 0) * fx2);
+        const spend   = spendKrw >= 10000
+            ? '₩' + (spendKrw / 10000).toFixed(0) + '만'
+            : '₩' + spendKrw.toLocaleString();
         const isVideo = c.media_type === 'video';
 
         // 썸네일
