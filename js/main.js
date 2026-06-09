@@ -5032,11 +5032,11 @@ function renderKRSection() {
     const summary = document.getElementById('kr-summary-cards');
     if (!grid) return;
 
-    // 전체 raw 데이터에서 (KR) 소재 필터
+    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴)
     const allData = window.allCreatives || [];
     let krData = allData.filter(c => {
         const name = (c.ad_name || c.creative_name || c.id || '').toString();
-        return name.includes('(KR)');
+        return /-EDIT/i.test(name);
     });
 
     // 브랜드 필터 적용
@@ -5062,7 +5062,7 @@ function renderKRSection() {
     });
 
     // 배지
-    if (badge) badge.textContent = `총 ${sorted.length}개 소재`;
+    if (badge) badge.textContent = `인플루언서 소재 ${sorted.length}개`;
 
     // 요약 카드
     if (summary && sorted.length) {
