@@ -99,6 +99,17 @@
                     <option value="">전체 캠페인</option>
                 </select>
                 <span id="campaign-count" class="hidden"></span>
+
+                <!-- ★ 날짜 범위 필터 -->
+                <div class="date-range-filter ml-auto flex items-center gap-2">
+                    <i class="fas fa-calendar-alt text-slate-400 text-sm"></i>
+                    <input type="date" id="date-from" class="date-range-input" title="시작일">
+                    <span class="text-slate-400 text-xs">~</span>
+                    <input type="date" id="date-to" class="date-range-input" title="종료일">
+                    <button id="date-range-reset" class="date-range-reset" title="날짜 필터 초기화">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
         </section>
 

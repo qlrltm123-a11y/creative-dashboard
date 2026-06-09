@@ -496,6 +496,69 @@ body {
 }
 
 /* Filters */
+/* ============================
+   날짜 범위 필터
+   ============================ */
+.date-range-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 5px 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: border-color 0.15s;
+}
+.date-range-filter:focus-within {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.date-range-input {
+    border: none;
+    outline: none;
+    font-size: 12px;
+    color: #475569;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.date-range-input::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+}
+.date-range-input:focus {
+    background: #f8fafc;
+}
+.date-range-reset {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+    display: none; /* 날짜 선택 시에만 표시 */
+}
+.date-range-reset.visible {
+    display: flex;
+    align-items: center;
+}
+.date-range-reset:hover {
+    color: #ef4444;
+    background: #fee2e2;
+}
+/* 날짜 필터 활성 상태 강조 */
+.date-range-filter.active {
+    border-color: #6366f1;
+    background: #f5f3ff;
+}
+.date-range-filter.active i.fa-calendar-alt {
+    color: #6366f1;
+}
+
 .filter-select {
     padding: 8px 12px;
     border: 1px solid #e2e8f0;

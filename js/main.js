@@ -7,6 +7,8 @@ let currentCampaign = ''; // ★ 전역 캠페인 필터 ('' = 전체) — UI �
 let currentPlatform = ''; // ★ 전역 매체(Platform) 필터 ('' = 전체) — 브랜드별로 동적 구성
 let currentRetail = '';   // ★ 전역 Retail 채널 필터 ('' = 전체, 'Qoo10'/'RKT' 등)
 let currentEvent  = '';   // ★ 전역 Event 필터 ('' = 전체, 시트 AA열)
+let dateFrom = '';        // ★ 전역 날짜 필터 시작일 (YYYY-MM-DD, '' = 제한없음)
+let dateTo   = '';        // ★ 전역 날짜 필터 종료일 (YYYY-MM-DD, '' = 제한없음)
 // ★ 섹션 단위 필터 (성과 분석 / AI 인사이트)
 // 성과 분석 섹션 필터 — 복수 선택(배열). 빈 배열 = 전체
 let performanceProducts = [];
@@ -150,7 +152,26 @@ window.updateDashboard = function() {
     // overview: updateKPIs + updateCharts 만으로 충분 (renderProductPerformance 불필요)
 
     document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
+    // 날짜 picker min/max 범위를 전체 데이터 기준으로 설정
+    _setDatePickerRange();
 };
+
+function _setDatePickerRange() {
+    const dateFromEl = document.getElementById('date-from');
+    const dateToEl   = document.getElementById('date-to');
+    if (!dateFromEl || !dateToEl || !allCreatives.length) return;
+    const dates = allCreatives
+        .map(c => (c.start_date || '').slice(0, 10))
+        .filter(d => d && d >= '2000-01-01');
+    if (!dates.length) return;
+    dates.sort();
+    const minD = dates[0];
+    const maxD = dates[dates.length - 1];
+    dateFromEl.min = minD;
+    dateFromEl.max = maxD;
+    dateToEl.min   = minD;
+    dateToEl.max   = maxD;
+}
 
 // ============================
 // Events
@@ -287,6 +308,36 @@ function bindEvents() {
     }
 
     // ★ 캠페인 전역 필터는 제거됨 (hidden 셀렉트만 유지) — 이벤트 바인딩 불필요
+
+    // ★ 날짜 범위 필터 이벤트 바인딩
+    const dateFromEl = document.getElementById('date-from');
+    const dateToEl   = document.getElementById('date-to');
+    const dateResetBtn = document.getElementById('date-range-reset');
+    const dateRangeWrap = document.querySelector('.date-range-filter');
+
+    function _onDateChange() {
+        dateFrom = dateFromEl ? dateFromEl.value : '';
+        dateTo   = dateToEl   ? dateToEl.value   : '';
+        // 리셋 버튼 / 활성 스타일 토글
+        const hasDate = dateFrom || dateTo;
+        if (dateResetBtn) dateResetBtn.classList.toggle('visible', !!hasDate);
+        if (dateRangeWrap) dateRangeWrap.classList.toggle('active', !!hasDate);
+        invalidatePerformancePoolCache();
+        debouncedUpdateDashboard();
+    }
+    if (dateFromEl) dateFromEl.addEventListener('change', _onDateChange);
+    if (dateToEl)   dateToEl.addEventListener('change', _onDateChange);
+    if (dateResetBtn) {
+        dateResetBtn.addEventListener('click', () => {
+            dateFrom = dateTo = '';
+            if (dateFromEl) dateFromEl.value = '';
+            if (dateToEl)   dateToEl.value   = '';
+            dateResetBtn.classList.remove('visible');
+            if (dateRangeWrap) dateRangeWrap.classList.remove('active');
+            invalidatePerformancePoolCache();
+            updateDashboard();
+        });
+    }
 
     // ★ 위닝 요소 인사이트 - 제품 필터
     const winningProdSel = document.getElementById('winning-product-select');
@@ -575,6 +626,21 @@ function getBrandCreatives(scope) {
     // ★ 전역 캠페인 필터 적용 (선택 시)
     if (currentCampaign) {
         list = list.filter(c => matchCampaign(c, currentCampaign));
+    }
+    // ★ 전역 날짜 범위 필터 적용
+    if (dateFrom) {
+        const from = dateFrom; // YYYY-MM-DD
+        list = list.filter(c => {
+            const d = (c.start_date || '').slice(0, 10);
+            return d >= from;
+        });
+    }
+    if (dateTo) {
+        const to = dateTo; // YYYY-MM-DD
+        list = list.filter(c => {
+            const d = (c.start_date || '').slice(0, 10);
+            return d && d <= to;
+        });
     }
     // ★ 섹션 단위 필터 (scope = 'performance' | 'ai')
     if (scope === 'performance') {
@@ -4045,6 +4111,9 @@ function aggregateByAdName(rows) {
             product: mergedProduct,
             brand: mergedBrand,
             campaign_name: mergedCampaign,
+            // 썸네일/미디어 URL: 그룹 내 첫 번째 비어있지 않은 값 사용 (첫 행이 빈 경우 대비)
+            thumbnail_url: items.map(x => x.thumbnail_url).find(v => v) || first.thumbnail_url || '',
+            media_url:     items.map(x => x.media_url).find(v => v)     || first.media_url     || '',
             // 집계 메타
             _aggregated: true,
             _row_count: items.length,
@@ -5045,6 +5114,13 @@ function renderKRSection() {
     const brand = typeof currentBrand !== 'undefined' ? currentBrand : (window.currentBrand || '');
     if (brand && brand !== 'ALL') {
         krData = krData.filter(c => (c.brand || '').toUpperCase() === brand.toUpperCase());
+    }
+    // ★ 날짜 범위 필터
+    if (typeof dateFrom !== 'undefined' && dateFrom) {
+        krData = krData.filter(c => (c.start_date || '').slice(0, 10) >= dateFrom);
+    }
+    if (typeof dateTo !== 'undefined' && dateTo) {
+        krData = krData.filter(c => { const d = (c.start_date || '').slice(0, 10); return d && d <= dateTo; });
     }
 
     // ad_name 기준으로 집계 (매체 통합)
