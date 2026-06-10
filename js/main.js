@@ -5200,7 +5200,7 @@ function renderKRSection() {
             ? '₩' + (totalSpendKrw / 10000).toFixed(0) + '만'
             : '₩' + totalSpendKrw.toLocaleString();
         summary.innerHTML = [
-            { label: '평균 ROAS', val: avgRoas.toFixed(2) + 'x', icon: 'fa-chart-line', color: 'text-indigo-600' },
+            { label: '평균 ROAS', val: Math.round(avgRoas * 100) + '%', icon: 'fa-chart-line', color: 'text-indigo-600' },
             { label: '평균 CTR',  val: (avgCtr * 100).toFixed(2) + '%', icon: 'fa-mouse-pointer', color: 'text-blue-600' },
             { label: '총 전환수', val: Math.round(totalCv).toLocaleString(), icon: 'fa-shopping-cart', color: 'text-emerald-600' },
             { label: '총 광고비', val: spendStr, icon: 'fa-won-sign', color: 'text-amber-600' },
@@ -5230,7 +5230,7 @@ function renderKRSection() {
     grid.innerHTML = sorted.map(c => {
         const fx2     = typeof getFxRate === 'function' ? getFxRate() : 9.5;
         const name    = c.ad_name || c.creative_name || c.id || '';
-        const roas    = (c.roas || 0).toFixed(2);
+        const roas    = Math.round((c.roas || 0) * 100);
         const ctr     = ((c.ctr || 0) * 100).toFixed(2);
         const cvr     = ((c.cvr || 0) * 100).toFixed(2);
         const cv      = Math.round(c.conversions || 0).toLocaleString();
@@ -5265,7 +5265,7 @@ function renderKRSection() {
             : '<span class="text-xs text-slate-400">분석 전</span>';
 
         // ROAS 색상
-        const roasColor = parseFloat(roas) >= 3 ? 'text-emerald-600' : parseFloat(roas) >= 1.5 ? 'text-amber-600' : 'text-rose-500';
+        const roasColor = roas >= 300 ? 'text-emerald-600' : roas >= 150 ? 'text-amber-600' : 'text-rose-500';
 
         // 플랫폼 배지
         const platforms = c._platforms ? [...c._platforms].join(' · ') : (c.platform || '');
@@ -5287,7 +5287,7 @@ function renderKRSection() {
             <div class="grid grid-cols-2 gap-2 text-xs">
                 <div class="bg-slate-50 rounded-lg p-2">
                     <div class="text-slate-400 mb-0.5">ROAS</div>
-                    <div class="font-bold ${roasColor}">${roas}x</div>
+                    <div class="font-bold ${roasColor}">${roas}%</div>
                 </div>
                 <div class="bg-slate-50 rounded-lg p-2">
                     <div class="text-slate-400 mb-0.5">CTR</div>
