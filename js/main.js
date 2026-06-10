@@ -607,7 +607,8 @@ window.updateActiveFilterChip = updateActiveFilterChip;
 // ============================
 // Filtering
 // ============================
-function getBrandCreatives(scope) {
+function getBrandCreatives(scope, opts) {
+    const ignoreDate = opts && opts.ignoreDate;
     let list = (currentBrand === 'ALL')
         ? allCreatives
         : allCreatives.filter(c => c.brand === currentBrand);
@@ -627,15 +628,15 @@ function getBrandCreatives(scope) {
     if (currentCampaign) {
         list = list.filter(c => matchCampaign(c, currentCampaign));
     }
-    // ★ 전역 날짜 범위 필터 적용
-    if (dateFrom) {
+    // ★ 전역 날짜 범위 필터 적용 (옵션 목록 산출 시에는 무시 가능)
+    if (!ignoreDate && dateFrom) {
         const from = dateFrom; // YYYY-MM-DD
         list = list.filter(c => {
             const d = (c.start_date || '').slice(0, 10);
             return d >= from;
         });
     }
-    if (dateTo) {
+    if (!ignoreDate && dateTo) {
         const to = dateTo; // YYYY-MM-DD
         list = list.filter(c => {
             const d = (c.start_date || '').slice(0, 10);
@@ -853,7 +854,8 @@ function populateEventOptions() {
 // 섹션별 제품 옵션 목록 (현재 브랜드+전역 캠페인 기준)
 function getSectionProductList() {
     // scope 없이 전역 필터까지만 적용한 결과로 옵션 산출
-    let base = getBrandCreatives();
+    // ★ 날짜 필터는 무시 — 날짜 범위가 좁아도 이벤트별 제품 목록은 항상 표시
+    let base = getBrandCreatives(undefined, { ignoreDate: true });
     // 성과 분석 이벤트 복수 선택 시 해당 이벤트들의 제품만
     if (performanceEvents.length) {
         base = base.filter(c => _pfHas(performanceEvents, c.event));
