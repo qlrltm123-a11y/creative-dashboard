@@ -109,8 +109,31 @@ function getPreviewEl() {
     return el;
 }
 
-function buildPreviewHtml(keyword, field) {
-    const items = (keywordCreativeMap[field] && keywordCreativeMap[field].get(keyword)) || [];
+// 키워드(또는 클러스터 멤버들) 기준 대표 소재 조회
+// - 클러스터로 묶인 워드맵 항목은 대표 keyword 자체가 keywordCreativeMap에 없을 수 있어
+//   members(원본 키워드 목록)을 합쳐서 ROAS 상위 3개를 다시 산출
+function getKeywordCreatives(field, keyword, members) {
+    const map = keywordCreativeMap[field];
+    if (!map) return [];
+    let items = map.get(keyword) || [];
+    if (!items.length && Array.isArray(members) && members.length) {
+        const seen = new Set();
+        const merged = [];
+        members.forEach(m => {
+            (map.get(m) || []).forEach(c => {
+                const id = c.id || c.ad_name || '';
+                if (seen.has(id)) return;
+                seen.add(id);
+                merged.push(c);
+            });
+        });
+        items = merged.sort((a, b) => (b.roas || 0) - (a.roas || 0)).slice(0, 3);
+    }
+    return items;
+}
+
+function buildPreviewHtml(keyword, field, members) {
+    const items = getKeywordCreatives(field, keyword, members);
     if (!items.length) {
         return `
             <div class="preview-header">
@@ -215,7 +238,7 @@ function positionPreviewAtEvent(el, evt) {
     el.style.top = y + 'px';
 }
 
-function showPreview(keyword, field, evt) {
+function showPreview(keyword, field, evt, members) {
     if (!keyword) return;
     const key = field + '::' + keyword;
 
@@ -229,7 +252,7 @@ function showPreview(keyword, field, evt) {
     hidePreviewTimer = null;
 
     const el = getPreviewEl();
-    el.innerHTML = buildPreviewHtml(keyword, field);
+    el.innerHTML = buildPreviewHtml(keyword, field, members);
 
     // 카드 자체에 hover/leave 핸들러 (카드 위에 있으면 유지)
     // ★ pinned 플래그로 자동 닫힘을 완전 차단 — 카드 위에서는 절대 사라지지 않음
@@ -254,7 +277,7 @@ function showPreview(keyword, field, evt) {
     // 클릭 시 해당 소재 모달 열기
     // ★ preview-body(스크롤 영역) 클릭은 무시 — 스크롤바 드래그/클릭이 모달을 여는 문제 방지
     //   .preview-item 클릭 시 해당 소재 ID, footer 클릭 시 첫 번째 소재 열기
-    const items = (keywordCreativeMap[field] && keywordCreativeMap[field].get(keyword)) || [];
+    const items = getKeywordCreatives(field, keyword, members);
     if (items.length && typeof window.openModal === 'function') {
         el.onclick = (e) => {
             const target = e.target;
@@ -334,12 +357,13 @@ function forceHidePreview() {
 
 // 요소에 hover 이벤트 바인딩 (재사용 헬퍼)
 // ★ mousemove 제거 — 첫 진입 시점에만 위치 고정
-function bindHoverPreview(elements, getKeyword, field) {
+function bindHoverPreview(elements, getKeyword, field, getMembers) {
     elements.forEach(el => {
         el.style.cursor = 'pointer';
         el.addEventListener('mouseenter', e => {
             const kw = getKeyword(el);
-            if (kw) showPreview(kw, field, e);
+            const members = typeof getMembers === 'function' ? getMembers(el) : null;
+            if (kw) showPreview(kw, field, e, members);
         });
         el.addEventListener('mouseleave', hidePreview);
     });
@@ -951,11 +975,13 @@ function attachInsightHoverEvents() {
     });
 
     // 2) 워드클라우드 (소구포인트)
+    // ★ textContent에는 클러스터 배지(×N)/지표값이 섞여 있어 data-keyword 사용
     const wordItems = document.querySelectorAll('#appealWordCloud .word-item');
     bindHoverPreview(
         Array.from(wordItems),
-        el => el.textContent.trim(),
-        'appeal_points'
+        el => el.dataset.keyword || el.textContent.trim(),
+        'appeal_points',
+        el => { try { return JSON.parse(el.dataset.members || '[]'); } catch (e) { return null; } }
     );
 
     // 3) TOP 메시지 행 (소구포인트 칩에 hover)
@@ -1568,7 +1594,8 @@ function renderAppealWordCloud(list) {
             + `\nROAS ${roasPct}% · 사용 ${d.count}회`
             + memberList;
 
-        return `<span class="word-item" data-cluster="${d.isCluster ? '1' : '0'}" style="font-size:${size}px;font-weight:${weight};color:${color}" title="${title.replace(/"/g, '&quot;')}">${d.keyword}${badge}${metricValSpan}</span>`;
+        const membersJson = JSON.stringify(d.members || [d.keyword]).replace(/"/g, '&quot;');
+        return `<span class="word-item" data-cluster="${d.isCluster ? '1' : '0'}" data-keyword="${d.keyword.replace(/"/g, '&quot;')}" data-members="${membersJson}" style="font-size:${size}px;font-weight:${weight};color:${color}" title="${title.replace(/"/g, '&quot;')}">${d.keyword}${badge}${metricValSpan}</span>`;
     }).join('');
 }
 
