@@ -855,6 +855,10 @@ function renderAIInsights() {
     // ★ 키워드 → 소재 매핑 빌드 (hover preview용) — 중앙값 기준 대표 소재 선정
     buildKeywordCreativeMap(list);
 
+    // ★ 키워드 검색 — 고효율 소재 찾기
+    bindKeywordSearch();
+    renderKeywordSearch(list);
+
     // 브랜드 ALL 상태일 때만 교차 인사이트 표시
     const crossEl = document.getElementById('brandCrossInsight');
     if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
@@ -1773,6 +1777,144 @@ function renderAppealFunnelChart(list) {
                 c.restore();
             }
         }]
+    });
+}
+
+// ============================
+// 키워드 검색 — 고효율 소재 찾기
+// ============================
+let _keywordSearchQuery = '';
+let _keywordSearchList = []; // 마지막 렌더에 사용된 list 캐시 (입력 시 재사용)
+
+function bindKeywordSearch() {
+    const input = document.getElementById('keyword-search-input');
+    const clearBtn = document.getElementById('keyword-search-clear');
+    if (!input || input.dataset.bound === '1') return;
+    input.dataset.bound = '1';
+
+    const debounced = debounce(() => {
+        _keywordSearchQuery = input.value || '';
+        renderKeywordSearch(_keywordSearchList);
+    }, 200);
+
+    input.addEventListener('input', debounced);
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            _keywordSearchQuery = '';
+            renderKeywordSearch(_keywordSearchList);
+            input.focus();
+        });
+    }
+}
+
+// 소재 썸네일 HTML (Drive URL 다중 fallback 체인 지원)
+function _kwSearchThumbHtml(c) {
+    const rawThumb = c.thumbnail_url || c.media_url || '';
+    const isVideo = c.media_type === 'video';
+    const fallback = `<div class="kw-search-thumb kw-search-thumb-fallback"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
+    if (!rawThumb) return fallback;
+    if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(rawThumb) && typeof window.buildDriveImgHtml === 'function') {
+        return window.buildDriveImgHtml(rawThumb, { className: 'kw-search-thumb', alt: '', finalFallbackHtml: fallback });
+    }
+    return `<img src="${rawThumb}" alt="" class="kw-search-thumb" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.outerHTML='${fallback.replace(/'/g, "\\'")}'">`;
+}
+
+function renderKeywordSearch(list) {
+    if (Array.isArray(list)) _keywordSearchList = list;
+    const results = document.getElementById('keyword-search-results');
+    const empty = document.getElementById('keyword-search-empty');
+    const countEl = document.getElementById('keyword-search-count');
+    const clearBtn = document.getElementById('keyword-search-clear');
+    if (!results || !empty) return;
+
+    const q = (_keywordSearchQuery || '').trim().toLowerCase();
+    if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+
+    if (!q) {
+        results.innerHTML = '';
+        results.classList.add('hidden');
+        empty.classList.remove('hidden');
+        empty.textContent = '검색어를 입력하면 일치하는 강조 포인트·소재명·메시지의 소재를 효율(ROAS) 순으로 보여줘요';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+
+    const base = typeof aggregateByAdName === 'function'
+        ? aggregateByAdName([...(_keywordSearchList || [])])
+        : (_keywordSearchList || []);
+
+    const matched = base.filter(c => {
+        const fields = [
+            c.ad_name, c.creative_name, c.product,
+            ...normalizeKeywords(c.appeal_points),
+            ...normalizeKeywords(c.hook_type),
+            ...normalizeKeywords(c.target_emotion),
+            c.key_message_kr, c.key_message_jp
+        ];
+        return fields.some(v => (v || '').toString().toLowerCase().includes(q));
+    });
+
+    // 광고비 중앙값 이상 + ROAS 높은 순으로 고효율 소재만 노출
+    const threshold = currentInsightThreshold || INSIGHT_MIN_SPEND;
+    let ranked = matched
+        .filter(c => (c.spend || 0) >= threshold && (c.roas || 0) > 0)
+        .sort((a, b) => (b.roas || 0) - (a.roas || 0));
+
+    // 기준 충족 소재가 없으면 기준을 낮춰 전체 일치 소재를 ROAS 순으로 표시
+    if (!ranked.length && matched.length) {
+        ranked = matched.slice().sort((a, b) => (b.roas || 0) - (a.roas || 0));
+    }
+    ranked = ranked.slice(0, 12);
+
+    if (countEl) {
+        countEl.textContent = matched.length
+            ? `"${_keywordSearchQuery}" 일치 ${matched.length}개 · 효율 상위 ${ranked.length}개 표시`
+            : '';
+    }
+
+    if (!ranked.length) {
+        results.innerHTML = '';
+        results.classList.add('hidden');
+        empty.classList.remove('hidden');
+        empty.textContent = `"${_keywordSearchQuery}"와 일치하는 소재가 없습니다`;
+        return;
+    }
+
+    results.classList.remove('hidden');
+    empty.classList.add('hidden');
+
+    results.innerHTML = ranked.map((c, i) => {
+        const thumbHtml = _kwSearchThumbHtml(c);
+        const isVideo = c.media_type === 'video';
+        const roasPct = Math.round((c.roas || 0) * 100);
+        const ctrPct = ((c.ctr || 0) * 100).toFixed(2);
+        const roasColor = roasPct >= 300 ? 'text-emerald-600' : roasPct >= 150 ? 'text-amber-600' : 'text-rose-500';
+        const name = c.ad_name || c.creative_name || '';
+        const appeals = normalizeKeywords(c.appeal_points).filter(a => a && !a.startsWith('❌')).slice(0, 3);
+        const id = c.id || c.ad_name || '';
+        return `
+            <div class="kw-search-card" data-creative-id="${id}" title="${name.replace(/"/g, '&quot;')}">
+                <div class="kw-search-thumb-wrap">
+                    ${thumbHtml}
+                    ${isVideo ? '<span class="kw-search-vbadge">▶</span>' : ''}
+                    <span class="kw-search-rank">${i + 1}</span>
+                </div>
+                <div class="kw-search-name">${name}</div>
+                <div class="kw-search-stats">
+                    <span class="font-bold ${roasColor}">ROAS ${roasPct}%</span>
+                    <span class="text-slate-400">CTR ${ctrPct}%</span>
+                </div>
+                ${appeals.length ? `<div class="kw-search-appeals">${appeals.map(a => `<span class="kw-search-chip">${a}</span>`).join('')}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    results.querySelectorAll('.kw-search-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const cid = card.getAttribute('data-creative-id');
+            if (cid && typeof window.openModal === 'function') window.openModal(cid);
+        });
     });
 }
 

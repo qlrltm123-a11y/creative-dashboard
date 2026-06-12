@@ -555,6 +555,23 @@
                 </select>
             </div>
 
+            <!-- 키워드 검색 — 고효율 소재 찾기 -->
+            <div class="chart-card mb-4" id="keywordSearchCard">
+                <h3 class="chart-title mb-3"><i class="fas fa-magnifying-glass mr-2 text-indigo-500"></i>키워드로 고효율 소재 찾기 <span class="info-tip" tabindex="0" data-tip="강조 포인트·소재명·메시지에서 검색어와 일치하는 소재를 찾아 광고효율(ROAS) 높은 순으로 보여줘요.">ⓘ</span></h3>
+                <div class="flex items-center gap-2 mb-3 flex-wrap">
+                    <div class="relative flex-1 max-w-md">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input id="keyword-search-input" type="text" placeholder="예: 한정판, 보습, 콜라보..." class="filter-select text-sm w-full" style="padding-left:32px">
+                    </div>
+                    <button id="keyword-search-clear" class="text-xs text-slate-500 hover:text-indigo-600 transition px-2 py-1 rounded hover:bg-slate-100 hidden">
+                        <i class="fas fa-times mr-1"></i>지우기
+                    </button>
+                    <span id="keyword-search-count" class="text-xs text-slate-500 ml-auto"></span>
+                </div>
+                <div id="keyword-search-results" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 hidden"></div>
+                <div id="keyword-search-empty" class="text-center text-slate-400 text-sm py-10">검색어를 입력하면 일치하는 강조 포인트·소재명·메시지의 소재를 효율(ROAS) 순으로 보여줘요</div>
+            </div>
+
             <!-- 브랜드 교차 인사이트 -->
             <div class="chart-card mb-4" id="brandCrossInsightCard">
                 <h3 class="chart-title mb-3"><i class="fas fa-code-branch mr-2 text-rose-500"></i>브랜드별 잘 먹히는 강조 포인트 비교 <span class="info-tip" tabindex="0" data-tip="같은 강조 포인트(소구점)라도 브랜드마다 광고 효율(ROAS)이 다르게 나와요. 브랜드별 강점 메시지를 비교해요.">ⓘ</span></h3>
