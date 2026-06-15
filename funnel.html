@@ -172,6 +172,11 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 @keyframes sp{to{transform:rotate(360deg)}}
 .error-state{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px 20px;color:#dc2626;font-size:13px;line-height:1.7;margin:20px 0}
 </style>
+<!-- Vercel Web Analytics -->
+<script type="module">
+    import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics@2.0.1/dist/index.mjs';
+    inject();
+</script>
 </head>
 <body>
 
@@ -560,7 +565,7 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(br261)} · ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card green">
-      <div class="kpi-label">전체 구매 전환 (유입→구매)</div>
+      <div class="kpi-label">전��� 구매 전환 (유입→구매)</div>
       <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
       <div class="kpi-sub">${prods.length}개 제품</div>
       ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}

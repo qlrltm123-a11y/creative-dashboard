@@ -2,7 +2,8 @@
   "name": "creative-dashboard",
   "version": "1.0.0",
   "private": true,
-"dependencies": {
-    "@higgsfield/client": "latest"
+  "dependencies": {
+    "@higgsfield/client": "latest",
+    "@vercel/analytics": "^2.0.1"
   }
 }

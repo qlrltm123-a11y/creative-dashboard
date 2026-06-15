@@ -14,6 +14,11 @@
         .data-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; border: 1px solid #e2e8f0; }
         .data-table td { padding: 4px 8px; border: 1px solid #e2e8f0; }
     </style>
+    <!-- Vercel Web Analytics -->
+    <script type="module">
+        import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics@2.0.1/dist/index.mjs';
+        inject();
+    </script>
 </head>
 <body class="bg-slate-50 p-6">
     <div class="max-w-[1400px] mx-auto">
@@ -135,7 +140,7 @@ async function runCheck() {
         html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
         html += '<h2 class="text-lg font-bold text-slate-900 mb-3">📊 시트 원본 vs 대시보드 KPI 비교</h2>';
         html += '<table class="data-table w-full">';
-        html += '<thead><tr><th>지표</th><th class="text-right">시트 원본 (raw CSV 합계)</th><th class="text-right">대시보드 (파싱 후 합계)</th><th class="text-right">차이</th></tr></thead><tbody>';
+        html += '<thead><tr><th>지표</th><th class="text-right">시트 원본 (raw CSV 합계)</th><th class="text-right">대시보드 (파싱 후 합���)</th><th class="text-right">차이</th></tr></thead><tbody>';
         const metrics = [
             { key: 'impressions', label: '총 노출수' },
             { key: 'clicks', label: '총 클릭수' },
