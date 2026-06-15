@@ -6,19 +6,80 @@
 // ============================================================
 
 const _AC_KEY   = 'google_ai_api_key';
-const _AC_MODEL = 'gemini-2.0-flash-exp';
+const _AC_MODEL = 'gemini-2.5-flash';
 let _acHistory = [];   // {role:'user'|'model', text}
 let _acOpen = false;
+
+/* ── 소재 1건 요약 (토큰 절약용 key subset) ── */
+function _acCreativeSummary(c, full = false) {
+    const base = {
+        소재명: c.ad_name || c.creative_name || '',
+        브랜드: c.brand || '',
+        제품: c.product || '',
+        광고비: Math.round(c.spend || 0),
+        매출: Math.round(c.revenue || 0),
+        ROAS: c.roas != null ? +(c.roas * 100).toFixed(0) + '%' : null,
+        CTR: c.ctr  != null ? +(c.ctr  * 100).toFixed(2) + '%' : null,
+        CVR: c.cvr  != null ? +(c.cvr  * 100).toFixed(2) + '%' : null,
+        CPA: c.cpa  != null ? Math.round(c.cpa) : null,
+        소구포인트: Array.isArray(c.appeal_points) ? c.appeal_points.slice(0, 3)
+                  : typeof c.appeal_points === 'string' ? c.appeal_points.split(/[,，、]/).map(v=>v.trim()).filter(Boolean).slice(0,3)
+                  : [],
+    };
+    if (!full) return base;
+    return {
+        ...base,
+        후킹유형: c.hook_type || '',
+        타겟감정: c.target_emotion || '',
+        키메시지: c.key_message_kr || c.key_message_jp || '',
+        시작일: (c.start_date || '').slice(0, 10),
+        매체: c.platform || '',
+        캠페인: c.campaign || '',
+        이벤트: c.event || '',
+    };
+}
+
+/* ── 쿼리와 관련 있는 소재를 찾아 반환 ── */
+function _acSearchCreatives(query) {
+    const raw = window.allCreatives || [];
+    if (!raw.length) return [];
+    const agg = typeof aggregateByAdName === 'function' ? aggregateByAdName(raw) : raw;
+    const q = query.toLowerCase();
+    // 토큰화: 2자 이상 단어만
+    const terms = q.split(/[\s,、，\.\/\-_]+/).filter(t => t.length >= 2);
+    if (!terms.length) return [];
+
+    const scored = agg.map(c => {
+        const fields = [c.ad_name, c.creative_name, c.product, c.brand,
+            ...(Array.isArray(c.appeal_points) ? c.appeal_points
+                : typeof c.appeal_points === 'string' ? c.appeal_points.split(/[,，、]/) : []),
+            c.hook_type, c.key_message_kr, c.key_message_jp].map(v => (v||'').toLowerCase());
+        let score = 0;
+        terms.forEach(t => { if (fields.some(f => f.includes(t))) score++; });
+        return { c, score };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score || (b.c.spend||0) - (a.c.spend||0));
+
+    return scored.slice(0, 20).map(x => _acCreativeSummary(x.c, true));
+}
 
 /* ── 통합 데이터 컨텍스트 빌더 ── */
 function _acBuildContext() {
     const ctx = { 생성시각: new Date().toISOString(), 데이터: {} };
 
-    // ── 1) 소재(Creative): 브랜드×날짜 일별 집계 + 제품 TOP ──
+    // ── 1) 소재(Creative): 전체 소재 목록(소재명 포함) + 브랜드×날짜 추이 + 제품TOP ──
     const creatives = window.allCreatives || [];
     if (creatives.length) {
-        const byBrandDate = {}; // brand -> date -> agg
-        const byBrandProd = {}; // brand -> product -> agg
+        // 1-a) 개별 소재 전체 목록 (aggregateByAdName 적용, ROAS 순)
+        const agg = typeof aggregateByAdName === 'function' ? aggregateByAdName(creatives) : creatives;
+        ctx.데이터.소재_전체목록 = agg
+            .slice()
+            .sort((a, b) => (b.spend || 0) - (a.spend || 0)) // 광고비 순(고른 커버리지)
+            .slice(0, 120)
+            .map(c => _acCreativeSummary(c, false));
+
+        // 1-b) 브랜드×날짜 일별 집계
+        const byBrandDate = {};
+        const byBrandProd = {};
         creatives.forEach(c => {
             const brand = c.brand || '기타';
             const date  = (c.start_date || '').slice(0,10);
@@ -35,8 +96,8 @@ function _acBuildContext() {
         });
         const fin = o => ({
             광고비: Math.round(o.spend), 매출: Math.round(o.revenue),
-            ROAS: o.spend>0 ? +(o.revenue/o.spend).toFixed(2) : 0,
-            CTR: o.impr>0 ? +(o.clicks/o.impr*100).toFixed(2) : 0,
+            ROAS: o.spend>0 ? +(o.revenue/o.spend*100).toFixed(0)+'%' : '0%',
+            CTR: o.impr>0 ? +(o.clicks/o.impr*100).toFixed(2)+'%' : '0%',
             전환: Math.round(o.conv),
         });
         const dailySeries = {};
@@ -47,7 +108,7 @@ function _acBuildContext() {
         Object.entries(byBrandProd).forEach(([b, prods]) => {
             prodTop[b] = Object.entries(prods)
                 .map(([name, o]) => ({ 제품: name, ...fin(o) }))
-                .sort((a,b2) => b2.ROAS - a.ROAS).slice(0, 8);
+                .sort((a,b2) => parseFloat(b2.ROAS) - parseFloat(a.ROAS)).slice(0, 8);
         });
         ctx.데이터.소재_일별추이 = dailySeries;
         ctx.데이터.소재_제품별 = prodTop;
@@ -104,7 +165,7 @@ function _acBuildContext() {
     return ctx;
 }
 
-/* ── Gemini 호출 (서버 프록시 /api/ai-chat — 키는 서버 env에서 관리) ── */
+/* ── Gemini 호출 (서버 프록시 /api/ai-chat) ── */
 async function _acAsk(question) {
     const ctx = _acBuildContext();
     const hasData = ctx.데이터 && Object.keys(ctx.데이터).length;
@@ -112,15 +173,37 @@ async function _acAsk(question) {
         return { error: '통합 데이터가 아직 없습니다. 시트를 불러오고, 퍼널/GMV 탭을 한번 방문해주세요.' };
     }
 
+    // ── 쿼리 키워드로 관련 소재 추가 주입 (소재명 검색 핵심 기능) ──
+    const matched = _acSearchCreatives(question);
+    if (matched.length) {
+        ctx.데이터.소재_검색결과 = {
+            _설명: `질문 키워드와 일치하는 소재 ${matched.length}개 (소재명·제품명·소구포인트 매칭, 전체 상세 정보 포함)`,
+            목록: matched,
+        };
+    }
+
+    const totalCreatives = (window.allCreatives || []).length;
+    const listedCount = (ctx.데이터.소재_전체목록 || []).length;
+
     const sys = `당신은 일본 이커머스(라쿠텐 메가와리 등)에서 한국 뷰티 브랜드(BOH/WM/CG)의 퍼포먼스 마케팅을 책임지는 시니어 광고 전략가입니다.
-아래 JSON은 대시보드의 통합 실데이터입니다: 소재 성과(ROAS/CTR/전환/광고비), GMV 목표대비 실적, 퍼널 전환율(유입→장바구니→구매).
+아래 JSON은 대시보드의 통합 실데이터입니다.
+
+[데이터 구조 안내]
+- 소재_전체목록: 전체 ${totalCreatives}개 소재 중 광고비 상위 ${listedCount}개 (소재명·ROAS·CTR·소구포인트 포함)
+- 소재_검색결과: 질문과 관련된 소재를 소재명/제품명/소구포인트 기준으로 매칭한 결과 (상세 정보 포함). **소재 관련 질문은 반드시 여기서 먼저 찾으세요.**
+- 소재_일별추이: 브랜드×날짜 집계 추이
+- 소재_제품별: 브랜드×제품 집계
+- GMV_목표대비실적: 일별 목표 vs 실적
+- 퍼널_전환율: 유입→장바구니→구매 전환율
 
 [언어 — 매우 중요]
 - 반드시 **모든 문장을 한국어로** 작성하세요. 영어 문장 절대 금지.
-- 영어는 고유명사(제품명 GiftBox_3D, 지표명 ROAS/CTR)에만 허용. 그 외 설명·분석·제안은 100% 한국어.
+- 영어는 고유명사(소재명·지표명 ROAS/CTR)에만 허용. 그 외 설명·분석·제안은 100% 한국어.
 
 [분석 원칙]
-- 제공된 데이터의 **실제 숫자를 반드시 인용**하세요 (예: "GiftBox_3D ROAS 1,926% · CTR 3.51%"). 두루뭉술한 표현 금지.
+- 소재명이 언급된 질문 → 소재_검색결과에서 해당 소재를 찾아 실제 수치(ROAS/CTR/광고비 등)를 인용해 답변.
+- 소재_검색결과에 없으면 소재_전체목록을 추가 탐색 후, 그래도 없으면 "해당 소재는 데이터에 없습니다"라고 명시.
+- 제공된 데이터의 **실제 숫자를 반드시 인용** (예: "ROAS 1,926% · CTR 3.51%"). 두루뭉술한 표현 금지.
 - 데이터에 없는 내용은 지어내지 말고 "데이터에 없음"이라고 명시.
 - 추이 분석은 날짜순 변화(상승/하락/%)와 원인 가설을 데이터 근거와 함께.
 
@@ -152,9 +235,9 @@ ${JSON.stringify(ctx, null, 1)}`;
     // 대화 히스토리 + 현재 질문
     const contents = [];
     contents.push({ role: 'user', parts: [{ text: sys }] });
-    contents.push({ role: 'model', parts: [{ text: '네, 통합 데이터를 확인했습니다. 질문해 주세요.' }] });
+    contents.push({ role: 'model', parts: [{ text: '네, 통합 데이터와 소재 전체 목록을 확인했습니다. 소재명·제품명으로 질문하시면 해당 소재의 실제 데이터를 찾아 답변드립니다.' }] });
     _acHistory.forEach(h => contents.push({ role: h.role, parts: [{ text: h.text }] }));
-    contents.push({ role: 'user', parts: [{ text: question + '\n\n(반드시 한국어로, 실제 데이터 수치를 인용해서 답변)' }] });
+    contents.push({ role: 'user', parts: [{ text: question + '\n\n(반드시 한국어로, 실제 데이터 수치를 인용해서 답변. 소재_검색결과가 있으면 거기서 먼저 찾기)' }] });
 
     try {
         const res = await fetch('/api/ai-chat', {
@@ -162,9 +245,7 @@ ${JSON.stringify(ctx, null, 1)}`;
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents,
-                // thinkingBudget:0 → 2.5 Flash의 내부 사고 토큰이 출력 예산을 잠식해
-                // 답변이 잘리는 문제 방지. maxOutputTokens는 본문에 온전히 사용됨.
-                generationConfig: { temperature: 0.4, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
+                generationConfig: { temperature: 0.35, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
             }),
         });
         const data = await res.json();
