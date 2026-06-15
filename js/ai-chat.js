@@ -335,3 +335,29 @@ window.acClear = function() {
     _acHistory = [];
     _acRenderMessages();
 };
+
+window.acAnalyzeVideo = async function(videoUrl, creativeName, extraQ) {
+    if (!_acOpen) window.toggleAiChat();
+    _acHistory.push({ role: 'user', text: `🎬 "${creativeName}" 영상 전체 분석 요청${extraQ ? ': ' + extraQ : ''}` });
+    _acRenderMessages();
+    const box = document.getElementById('ac-messages');
+    const loadId = 'ac-load-' + Date.now();
+    box.insertAdjacentHTML('beforeend', `<div class="ac-msg ac-model" id="${loadId}"><div class="ac-bubble ac-loading"><span></span><span></span><span></span></div><div style="font-size:11px;color:#94a3b8;margin-top:4px;padding-left:8px">영상 업로드 &amp; 분석 중... (30초 내외 소요)</div></div>`);
+    box.scrollTop = box.scrollHeight;
+    try {
+        const res = await fetch('/api/analyze-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl, creativeName, question: extraQ || '' }),
+        });
+        const data = await res.json();
+        document.getElementById(loadId)?.remove();
+        _acHistory.push({ role: 'model', text: !res.ok || data.error
+            ? '⚠️ 영상 분석 실패: ' + (data.error || '알 수 없는 오류')
+            : `🎬 **${creativeName} 영상 분석 결과**\n\n${data.text}` });
+    } catch (e) {
+        document.getElementById(loadId)?.remove();
+        _acHistory.push({ role: 'model', text: '⚠️ 네트워크 오류: ' + e.message });
+    }
+    _acRenderMessages();
+};

@@ -1906,15 +1906,24 @@ function renderKeywordSearch(list) {
                     <span class="text-slate-400">CTR ${ctrPct}%</span>
                 </div>
                 ${appeals.length ? `<div class="kw-search-appeals">${appeals.map(a => `<span class="kw-search-chip">${a}</span>`).join('')}</div>` : ''}
+                ${isVideo && c.media_url ? `<button class="kw-video-btn" data-video-url="${(c.media_url||'').replace(/"/g,'&quot;')}" data-name="${name.replace(/"/g,'&quot;')}">🎬 영상 분석</button>` : ''}
             </div>
         `;
     }).join('');
 
     results.querySelectorAll('.kw-search-card').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.kw-video-btn')) return;
             const cid = card.getAttribute('data-creative-id');
             if (cid && typeof window.openModal === 'function') window.openModal(cid);
         });
+        const vBtn = card.querySelector('.kw-video-btn');
+        if (vBtn) {
+            vBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.acAnalyzeVideo(vBtn.dataset.videoUrl, vBtn.dataset.name);
+            });
+        }
     });
 }
 

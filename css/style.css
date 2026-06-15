@@ -1240,6 +1240,22 @@ body {
     gap: 8px;
 }
 
+.modal-video-analyze-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+}
+.modal-video-analyze-btn:hover { opacity: 0.88; transform: translateY(-1px); }
 .modal-ai-section {
     background: linear-gradient(135deg, #faf5ff, #fdf2f8);
     border: 1px solid #e9d5ff;
@@ -7152,6 +7168,21 @@ img.mw-cr-thumb {
     color: #94a3b8;
     font-size: 26px;
 }
+.kw-video-btn {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 5px 0;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.kw-video-btn:hover { opacity: 0.85; }
 .kw-search-vbadge {
     position: absolute;
     top: 50%;
