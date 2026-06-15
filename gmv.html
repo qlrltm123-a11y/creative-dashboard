@@ -117,6 +117,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .s-mid      { color: #f59e0b; }
 .s-cons     { color: #64748b; }
 .pace-bar { display: flex; align-items: center; gap: 8px; }
+
+/* ── INFO TOOLTIP (비마케터용 용어 설명) ── */
+.info-tip { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: var(--border); color: var(--muted); font-size: 9px; font-weight: 700; cursor: help; position: relative; margin-left: 3px; vertical-align: middle; }
+.info-tip:hover, .info-tip:focus { background: var(--accent); color: #fff; outline: none; }
+.info-tip::after { content: attr(data-tip); position: absolute; bottom: 150%; left: 0; background: #1e293b; color: #fff; font-size: 11px; font-weight: 400; line-height: 1.5; width: 220px; max-width: 70vw; padding: 8px 10px; border-radius: 8px; white-space: normal; text-align: left; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 50; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+.info-tip:hover::after, .info-tip:focus::after { opacity: 1; }
 .pace-bg { width: 60px; height: 4px; background: var(--card); border-radius: 2px; overflow: hidden; }
 .pace-fill { height: 100%; border-radius: 2px; background: var(--accent); }
 .rate-chip { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
@@ -173,14 +179,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     <div id="all-brands"></div>
     <!-- 전체 시나리오 -->
     <div class="sim-section">
-      <h2>📈 시나리오별 마감 예상 (전체 합산)</h2>
+      <h2>📈 시나리오별 마감 예상 (전체 합산) <span class="info-tip" tabindex="0" data-tip="지금 속도가 앞으로 어떻게 바뀔지 가정해서, 오늘 마감 시점 매출을 미리 예측해봐요. '매우 낙관'일수록 남은 시간 동안 속도가 더 빨라진다고 가정한 거예요.">ⓘ</span></h2>
       <table class="sim-table">
         <thead><tr>
           <th>시나리오</th>
-          <th>페이스 유지율</th>
+          <th>페이스 유지율 <span class="info-tip" tabindex="0" data-tip="남은 시간 동안 지금 속도를 몇 배로 유지한다고 가정하는지. 100%=지금 속도 그대로, 150%=지금보다 1.5배 빨라짐, 30%=지금보다 느려짐.">ⓘ</span></th>
           <th>예상 마감 매출</th>
-          <th>달성률</th>
-          <th>목표 대비</th>
+          <th>달성률 <span class="info-tip" tabindex="0" data-tip="이 시나리오대로면 오늘 목표 매출 대비 몇 %를 달성할지.">ⓘ</span></th>
+          <th>목표 대비 <span class="info-tip" tabindex="0" data-tip="목표 매출보다 얼마나 더 벌거나(+) 덜 버는지(-) 금액 차이.">ⓘ</span></th>
         </tr></thead>
         <tbody id="all-sim-body"></tbody>
       </table>
@@ -520,16 +526,20 @@ function renderBrandPanel(brand) {
 
     <!-- 페이스 박스 -->
     <div class="sim-section" style="margin-bottom:14px">
-      <h2>⚡ 구간 페이스 (입력 기록 기반)</h2>
+      <h2>⚡ 구간 페이스 (입력 기록 기반) <span class="info-tip" tabindex="0" data-tip="실적을 입력할 때마다 직전 입력과 비교해서 '최근 얼마나 빠른 속도로 매출이 늘고 있는지'를 시간당(/h) 금액으로 계산해요.">ⓘ</span></h2>
       <div class="pace-box"></div>
     </div>
 
     <!-- 시나리오 -->
     <div class="sim-section">
-      <h2>📈 시나리오별 마감 예상</h2>
+      <h2>📈 시나리오별 마감 예상 <span class="info-tip" tabindex="0" data-tip="지금 속도가 앞으로 어떻게 바뀔지 가정해서, 오늘 마감 시점 매출을 미리 예측해봐요. '매우 낙관'일수록 남은 시간 동안 속도가 더 빨라진다고 가정한 거예요.">ⓘ</span></h2>
       <table class="sim-table">
         <thead><tr>
-          <th>시나리오</th><th>페이스 유지율</th><th>예상 마감</th><th>달성률</th><th>목표 대비</th>
+          <th>시나리오</th>
+          <th>페이스 유지율 <span class="info-tip" tabindex="0" data-tip="남은 시간 동안 지금 속도를 몇 배로 유지한다고 가정하는지. 100%=지금 속도 그대로, 150%=지금보다 1.5배 빨라짐, 30%=지금보다 느려짐.">ⓘ</span></th>
+          <th>예상 마감</th>
+          <th>달성률 <span class="info-tip" tabindex="0" data-tip="이 시나리오대로면 오늘 목표 매출 대비 몇 %를 달성할지.">ⓘ</span></th>
+          <th>목표 대비 <span class="info-tip" tabindex="0" data-tip="목표 매출보다 얼마나 더 벌거나(+) 덜 버는지(-) 금액 차이.">ⓘ</span></th>
         </tr></thead>
         <tbody>${simRows}</tbody>
       </table>
@@ -826,11 +836,11 @@ function renderPaceBox(brand) {
     <div style="background:${isOk?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border:1px solid ${statusColor};border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:1.3rem">${statusIcon}</div>
       <div style="flex:1;min-width:180px">
-        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">페이스 판정</div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px">페이스 판정 <span class="info-tip" tabindex="0" data-tip="방금 입력한 실적의 속도(시간당 매출)가 목표 달성에 필요한 속도보다 빠른지(✅) 느린지(⚠️) 비교한 결과예요.">ⓘ</span></div>
         <div style="font-size:0.95rem;font-weight:700;color:${statusColor}">${statusLabel}</div>
       </div>
       <div style="text-align:right;min-width:120px">
-        <div style="font-size:0.65rem;color:var(--muted)">필요 페이스</div>
+        <div style="font-size:0.65rem;color:var(--muted)">필요 페이스 <span class="info-tip" tabindex="0" data-tip="남은 시간 동안 시간당 이만큼씩 벌어야 오늘 목표를 채울 수 있어요. (목표까지 남은 금액 ÷ 남은 시간)">ⓘ</span></div>
         <div style="font-size:1rem;font-weight:700;color:var(--warn)">${fmt(Math.round(needPerHour))}/h</div>
         <div style="font-size:0.72rem;color:var(--muted)">${fmt(Math.round(needPerMin))}/m</div>
       </div>
@@ -839,7 +849,7 @@ function renderPaceBox(brand) {
     <!-- 페이스 게이지 -->
     <div style="background:var(--card);border-radius:10px;padding:14px 16px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--muted);margin-bottom:6px">
-        <span>현재 구간 페이스</span><span style="color:${curColor};font-weight:700">${fmt(Math.round(info.perHour))}/h</span>
+        <span>현재 구간 페이스 <span class="info-tip" tabindex="0" data-tip="가장 최근에 입력한 두 실적 사이의 증가분을 시간당(/h) 속도로 환산한 값이에요. 이 속도가 계속된다면 시간당 이만큼 벌린다는 뜻.">ⓘ</span></span><span style="color:${curColor};font-weight:700">${fmt(Math.round(info.perHour))}/h</span>
       </div>
       <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px">
         <div style="height:100%;width:${curW}%;background:${curColor};border-radius:4px;transition:width 0.4s"></div>

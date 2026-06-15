@@ -2692,7 +2692,7 @@ function renderTopPlatformCombos(enriched, metric, container) {
         cvr:          { label: '구매전환율(CVR)',        format: v => ((v || 0) * 100).toFixed(2) + '%' },
         revenue:      { label: '매출',        format: v => '₩' + formatNumber(v || 0) },
         atc_rate:     { label: '장바구니 담기율',       format: v => ((v || 0) * 100).toFixed(2) + '%' },
-        cost_per_atc: { label: 'Cost/ATC',   format: v => '₩' + formatNumber(Math.round(v || 0)) },
+        cost_per_atc: { label: '장바구니 1건당 광고비',   format: v => '₩' + formatNumber(Math.round(v || 0)) },
     }[metric] || { label: metric, format: v => v };
 
     const medals = ['🥇', '🥈', '🥉'];
@@ -2784,7 +2784,7 @@ function renderPlatformMatrixHeatmap(enriched, platformTotals, appealTotals, met
         cvr:          { label: '구매전환율(CVR)',       format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
         revenue:      { label: '매출',       format: v => '₩'+formatNumber(v||0),               short: v => '₩'+formatNumber(v||0),            lowerBetter: false },
         atc_rate:     { label: '장바구니 담기율',      format: v => ((v||0)*100).toFixed(2)+'%',          short: v => ((v||0)*100).toFixed(1)+'%',       lowerBetter: false },
-        cost_per_atc: { label: 'Cost/ATC',  format: v => '₩'+formatNumber(Math.round(v||0)),   short: v => '₩'+formatNumber(Math.round(v||0)), lowerBetter: true  },
+        cost_per_atc: { label: '장바구니 1건당 광고비',  format: v => '₩'+formatNumber(Math.round(v||0)),   short: v => '₩'+formatNumber(Math.round(v||0)), lowerBetter: true  },
     }[metric] || { label: metric, format: v => v, short: v => v, lowerBetter: false };
 
     // 색상 함수 — 값에 따라 인디고 그라데이션 (lowerBetter면 반전)
@@ -3938,7 +3938,7 @@ const METRIC_CONFIG = {
     // 장바구니 최적화 지표
     atc_rate:     { label: '장바구니 담기율',          format: v => ((v||0) * 100).toFixed(2) + '%',       higherIsBetter: true },
     add_to_cart:  { label: '장바구니 담기 건수',       format: v => formatNumber(v||0) + '건',            higherIsBetter: true },
-    cost_per_atc: { label: 'Cost per ATC',  format: v => '₩' + formatNumber(Math.round(v||0)), higherIsBetter: false },
+    cost_per_atc: { label: '장바구니 1건당 광고비',  format: v => '₩' + formatNumber(Math.round(v||0)), higherIsBetter: false },
 };
 
 // ============================
@@ -4203,7 +4203,7 @@ function renderProductPerformance() {
             grp.innerHTML = `
                 <option value="atc_rate">ATC율 (장바구니율)</option>
                 <option value="add_to_cart">ATC 건수</option>
-                <option value="cost_per_atc">Cost per ATC</option>`;
+                <option value="cost_per_atc">장바구니 1건당 광고비</option>`;
             metricSel.appendChild(grp);
         } else if (!cartMode && hasAtcOpt) {
             // 장바구니 모드 해제 시 ATC 옵션 제거
@@ -4752,7 +4752,7 @@ function openModal(id, preloadedCreative) {
                             <div class="value">${((c.atc_rate || 0) * 100).toFixed(2)}%</div>
                         </div>
                         <div class="metric-box highlight">
-                            <div class="label">Cost per ATC</div>
+                            <div class="label">장바구니 1건당 광고비</div>
                             <div class="value">₩${formatNumber(c.cost_per_atc || 0)}</div>
                         </div>
                     </div>
