@@ -4722,11 +4722,11 @@ function openModal(id, preloadedCreative) {
                         ${c.spend_jpy ? `<div class="text-[10px] text-slate-400 mt-0.5">¥${formatNumber(c.spend_jpy)}</div>` : ''}
                     </div>
                     <div class="metric-box">
-                        <div class="label">CPC</div>
+                        <div class="label">CPC(클릭당 비용)</div>
                         <div class="value">₩${formatNumber(Math.round(c.cpc || 0))}</div>
                     </div>
                     <div class="metric-box">
-                        <div class="label">CPA</div>
+                        <div class="label">CPA(전환당 비용)</div>
                         <div class="value">₩${formatNumber(c.cpa)}</div>
                     </div>
                     <div class="metric-box" title="${c.revenue_jpy ? '원본: ¥' + formatNumber(c.revenue_jpy) : ''}">

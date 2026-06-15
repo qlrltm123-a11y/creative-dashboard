@@ -38,7 +38,7 @@ const INSIGHT_METRIC_CFG = {
         fmtDev:  dev => (dev >= 0 ? '+' : '') + Number(dev).toFixed(2) + '%p',
     },
     cpa: {
-        key: 'cpa', label: 'CPA', unitLabel: '(₩)', lowerBetter: true,
+        key: 'cpa', label: 'CPA(전환당 비용)', unitLabel: '(₩)', lowerBetter: true,
         hue: 35, sat: '85%', minPad: 1000,
         fmtVal:  v => Math.round(v),
         fmtTick: v => '₩' + Math.round(v).toLocaleString(),
