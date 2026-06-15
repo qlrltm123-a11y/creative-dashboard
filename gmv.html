@@ -652,7 +652,7 @@ function renderAllTab() {
       <div class="s-sub">시간 소진 ${(dp.pct*100).toFixed(0)}%</div>
     </div>
     <div class="stat-card">
-      <div class="s-label">마감까지</div>
+      <div class="s-label">마감까���</div>
       <div class="s-val">${remH}h ${remM}m</div>
       <div class="s-sub">${selectedDate}</div>
     </div>
@@ -958,7 +958,7 @@ function clearLog(brand) {
   renderPaceBox(brand);
 }
 
-// ───────── 입력 핸들러 ─────────
+// ──────��── 입력 핸들러 ─────────
 function onInput(brand, val) {
   getActuals()[brand] = parseNum(val);
   save();
@@ -1098,5 +1098,7 @@ setInterval(() => {
   renderAll();
 }, 10000);
 </script>
+<!-- Vercel Speed Insights -->
+<script type="module" src="js/speed-insights-init.js"></script>
 </body>
 </html>

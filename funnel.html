@@ -560,7 +560,7 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(br261)} · ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card green">
-      <div class="kpi-label">전체 구매 전환 (유입→구매)</div>
+      <div class="kpi-label">전��� 구매 전환 (유입→구매)</div>
       <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
       <div class="kpi-sub">${prods.length}개 제품</div>
       ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}
@@ -666,7 +666,7 @@ function renderSummaryTab(brand, data, prods) {
     ${downs.length?downs.map(m=>hlItem(m,false)).join(''):'<div style="font-size:11px;color:#94a3b8;padding:6px 0">하락 제품 없음</div>'}`;
 }
 
-// ── Funnel Cards ──────────────────────────────────────────────────────────────
+// ── Funnel Cards ��─────────────────────────────────────────────────────────────
 function aggregate(rows) {
   const totInflow = rows.reduce((s,r)=>s+(r.inflow||0),0);
   const totCart   = rows.reduce((s,r)=>s+(r.cart||0),0);
@@ -809,7 +809,7 @@ function renderDeltaCards(brand, data, prods) {
   });
 }
 
-// ── Trend Charts ──────────────────────────────────────────────────────────────
+// ── Trend Charts ─────────────────────────��────────────────────────────────────
 function renderTrendCharts(brand, data, prods) {
   const grid = document.getElementById(`trend-${brand}`);
   prods.forEach(prod => {
@@ -1072,5 +1072,7 @@ function setRankMetric(brand, metric, btn) {
   renderFunnelRank(brand);
 }
 </script>
+<!-- Vercel Speed Insights -->
+<script type="module" src="js/speed-insights-init.js"></script>
 </body>
 </html>
