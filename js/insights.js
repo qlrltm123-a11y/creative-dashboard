@@ -1959,7 +1959,7 @@ function renderMarketInsightSection(list) {
     if (!mr) { el.style.display = 'none'; return; }
     el.style.display = '';
 
-    // 현재 데이터에서 소구포인트별 평균ROAS 맵 생성
+    // 소구포인트별 ROAS 맵 (탭 뱃지용)
     const appealRoasMap = new Map();
     (list || []).forEach(c => {
         if ((c.spend || 0) < currentInsightThreshold) return;
@@ -1979,52 +1979,58 @@ function renderMarketInsightSection(list) {
         return cnt ? Math.round(sum / cnt * 100) : null;
     };
 
-    // 탭별 데이터 정의
+    // UGC 테마 → 실 소재 매핑
+    const findUGCCreatives = (ugcTheme, ugcMsg, productMatchKws) => {
+        const themeWords = (ugcTheme + ' ' + (ugcMsg || ''))
+            .split(/[\s·,→]+/)
+            .map(w => w.trim().toLowerCase())
+            .filter(w => w.length >= 2);
+        const baseList = (list || []).filter(c => (c.spend || 0) >= currentInsightThreshold);
+        let matched = baseList.filter(c => {
+            const fields = [
+                ...normalizeKeywords(c.appeal_points),
+                ...(Array.isArray(c.hook_type) ? c.hook_type : [c.hook_type || '']),
+                c.product || '',
+            ].join(' ').toLowerCase();
+            return themeWords.some(w => w.length >= 3 && fields.includes(w));
+        });
+        if (!matched.length) {
+            matched = baseList.filter(c => {
+                const fields = normalizeKeywords(c.appeal_points).join(' ').toLowerCase();
+                return productMatchKws.some(kw => fields.includes(kw.toLowerCase()));
+            });
+        }
+        return matched.map(c => ({
+            name: (c.ad_name || c.creative_id || '').slice(0, 35),
+            roas: Math.round((c.roas || 0) * 100),
+            spend: Math.round(c.spend || 0),
+        })).sort((a, b) => b.roas - a.roas).slice(0, 8);
+    };
+
     const PRODUCTS = [
-        {
-            key: '탄탄크림', label: '탄탄크림', icon: '🧴',
-            data: mr.탄탄크림,
-            matchKws: ['탄력', '리프팅', '하안부', '처짐', '탄탄', '翌朝', '夜タン'],
-            color: '#e11d48', light: '#fff1f2', border: '#fecdd3',
-        },
-        {
-            key: '겔미스트', label: '겔미스트', icon: '💧',
-            data: mr.겔미스트,
-            matchKws: ['보습', '수분', '건조', '미스트', '겔', '촉촉'],
-            color: '#0284c7', light: '#f0f9ff', border: '#bae6fd',
-        },
-        {
-            key: 'NAD크림', label: 'NAD크림', icon: '✨',
-            data: mr.NAD크림,
-            matchKws: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기'],
-            color: '#7c3aed', light: '#f5f3ff', border: '#ddd6fe',
-        },
-        {
-            key: '컬러그램', label: '컬러그램 립틴트', icon: '💋',
-            data: mr.컬러그램,
-            matchKws: ['립틴트', '틴트', '발색', '지속력', '립', '마스크'],
-            color: '#db2777', light: '#fdf2f8', border: '#fbcfe8',
-        },
-        {
-            key: '웨이크메이크', label: '웨이크메이크 베이스', icon: '🌅',
-            data: mr.웨이크메이크,
-            matchKws: ['베이스', '파운데이션', '밀착', '피부표현', '커버', '지속'],
-            color: '#d97706', light: '#fffbeb', border: '#fde68a',
-        },
+        { key: '탄탄크림', label: '탄탄크림', icon: '🧴', data: mr.탄탄크림,
+          matchKws: ['탄력', '리프팅', '하안부', '처짐', '탄탄', '翌朝', '夜タン'],
+          color: '#e11d48', light: '#fff1f2', border: '#fecdd3' },
+        { key: '겔미스트', label: '겔미스트', icon: '💧', data: mr.겔미스트,
+          matchKws: ['보습', '수분', '건조', '미스트', '겔', '촉촉'],
+          color: '#0284c7', light: '#f0f9ff', border: '#bae6fd' },
+        { key: 'NAD크림', label: 'NAD크림', icon: '✨', data: mr.NAD크림,
+          matchKws: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기'],
+          color: '#7c3aed', light: '#f5f3ff', border: '#ddd6fe' },
+        { key: '컬러그램', label: '컬러그램 립틴트', icon: '💋', data: mr.컬러그램,
+          matchKws: ['립틴트', '틴트', '발색', '지속력', '립', '마스크'],
+          color: '#db2777', light: '#fdf2f8', border: '#fbcfe8' },
+        { key: '웨이크메이크', label: '웨이크메이크 베이스', icon: '🌅', data: mr.웨이크메이크,
+          matchKws: ['베이스', '파운데이션', '밀착', '피부표현', '커버', '지속'],
+          color: '#d97706', light: '#fffbeb', border: '#fde68a' },
     ];
 
-    // 현재 브랜드 필터에 맞는 탭만 활성화
     const brandKey = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? currentBrand.toUpperCase() : 'ALL';
-    const BRAND_MAP = {
-        BOH: ['탄탄크림', '겔미스트', 'NAD크림'],
-        WM:  ['웨이크메이크'],
-        CG:  ['컬러그램'],
-    };
+    const BRAND_MAP = { BOH: ['탄탄크림', '겔미스트', 'NAD크림'], WM: ['웨이크메이크'], CG: ['컬러그램'] };
     const allowed = BRAND_MAP[brandKey];
     const activeTabs = allowed ? PRODUCTS.filter(p => allowed.includes(p.key)) : PRODUCTS;
 
     const tabId = 'mr-tab-' + Date.now();
-
     const tabBtns = activeTabs.map((p, i) => {
         const avgRoas = getAvgRoas(p.matchKws);
         return `<button class="mr-tab-btn${i===0?' active':''}" data-tab="${p.key}"
@@ -2038,82 +2044,45 @@ function renderMarketInsightSection(list) {
         const d = p.data;
         if (!d) return `<div class="mr-panel-empty">데이터 없음</div>`;
 
-        // 검색키워드 테이블 (탄탄크림만)
-        const kwTable = (d.검색키워드 && Object.keys(d.검색키워드).length) ? `
-        <div class="mr-block">
-            <div class="mr-block-title">🔍 일본 검색 키워드 트렌드 <span class="mr-block-sub">(리스닝마인드)</span></div>
-            <div class="mr-kw-table">
-                ${Object.entries(d.검색키워드).map(([kw, v]) => `
-                <div class="mr-kw-row">
-                    <span class="mr-kw-name">${kw}</span>
-                    ${v.월검색량 ? `<span class="mr-kw-vol">${v.월검색량.toLocaleString()}건/월</span>` : '<span class="mr-kw-vol mr-kw-vol-na">측정불가</span>'}
-                    <span class="mr-kw-insight">${v.인사이트}</span>
-                </div>`).join('')}
-            </div>
-        </div>` : (d.검색인사이트 ? `
-        <div class="mr-block">
-            <div class="mr-block-title">🔍 검색 인사이트 <span class="mr-block-sub">(리스닝마인드)</span></div>
-            <div class="mr-insight-text">${d.검색인사이트}</div>
-        </div>` : '');
-
-        // CEP 카드 그리드 (CEP요약 또는 CEP 필드 호환)
-        const cepCards = (d.CEP요약 || d.CEP || []).map(cep => {
-            const relKws = p.matchKws;
-            const avgR = getAvgRoas(relKws);
-            return `<div class="mr-cep-card" style="border-left-color:${p.color}">
+        // CEP 카드
+        const cepCards = (d.CEP요약 || d.CEP || []).map(cep => `
+            <div class="mr-cep-card" style="border-left-color:${p.color}">
                 <div class="mr-cep-id" style="background:${p.color}">CEP-${cep.id}</div>
                 <div class="mr-cep-type">${cep.type}</div>
                 <div class="mr-cep-trigger">${cep.트리거}</div>
-            </div>`;
-        }).join('');
+            </div>`).join('');
 
-        // UGC 방향 × 성과 교차 (UGC방향성 또는 UGC방향 필드 호환)
+        // UGC 방향 × 실 소재 교차 (hover 시 소재 상세)
         const ugcCards = (d.UGC방향성 || d.UGC방향 || []).map(u => {
-            const themeKws = (u.관련CEP || '').split(',').map(s => s.trim()).filter(Boolean);
-            const matchedKws = [...p.matchKws, ...themeKws.slice(0,2)];
-            const avgR = getAvgRoas(matchedKws);
-            const ex = (u.UGC예시 || []).slice(0, 2);
-            return `<div class="mr-ugc-card" style="border-color:${p.border};background:${p.light}">
+            const creatives = findUGCCreatives(u.테마, u.핵심메시지, p.matchKws);
+            const avgR = creatives.length
+                ? Math.round(creatives.reduce((s, c) => s + c.roas, 0) / creatives.length)
+                : null;
+            const tipData = encodeURIComponent(JSON.stringify(creatives));
+            return `<div class="mr-ugc-card" style="border-color:${p.border};background:${p.light}"
+                        onmouseenter="window._mrShowUGCTip(this,'${tipData}')"
+                        onmouseleave="window._mrHideUGCTip()">
                 <div class="mr-ugc-top">
                     <span class="mr-ugc-theme" style="color:${p.color}">${u.테마}</span>
-                    ${avgR ? `<span class="mr-ugc-roas">실 소재 ROAS ${avgR}%</span>` : ''}
+                    ${avgR ? `<span class="mr-ugc-roas">평균 ROAS ${avgR}% <span class="mr-ugc-cnt">(${creatives.length}개 소재)</span></span>`
+                           : `<span class="mr-ugc-roas-na">소재 데이터 없음</span>`}
                 </div>
-                <div class="mr-ugc-cep">${u.관련CEP || ''}</div>
-                ${u.소비자심리 ? `<div class="mr-ugc-psych">${u.소비자심리}</div>` : ''}
                 ${u.핵심메시지 ? `<div class="mr-ugc-msg">💡 ${u.핵심메시지}</div>` : ''}
-                ${ex.length ? `<div class="mr-ugc-ex">${ex.map(e=>`<div>• ${e}</div>`).join('')}</div>` : ''}
             </div>`;
         }).join('');
 
-        // 광고 카피 후보 (탄탄크림만)
-        const copySection = (d.광고카피후보 || []).length ? `
-        <div class="mr-block">
-            <div class="mr-block-title">✍️ 광고 카피 후보</div>
-            <div class="mr-copy-grid">
-                ${(d.광고카피후보 || []).map(c => `
-                <div class="mr-copy-card">
-                    <span class="mr-copy-badge">${c.유형}</span>
-                    <div class="mr-copy-jp">${c.jp}</div>
-                    <div class="mr-copy-kr">${c.kr}</div>
-                </div>`).join('')}
-            </div>
-        </div>` : '';
-
-        // 전략 요약 (탄탄크림)
         const stratBanner = d.전략핵심 ? `<div class="mr-strat-banner" style="border-left-color:${p.color}">${d.전략핵심}</div>` : '';
 
         return `
         ${stratBanner}
-        ${kwTable}
         ${cepCards.length ? `<div class="mr-block">
             <div class="mr-block-title">📍 소비자 진입 시점 (CEP) <span class="mr-block-sub">— 이런 상황에서 제품을 떠올린다</span></div>
             <div class="mr-cep-grid">${cepCards}</div>
         </div>` : ''}
         ${ugcCards.length ? `<div class="mr-block">
-            <div class="mr-block-title">🎬 UGC 방향 × 실 성과 교차</div>
+            <div class="mr-block-title">🎬 UGC 방향 × 실 성과 교차 <span class="mr-block-sub">— 마우스를 올리면 해당 소재 확인</span></div>
             <div class="mr-ugc-grid">${ugcCards}</div>
-        </div>` : ''}
-        ${copySection}`;
+        </div>` : ''}`;
     };
 
     const panels = activeTabs.map((p, i) => `
@@ -2122,20 +2091,15 @@ function renderMarketInsightSection(list) {
         </div>`).join('');
 
     el.innerHTML = `
-        <div class="mr-section-header">
-            <span><i class="fas fa-magnifying-glass-chart mr-1 text-violet-500"></i>시장조사 × 성과 데이터 통합 인사이트</span>
-            <span class="mr-section-sub">리스닝마인드 CEP·UGC × 실 광고 ROAS 교차 분석</span>
-        </div>
         <div class="mr-tabs" id="${tabId}">${tabBtns}</div>
-        <div class="mr-panels">${panels}</div>`;
+        <div class="mr-panels">${panels}</div>
+        <div id="mr-ugc-tooltip" class="mr-ugc-tooltip" style="display:none"></div>`;
 
     window._mrSwitchTab = function(tabId, key, btn, color) {
         const wrap = document.getElementById(tabId);
         if (!wrap) return;
         wrap.querySelectorAll('.mr-tab-btn').forEach(b => {
-            b.classList.remove('active');
-            b.style.borderBottomColor = '';
-            b.style.color = '';
+            b.classList.remove('active'); b.style.borderBottomColor = ''; b.style.color = '';
         });
         btn.classList.add('active');
         btn.style.borderBottomColor = color;
@@ -2145,6 +2109,32 @@ function renderMarketInsightSection(list) {
         panelWrap.querySelectorAll('.mr-panel').forEach(p => p.classList.add('hidden'));
         const target = panelWrap.querySelector(`[data-panel="${key}"]`);
         if (target) target.classList.remove('hidden');
+    };
+
+    window._mrShowUGCTip = function(cardEl, tipData) {
+        const tip = document.getElementById('mr-ugc-tooltip');
+        if (!tip) return;
+        let creatives = [];
+        try { creatives = JSON.parse(decodeURIComponent(tipData)); } catch(e) { return; }
+        if (!creatives.length) { tip.style.display = 'none'; return; }
+        tip.innerHTML = `
+            <div class="mr-tip-title">연계 소재 (ROAS 순)</div>
+            ${creatives.map(c => `<div class="mr-tip-row">
+                <span class="mr-tip-name">${c.name || '-'}</span>
+                <span class="mr-tip-roas" style="color:${c.roas >= 200 ? '#16a34a' : c.roas >= 100 ? '#d97706' : '#dc2626'}">${c.roas}%</span>
+            </div>`).join('')}`;
+        tip.style.display = 'block';
+        const rect = cardEl.getBoundingClientRect();
+        const tipW = 280;
+        let left = rect.left + window.scrollX;
+        if (left + tipW > window.innerWidth - 16) left = window.innerWidth - tipW - 16 + window.scrollX;
+        tip.style.left = left + 'px';
+        tip.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    };
+
+    window._mrHideUGCTip = function() {
+        const tip = document.getElementById('mr-ugc-tooltip');
+        if (tip) tip.style.display = 'none';
     };
 }
 
@@ -2186,53 +2176,78 @@ function renderMarketResearchLinks(list) {
     if (!container) return;
     if (!mr) { container.style.display = 'none'; return; }
 
-    // 현재 필터된 데이터에서 소구포인트 ROAS 상위 추출
+    // 매출 중위값 계산
+    const validList = (list || []).filter(c => (c.spend || 0) >= currentInsightThreshold && (c.revenue || 0) > 0);
+    const sortedRevs = validList.map(c => c.revenue).sort((a, b) => a - b);
+    const medianRev = sortedRevs.length ? sortedRevs[Math.floor(sortedRevs.length / 2)] : 0;
+
+    // 매출 중위 이상 소재만 집계 — 소구포인트별 ROAS 목록 수집
     const aggMap = new Map();
-    (list || []).forEach(c => {
-        if ((c.spend || 0) < currentInsightThreshold) return;
+    validList.forEach(c => {
+        if ((c.revenue || 0) < medianRev) return;
         normalizeKeywords(c.appeal_points).forEach(kw => {
             if (!kw || kw.startsWith('❌')) return;
-            const e = aggMap.get(kw) || { kw, totalROAS: 0, count: 0, totalSpend: 0 };
-            e.totalROAS += (c.roas || 0);
-            e.count++;
-            e.totalSpend += (c.spend || 0);
+            const e = aggMap.get(kw) || { kw, roasList: [], creatives: [], totalSpend: 0 };
+            e.roasList.push(c.roas || 0);
+            e.creatives.push({ name: (c.ad_name || c.creative_id || '').slice(0, 30), roas: Math.round((c.roas || 0) * 100) });
+            e.totalSpend += c.spend || 0;
             aggMap.set(kw, e);
         });
     });
-    const topAppeals = [...aggMap.values()]
-        .filter(e => e.count >= 2)
-        .sort((a, b) => (b.totalROAS / b.count) - (a.totalROAS / a.count))
-        .slice(0, 5);
 
-    if (!topAppeals.length) { container.style.display = 'none'; return; }
+    // 소구포인트별 통계 계산
+    const allAppeals = [...aggMap.values()].map(e => {
+        const avg = e.roasList.reduce((s, r) => s + r, 0) / e.roasList.length;
+        const sorted = [...e.roasList].sort((a, b) => a - b);
+        return {
+            kw: e.kw,
+            avgRoas: Math.round(avg * 100),
+            minRoas: Math.round(sorted[0] * 100),
+            maxRoas: Math.round(sorted[sorted.length - 1] * 100),
+            count: e.roasList.length,
+            creatives: e.creatives.sort((a, b) => b.roas - a.roas).slice(0, 6),
+        };
+    }).sort((a, b) => b.avgRoas - a.avgRoas);
 
-    // 시장조사 매핑 있는 항목만 필터링
-    const mappedAppeals = topAppeals
+    // 시장조사 매핑 있는 항목만
+    const mappedAppeals = allAppeals
         .map(entry => ({ ...entry, match: _mrMatchProduct(entry.kw) }))
         .filter(entry => entry.match);
 
     if (!mappedAppeals.length) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    const cards = mappedAppeals.map(({ kw, totalROAS, count, totalSpend, match }) => {
-        const avgROAS = Math.round(totalROAS / count * 100);
+    // ROAS 패턴 구분: 고효율 / 중효율 / 성장가능
+    const tierOf = (avgRoas) => avgRoas >= 200
+        ? { label: '고효율', color: '#16a34a', bg: '#f0fdf4' }
+        : avgRoas >= 100
+        ? { label: '중효율', color: '#d97706', bg: '#fffbeb' }
+        : { label: '성장가능', color: '#6366f1', bg: '#eef2ff' };
+
+    const cards = mappedAppeals.map(({ kw, avgRoas, minRoas, maxRoas, count, creatives, match }) => {
+        const tier = tierOf(avgRoas);
         const ceps = _mrGetRelevantCEPs(match.data, kw);
         const ugcDirs = match.data?.UGC방향성 || match.data?.UGC방향 || [];
         const ugcMatch = ugcDirs.find(u => ceps.some(c => u.관련CEP?.toLowerCase().includes(c.type?.slice(0, 5)?.toLowerCase()))) || ugcDirs[0];
-        const ugcEx = match.data?.UGC카피예시?.[0] || (match.productKey === '탄탄크림' && mr.탄탄크림?.광고카피후보?.[0]?.kr) || null;
-
+        const tipData = encodeURIComponent(JSON.stringify(creatives));
         const chatQ = `소구포인트 "${kw}"의 고효율 소재 패턴 + ${match.productKey} 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
 
         return `
-        <div class="mr-link-card">
+        <div class="mr-link-card" style="border-top: 3px solid ${tier.color}">
             <div class="mr-link-top">
                 <span class="mr-link-kw">${kw}</span>
-                <span class="mr-link-roas">ROAS ${avgROAS}% <span class="mr-link-cnt">(${count}개 소재)</span></span>
+                <span class="mr-link-tier" style="background:${tier.bg};color:${tier.color}">${tier.label}</span>
+            </div>
+            <div class="mr-link-roas-row"
+                 onmouseenter="window._mrShowUGCTip(this,'${tipData}')"
+                 onmouseleave="window._mrHideUGCTip()">
+                <span class="mr-link-roas-avg" style="color:${tier.color}">평균 ${avgRoas}%</span>
+                <span class="mr-link-roas-range">범위 ${minRoas}~${maxRoas}%</span>
+                <span class="mr-link-cnt">${count}개 소재 ↗ hover</span>
             </div>
             <div class="mr-link-product">${match.productKey} 시장조사 연계</div>
             ${ceps.length ? `<div class="mr-link-ceps">${ceps.map(c => `<span class="mr-link-cep-chip">CEP: ${c.type}</span>`).join('')}</div>` : ''}
-            ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${ugcMatch.핵심메시지 || (ugcMatch.소비자심리 || '').slice(0, 40)}</div>` : ''}
-            ${ugcEx ? `<div class="mr-link-copy">"${ugcEx}"</div>` : ''}
+            ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${(ugcMatch.핵심메시지 || '').slice(0, 40)}</div>` : ''}
             <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(${JSON.stringify(chatQ)})">
                 ✨ AI에게 소재 기획 요청
             </button>
@@ -2243,7 +2258,7 @@ function renderMarketResearchLinks(list) {
         <div class="mr-links-header">
             <i class="fas fa-chart-network mr-1 text-violet-500"></i>
             성과 데이터 × 시장조사 연계
-            <span class="mr-links-sub">실제 ROAS 상위 소구포인트 → 리스닝마인드 CEP·UGC 방향 자동 매핑</span>
+            <span class="mr-links-sub">매출 중위 이상 소재 기준 · ROAS 패턴별 소구포인트 → 리스닝마인드 CEP·UGC 매핑</span>
         </div>
         <div class="mr-links-grid">${cards}</div>
     `;

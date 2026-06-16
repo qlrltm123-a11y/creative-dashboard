@@ -7311,36 +7311,51 @@ img.mw-cr-thumb {
 .mr-ugc-card {
     border:1px solid #e9d5ff; border-radius:10px; padding:12px 14px;
     display:flex; flex-direction:column; gap:6px;
+    cursor:default; transition: box-shadow .15s;
 }
+.mr-ugc-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); }
 .mr-ugc-top { display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .mr-ugc-theme { font-size:13px; font-weight:700; }
 .mr-ugc-roas {
     font-size:10px; font-weight:700; color:#059669;
     background:#d1fae5; border-radius:4px; padding:2px 7px; white-space:nowrap;
 }
-.mr-ugc-cep { font-size:10px; color:#94a3b8; }
-.mr-ugc-psych { font-size:11px; color:#475569; line-height:1.5; }
+.mr-ugc-cnt { font-weight:400; opacity:.75; }
+.mr-ugc-roas-na { font-size:10px; color:#94a3b8; }
 .mr-ugc-msg {
     font-size:11px; font-weight:600; color:#1e293b;
     background:#fff; border-radius:6px; padding:5px 8px;
 }
-.mr-ugc-ex {
-    font-size:11px; color:#7c3aed; font-style:italic; line-height:1.6;
+/* UGC hover 툴팁 */
+.mr-ugc-tooltip {
+    position:absolute; z-index:9999;
+    background:#1e293b; color:#f8fafc;
+    border-radius:10px; padding:10px 14px;
+    width:280px; box-shadow:0 8px 24px rgba(0,0,0,.22);
+    pointer-events:none;
 }
-/* 광고 카피 후보 */
-.mr-copy-grid {
-    display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px;
+.mr-tip-title {
+    font-size:10px; font-weight:700; color:#94a3b8;
+    text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;
 }
-.mr-copy-card {
-    background:#fff8f1; border:1px solid #fed7aa; border-radius:8px; padding:10px 12px;
-    display:flex; flex-direction:column; gap:5px;
+.mr-tip-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:4px 0; border-bottom:1px solid rgba(255,255,255,.06); gap:8px;
 }
-.mr-copy-badge {
-    font-size:10px; font-weight:700; color:#c2410c;
-    background:#ffedd5; border-radius:4px; padding:2px 7px; width:fit-content;
+.mr-tip-row:last-child { border-bottom:none; }
+.mr-tip-name { font-size:11px; color:#e2e8f0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mr-tip-roas { font-size:11px; font-weight:700; white-space:nowrap; }
+/* 성과×시장조사 연계 카드 신규 요소 */
+.mr-link-tier {
+    font-size:10px; font-weight:700; border-radius:4px; padding:2px 8px; white-space:nowrap;
 }
-.mr-copy-jp { font-size:12px; font-weight:600; color:#1e293b; line-height:1.6; }
-.mr-copy-kr { font-size:11px; color:#64748b; }
+.mr-link-roas-row {
+    display:flex; align-items:center; gap:8px; cursor:default;
+    padding:4px 0; flex-wrap:wrap;
+}
+.mr-link-roas-avg { font-size:14px; font-weight:800; }
+.mr-link-roas-range { font-size:11px; color:#64748b; }
+.mr-link-cnt { font-size:10px; color:#94a3b8; }
 .mr-panel-empty { font-size:13px; color:#94a3b8; padding:20px; text-align:center; }
 
 .kw-search-vbadge {
