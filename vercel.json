@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/analyze-video.js": { "maxDuration": 60 }
+    "api/analyze-video.js": { "maxDuration": 60 },
+    "api/ai-chat.js": { "maxDuration": 30 }
   },
   "rewrites": [
     { "source": "/(.*)", "destination": "/$1" }

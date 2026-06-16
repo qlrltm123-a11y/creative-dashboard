@@ -171,34 +171,38 @@ function _acBuildContext() {
         }
     } catch(e) {}
 
-    // ── 시장조사 데이터 주입 (boh-tankcream-dashboard 기반) ──
+    // ── 시장조사 데이터 주입 (핵심 요약만 — 토큰 절약) ──
     if (window.MARKET_RESEARCH) {
         const mr = window.MARKET_RESEARCH;
+        const compactCEPs = (arr) => (arr || []).map(c => c.type + ': ' + c.트리거).join(' / ');
+        const compactUGC = (arr) => (arr || []).map(u => u.테마 + '→' + (u.핵심메시지 || u.소비자심리 || '').slice(0, 30)).join(' / ');
         ctx.시장조사 = {
-            _설명: '리스닝마인드 조사 + 최종전략보고서 기반 (2026-06-15). 제품별 CEP/UGC/검색키워드/광고카피 포함.',
             탄탄크림: {
-                전략핵심: mr.탄탄크림?.전략핵심,
+                전략: mr.탄탄크림?.전략핵심,
                 화이트스페이스: mr.탄탄크림?.화이트스페이스,
-                검색키워드: mr.탄탄크림?.검색키워드,
-                광고카피후보: mr.탄탄크림?.광고카피후보,
-                워딩금지: mr.탄탄크림?.워딩금지,
-                채널전략: mr.탄탄크림?.채널전략,
-                UGC방향성: mr.탄탄크림?.UGC방향성,
-                CEP요약: mr.탄탄크림?.CEP요약,
+                검색상위키워드: Object.entries(mr.탄탄크림?.검색키워드 || {}).map(([k, v]) => k + (v.월검색량 ? `(${v.월검색량})` : '') + ': ' + v.인사이트).slice(0, 3).join(' / '),
+                카피후보: (mr.탄탄크림?.광고카피후보 || []).map(c => `[${c.유형}] ${c.kr}`).join(' / '),
+                워딩금지: (mr.탄탄크림?.워딩금지 || []).join(', '),
+                CEP: compactCEPs(mr.탄탄크림?.CEP요약),
+                UGC방향: compactUGC(mr.탄탄크림?.UGC방향성),
             },
             겔미스트: {
                 검색인사이트: mr.겔미스트?.검색인사이트,
-                UGC방향성: mr.겔미스트?.UGC방향성,
-                UGC카피예시: mr.겔미스트?.UGC카피예시,
-                CEP요약: mr.겔미스트?.CEP요약,
+                CEP: compactCEPs(mr.겔미스트?.CEP요약),
+                UGC방향: compactUGC(mr.겔미스트?.UGC방향성),
+                카피예시: (mr.겔미스트?.UGC카피예시 || []).slice(0, 3).join(' / '),
             },
             NAD크림: {
                 검색인사이트: mr.NAD크림?.검색인사이트,
-                UGC방향성: mr.NAD크림?.UGC방향성,
-                UGC카피예시: mr.NAD크림?.UGC카피예시,
-                CEP요약: mr.NAD크림?.CEP요약,
+                CEP: compactCEPs(mr.NAD크림?.CEP요약),
+                UGC방향: compactUGC(mr.NAD크림?.UGC방향성),
+                카피예시: (mr.NAD크림?.UGC카피예시 || []).slice(0, 3).join(' / '),
             },
-            공통전략: mr.공통전략,
+            공통: {
+                소비자특성: (mr.공통전략?.일본소비자특성 || []).join(' / '),
+                고효율앵글: (mr.공통전략?.고효율소재앵글 || []).join(' / '),
+                약기법주의: (mr.공통전략?.약기법주의 || []).join(' / '),
+            },
         };
     }
 
