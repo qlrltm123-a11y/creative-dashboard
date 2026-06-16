@@ -864,33 +864,38 @@ function renderAIInsights() {
     if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
     renderBrandCrossInsight(window.allCreatives || list);
 
-    // 1차 배치: 가장 먼저 보이는 영역 (즉시)
+    // 1차 배치: 즉시 — 화면에 바로 보이는 영역만
     renderSuccessPatterns(list);
     renderInsightThresholdBadge();
 
-    // 2차 배치: 차트 (16ms 후 — 첫 paint 후)
+    // 2차 배치: 첫 paint 이후 차트 (브라우저 입력 처리 여유)
     setTimeout(() => {
         renderAppealRoasChart(list);
         renderAppealWordCloud(list);
         bindWordCloudMetricSelect();
-    }, 16);
+    }, 100);
 
     // 3차 배치: 나머지 차트
     setTimeout(() => {
         renderHookCtrChart(list);
         renderEmotionChart(list);
         renderTopMessages(list);
-    }, 50);
+    }, 300);
 
-    // 4차 배치: 무거운 히트맵 + 시장조사 연계
-    setTimeout(() => {
+    // 4차 배치: 무거운 히트맵 + 시장조사 연계 (idle 시점에 실행)
+    const batch4 = () => {
         renderAppealFunnelChart(list);
         renderAppealHookHeatmap(list);
         bindInsightChartSelects();
         attachInsightHoverEvents();
         renderMarketResearchLinks(list);
         renderMarketInsightSection(list);
-    }, 100);
+    };
+    if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(batch4, { timeout: 1000 });
+    } else {
+        setTimeout(batch4, 600);
+    }
 }
 
 // ★ 차트별 지표 셀렉트 바인딩
