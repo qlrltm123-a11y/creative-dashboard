@@ -864,24 +864,32 @@ function renderAIInsights() {
     if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
     renderBrandCrossInsight(window.allCreatives || list);
 
+    // 1차 배치: 가장 먼저 보이는 영역 (즉시)
     renderSuccessPatterns(list);
-    renderAppealRoasChart(list);
-    renderAppealWordCloud(list);
-    bindWordCloudMetricSelect();
-    renderHookCtrChart(list);
-    renderEmotionChart(list);
-    renderTopMessages(list);
-    renderAppealFunnelChart(list);
-    renderAppealHookHeatmap(list);
-
-    // 선정 기준 안내 배지 갱신
     renderInsightThresholdBadge();
 
-    // ★ 차트별 지표 셀렉트 바인딩 (최초 1회)
-    bindInsightChartSelects();
+    // 2차 배치: 차트 (16ms 후 — 첫 paint 후)
+    setTimeout(() => {
+        renderAppealRoasChart(list);
+        renderAppealWordCloud(list);
+        bindWordCloudMetricSelect();
+    }, 16);
 
-    // ★ hover preview 이벤트 바인딩
-    attachInsightHoverEvents();
+    // 3차 배치: 나머지 차트
+    setTimeout(() => {
+        renderHookCtrChart(list);
+        renderEmotionChart(list);
+        renderTopMessages(list);
+    }, 50);
+
+    // 4차 배치: 무거운 히트맵 + 시장조사 연계
+    setTimeout(() => {
+        renderAppealFunnelChart(list);
+        renderAppealHookHeatmap(list);
+        bindInsightChartSelects();
+        attachInsightHoverEvents();
+        renderMarketResearchLinks(list);
+    }, 100);
 }
 
 // ★ 차트별 지표 셀렉트 바인딩
@@ -1936,6 +1944,110 @@ if (typeof window.formatNumber !== 'function') {
         return Number(num).toLocaleString('ko-KR');
     };
 }
+
+// ── 시장조사 연계 인사이트 카드 ───────────────────────────────
+function _mrMatchProduct(keyword) {
+    const mr = window.MARKET_RESEARCH;
+    if (!mr) return null;
+    const k = (keyword || '').toLowerCase();
+    // 제품 키워드 매핑
+    const maps = [
+        { key: '탄탄크림', terms: ['탄력', '리프팅', '처짐', '탄탄', '탄크림', '하안부', '翌朝', '夜タン', '탄탄', '탄크', 'liftin', 'tightening', '눈가', '마리오네트', '페이스라인'] },
+        { key: '겔미스트', terms: ['보습', '수분', '건조', '미스트', '젤리', '겔', '촉촉', '메이크업', '들뜸', '육아'] },
+        { key: 'NAD크림', terms: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기', '나이트', '에너지'] },
+    ];
+    for (const m of maps) {
+        if (m.terms.some(t => k.includes(t))) return { productKey: m.key, data: mr[m.key] };
+    }
+    return null;
+}
+
+function _mrGetRelevantCEPs(productData, keyword) {
+    if (!productData?.CEP요약) return [];
+    const k = (keyword || '').toLowerCase();
+    // CEP type/trigger 중 키워드 관련 있는 것 우선 정렬
+    const scored = productData.CEP요약.map(cep => {
+        const text = ((cep.type || '') + ' ' + (cep.트리거 || '')).toLowerCase();
+        const score = k.split(/\s+/).filter(w => w.length >= 2).reduce((s, w) => s + (text.includes(w) ? 2 : 0), 0);
+        return { ...cep, _score: score };
+    });
+    scored.sort((a, b) => b._score - a._score);
+    return scored.slice(0, 3);
+}
+
+function renderMarketResearchLinks(list) {
+    const mr = window.MARKET_RESEARCH;
+    const container = document.getElementById('mr-links-section');
+    if (!container) return;
+    if (!mr) { container.style.display = 'none'; return; }
+
+    // 현재 필터된 데이터에서 소구포인트 ROAS 상위 추출
+    const aggMap = new Map();
+    (list || []).forEach(c => {
+        if ((c.spend || 0) < currentInsightThreshold) return;
+        normalizeKeywords(c.appeal_points).forEach(kw => {
+            if (!kw || kw.startsWith('❌')) return;
+            const e = aggMap.get(kw) || { kw, totalROAS: 0, count: 0, totalSpend: 0 };
+            e.totalROAS += (c.roas || 0);
+            e.count++;
+            e.totalSpend += (c.spend || 0);
+            aggMap.set(kw, e);
+        });
+    });
+    const topAppeals = [...aggMap.values()]
+        .filter(e => e.count >= 2)
+        .sort((a, b) => (b.totalROAS / b.count) - (a.totalROAS / a.count))
+        .slice(0, 5);
+
+    if (!topAppeals.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+
+    const cards = topAppeals.map(({ kw, totalROAS, count, totalSpend }) => {
+        const avgROAS = Math.round(totalROAS / count * 100);
+        const match = _mrMatchProduct(kw);
+        const ceps = match ? _mrGetRelevantCEPs(match.data, kw) : [];
+        const ugcDirs = match?.data?.UGC방향성 || [];
+        // 가장 관련성 높은 UGC 방향 1개
+        const ugcMatch = ugcDirs.find(u => ceps.some(c => u.관련CEP?.toLowerCase().includes(c.type?.slice(0, 5)?.toLowerCase()))) || ugcDirs[0];
+        const ugcEx = match?.data?.UGC카피예시?.[0] || (match?.key === '탄탄크림' && mr.탄탄크림?.광고카피후보?.[0]?.kr) || null;
+
+        const chatQ = `소구포인트 "${kw}"의 고효율 소재 패턴 + ${match?.productKey || ''} 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
+
+        return `
+        <div class="mr-link-card">
+            <div class="mr-link-top">
+                <span class="mr-link-kw">${kw}</span>
+                <span class="mr-link-roas">ROAS ${avgROAS}% <span class="mr-link-cnt">(${count}개 소재)</span></span>
+            </div>
+            ${match ? `
+            <div class="mr-link-product">${match.productKey} 시장조사 연계</div>
+            ${ceps.length ? `<div class="mr-link-ceps">${ceps.map(c => `<span class="mr-link-cep-chip">CEP: ${c.type}</span>`).join('')}</div>` : ''}
+            ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${ugcMatch.핵심메시지 || (ugcMatch.소비자심리 || '').slice(0, 40)}</div>` : ''}
+            ${ugcEx ? `<div class="mr-link-copy">"${ugcEx}"</div>` : ''}
+            ` : `<div class="mr-link-no-match text-xs text-slate-400 mt-1">시장조사 매핑 없음 — AI에게 직접 분석 요청 가능</div>`}
+            <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(${JSON.stringify(chatQ)})">
+                ✨ AI에게 소재 기획 요청
+            </button>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="mr-links-header">
+            <i class="fas fa-chart-network mr-1 text-violet-500"></i>
+            성과 데이터 × 시장조사 연계
+            <span class="mr-links-sub">실제 ROAS 상위 소구포인트 → 리스닝마인드 CEP·UGC 방향 자동 매핑</span>
+        </div>
+        <div class="mr-links-grid">${cards}</div>
+    `;
+}
+
+// AI 챗봇에 소재 기획 요청 (시장조사 연계)
+window.acAnalyzeAppeal = function(query) {
+    if (typeof window.toggleAiChat === 'function' && !window._acOpen) window.toggleAiChat();
+    const input = document.getElementById('ac-input');
+    if (input) { input.value = query; input.style.height = 'auto'; }
+    if (typeof window.acSend === 'function') window.acSend();
+};
 
 // 전역 노출
 window.renderAIInsights = renderAIInsights;

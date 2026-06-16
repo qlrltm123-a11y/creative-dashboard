@@ -7183,6 +7183,66 @@ img.mw-cr-thumb {
     transition: opacity 0.15s;
 }
 .kw-video-btn:hover { opacity: 0.85; }
+
+/* ── 시장조사 연계 카드 ── */
+.mr-links-header {
+    font-size: 14px; font-weight: 700; color: #1e293b;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.mr-links-sub {
+    font-size: 11px; font-weight: 400; color: #94a3b8; margin-left: 4px;
+}
+.mr-links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+.mr-link-card {
+    background: linear-gradient(135deg, #f5f3ff, #fdf4ff);
+    border: 1px solid #e9d5ff;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 7px;
+}
+.mr-link-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.mr-link-kw {
+    font-size: 13px; font-weight: 700; color: #6d28d9;
+}
+.mr-link-roas {
+    font-size: 12px; font-weight: 700; color: #059669; white-space: nowrap;
+}
+.mr-link-cnt { font-size: 10px; font-weight: 400; color: #94a3b8; }
+.mr-link-product {
+    font-size: 10px; font-weight: 600; color: #7c3aed;
+    background: #ede9fe; border-radius: 4px; padding: 2px 7px; display: inline-block; width: fit-content;
+}
+.mr-link-ceps {
+    display: flex; flex-wrap: wrap; gap: 4px;
+}
+.mr-link-cep-chip {
+    font-size: 10px; background: #f3e8ff; color: #7c3aed;
+    border: 1px solid #ddd6fe; border-radius: 4px; padding: 2px 6px;
+}
+.mr-link-ugc {
+    font-size: 11px; color: #475569; line-height: 1.5;
+    background: #fff; border-radius: 6px; padding: 6px 8px;
+    border-left: 3px solid #a78bfa;
+}
+.mr-link-copy {
+    font-size: 10px; color: #7c3aed; font-style: italic;
+    background: #faf5ff; border-radius: 4px; padding: 4px 7px;
+}
+.mr-link-btn {
+    margin-top: 2px; width: 100%; padding: 7px 0;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff; border: none; border-radius: 7px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s;
+}
+.mr-link-btn:hover { opacity: 0.85; }
+
 .kw-search-vbadge {
     position: absolute;
     top: 50%;
