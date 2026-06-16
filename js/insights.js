@@ -2105,7 +2105,7 @@ function renderMarketResearchLinks(list) {
             <div class="mr-link-product">${productKey} 시장조사 연계</div>
             <div class="mr-link-ceps">${topKws.map(k => `<span class="mr-link-cep-chip" title="ROAS ${k.avgRoas}%">${k.kw}</span>`).join('')}</div>
             ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${(ugcMatch.핵심메시지 || '').slice(0, 40)}</div>` : ''}
-            <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(${JSON.stringify(chatQ)})">
+            <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(decodeURIComponent('${encodeURIComponent(chatQ)}'))">
                 ✨ AI에게 소재 기획 요청
             </button>
         </div>`;
