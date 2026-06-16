@@ -73,9 +73,18 @@ function _acBuildContext() {
         const agg = typeof aggregateByAdName === 'function' ? aggregateByAdName(creatives) : creatives;
         ctx.데이터.소재_전체목록 = agg
             .slice()
-            .sort((a, b) => (b.spend || 0) - (a.spend || 0)) // 광고비 순(고른 커버리지)
-            .slice(0, 120)
-            .map(c => _acCreativeSummary(c, false));
+            .sort((a, b) => (b.spend || 0) - (a.spend || 0))
+            .slice(0, 50)
+            .map(c => ({
+                소재명: c.ad_name || c.creative_name || '',
+                브랜드: c.brand || '',
+                제품: c.product || '',
+                ROAS: c.roas != null ? +(c.roas*100).toFixed(0)+'%' : null,
+                CTR: c.ctr != null ? +(c.ctr*100).toFixed(2)+'%' : null,
+                광고비: Math.round(c.spend||0),
+                소구: Array.isArray(c.appeal_points) ? c.appeal_points.slice(0,2).join(',')
+                      : typeof c.appeal_points==='string' ? c.appeal_points.split(/[,，、]/).map(v=>v.trim()).slice(0,2).join(',') : '',
+            }));
 
         // 1-b) 브랜드×날짜 일별 집계
         const byBrandDate = {};
