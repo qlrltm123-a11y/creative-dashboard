@@ -50,10 +50,11 @@ function _acSearchCreatives(query) {
     if (!terms.length) return [];
 
     const scored = agg.map(c => {
+        const toStr = v => Array.isArray(v) ? v.join(' ') : (v || '');
         const fields = [c.ad_name, c.creative_name, c.product, c.brand,
             ...(Array.isArray(c.appeal_points) ? c.appeal_points
                 : typeof c.appeal_points === 'string' ? c.appeal_points.split(/[,，、]/) : []),
-            c.hook_type, c.key_message_kr, c.key_message_jp].map(v => (v||'').toLowerCase());
+            toStr(c.hook_type), c.key_message_kr, c.key_message_jp].map(v => toStr(v).toLowerCase());
         let score = 0;
         terms.forEach(t => { if (fields.some(f => f.includes(t))) score++; });
         return { c, score };
