@@ -111,13 +111,15 @@ function _acBuildContext() {
         });
         const dailySeries = {};
         Object.entries(byBrandDate).forEach(([b, dates]) => {
-            dailySeries[b] = Object.keys(dates).sort().map(dt => ({ 날짜: dt, ...fin(dates[dt]) }));
+            const sorted = Object.keys(dates).sort();
+            // 최근 14일만
+            dailySeries[b] = sorted.slice(-14).map(dt => ({ 날짜: dt, ...fin(dates[dt]) }));
         });
         const prodTop = {};
         Object.entries(byBrandProd).forEach(([b, prods]) => {
             prodTop[b] = Object.entries(prods)
                 .map(([name, o]) => ({ 제품: name, ...fin(o) }))
-                .sort((a,b2) => parseFloat(b2.ROAS) - parseFloat(a.ROAS)).slice(0, 8);
+                .sort((a,b2) => parseFloat(b2.ROAS) - parseFloat(a.ROAS)).slice(0, 5);
         });
         ctx.데이터.소재_일별추이 = dailySeries;
         ctx.데이터.소재_제품별 = prodTop;
@@ -282,7 +284,7 @@ async function _acAsk(question) {
 - 데이터상 고ROAS라도 위 표현이 보이면 "⚠️ 약기법 주의: ○○ 표현은 규제 소지" 라고 반드시 함께 안내.
 
 [통합 데이터]
-${JSON.stringify(ctx, null, 1)}`;
+${(() => { const s = JSON.stringify(ctx); return s.length > 40000 ? s.slice(0, 40000) + '...(이하 생략)' : s; })()}`;
 
     // 대화 히스토리 + 현재 질문
     const contents = [];
