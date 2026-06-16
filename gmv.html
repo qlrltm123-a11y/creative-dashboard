@@ -146,6 +146,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .c-danger { color: var(--danger) !important; }
 .c-text { color: var(--text) !important; font-weight: 600; }
 </style>
+<!-- Vercel Web Analytics -->
+<script type="module">
+    import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics@2.0.1/dist/index.mjs';
+    inject();
+</script>
 </head>
 <body>
 
@@ -652,7 +657,7 @@ function renderAllTab() {
       <div class="s-sub">시간 소진 ${(dp.pct*100).toFixed(0)}%</div>
     </div>
     <div class="stat-card">
-      <div class="s-label">마감까지</div>
+      <div class="s-label">마감까���</div>
       <div class="s-val">${remH}h ${remM}m</div>
       <div class="s-sub">${selectedDate}</div>
     </div>
@@ -958,7 +963,7 @@ function clearLog(brand) {
   renderPaceBox(brand);
 }
 
-// ───────── 입력 핸들러 ─────────
+// ──────��── 입력 핸들러 ─────────
 function onInput(brand, val) {
   getActuals()[brand] = parseNum(val);
   save();

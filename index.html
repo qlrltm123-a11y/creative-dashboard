@@ -19,6 +19,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Vercel Web Analytics -->
+    <script type="module">
+        import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics@2.0.1/dist/index.mjs';
+        inject();
+    </script>
 </head>
 <body class="bg-slate-50">
     <!-- Header -->
@@ -357,7 +362,7 @@
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>놓친 매출 순위 (장바구니 이탈) <span class="info-tip" tabindex="0" data-tip="이탈률 = (담은 건수 − 구매 건수) ÷ 담은 건수 = 담아놓고 안 산 비율. 놓친 매출 = 이탈 건수 × 1인당 구매액. 금액 큰 제품부터 결제 단계 개선 효과가 커요.">ⓘ</span></h3>
+                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>놓친 매출 순위 (장바구니 이탈) <span class="info-tip" tabindex="0" data-tip="이탈�� = (담은 건수 − 구매 건수) ÷ 담은 건수 = 담아놓고 안 산 비율. 놓친 매출 = 이탈 건수 × 1인당 구매액. 금액 큰 제품부터 결제 단계 개선 효과가 커요.">ⓘ</span></h3>
                     <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: '거의 살 뻔했는데 놓친' 매출이 큰 제품. 여기부터 가격·쿠폰·재고·결제 화면을 고치면 매출 회복 효과 큼</p>
                     <p class="text-xs text-slate-400 mt-0.5">📐 <b>이탈률</b> = (담은 건수 − 구매 건수) ÷ 담은 건수 = <b>담아놓고 안 산 비율</b> · <b>놓친 매출</b> = 이탈 건수 × 1인당 구매액</p>
                 </div>
