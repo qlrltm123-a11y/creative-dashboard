@@ -600,13 +600,15 @@ function _buildGeneratePanelHTML(p) {
         const rawThumb = c.thumbnail_url || c.media_url || '';
         const rawRef   = c.media_url || c.thumbnail_url || '';
         const refUrl   = _toDirectImageUrl(rawRef) || rawRef;
+        const safeRefUrl = encodeURIComponent(refUrl);
+        const safeAdName = (c.ad_name || '').replace(/"/g, '&quot;');
         const imgHtml  = (typeof buildDriveImgHtml === 'function' && typeof isDriveUrl === 'function' && isDriveUrl(rawThumb))
             ? buildDriveImgHtml(rawThumb, { className: 'gen-ref-thumb', loading: 'lazy' })
             : `<img src="${_toDirectImageUrl(rawThumb) || rawThumb}" class="gen-ref-thumb" loading="lazy" onerror="this.style.opacity='0.12'">`;
-        return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${c.ad_name || ''}">
+        return `<div class="gen-ref-item" data-url="${refUrl}" onclick="_toggleRefItem(this)" title="${safeAdName}">
             ${imgHtml}
             <span class="gen-ref-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'위'}</span>
-            <button class="gen-ref-insert-btn" onclick="event.stopPropagation();_insertRefToPrompt('${refUrl}')">📎 삽입</button>
+            <button class="gen-ref-insert-btn" onclick="event.stopPropagation();_insertRefToPrompt(decodeURIComponent('${safeRefUrl}'))">📎 삽입</button>
         </div>`;
     }).join('') || '<p class="text-xs text-slate-400 py-2">소재 없음</p>';
 

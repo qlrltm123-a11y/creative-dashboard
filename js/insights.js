@@ -2129,6 +2129,61 @@ window.acAnalyzeAppeal = function(query) {
     if (typeof window.acSend === 'function') window.acSend();
 };
 
+// UGC Tip hover 시스템 — mr-link-roas-row onmouseenter/onmouseleave 에서 호출
+(function() {
+    let _ugcTipEl = null;
+    let _ugcHideTimer = null;
+
+    function getUgcTipEl() {
+        if (!_ugcTipEl) {
+            _ugcTipEl = document.createElement('div');
+            _ugcTipEl.id = 'mr-ugc-tip';
+            _ugcTipEl.style.cssText = [
+                'position:fixed;z-index:9999;background:#1e1b4b;color:#e0e7ff',
+                'border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.5',
+                'box-shadow:0 8px 32px rgba(0,0,0,0.35);max-width:320px;pointer-events:none',
+                'opacity:0;transition:opacity 0.15s;max-height:280px;overflow-y:auto'
+            ].join(';');
+            document.body.appendChild(_ugcTipEl);
+        }
+        return _ugcTipEl;
+    }
+
+    window._mrShowUGCTip = function(triggerEl, encodedData) {
+        clearTimeout(_ugcHideTimer);
+        _ugcHideTimer = null;
+        let creatives = [];
+        try { creatives = JSON.parse(decodeURIComponent(encodedData)); } catch(e) { return; }
+        if (!creatives.length) return;
+
+        const tip = getUgcTipEl();
+        const rows = creatives.slice(0, 8).map(c => {
+            const name = c.creative_name || c.ad_name || '(이름 없음)';
+            const roas = c.roas != null ? `ROAS ${Math.round(c.roas * 100)}%` : '';
+            return `<div style="border-bottom:1px solid rgba(255,255,255,0.08);padding:4px 0;display:flex;justify-content:space-between;gap:8px">
+                <span style="opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${name}</span>
+                ${roas ? `<span style="opacity:0.6;white-space:nowrap;flex-shrink:0">${roas}</span>` : ''}
+            </div>`;
+        }).join('');
+        tip.innerHTML = `<div style="font-weight:700;margin-bottom:6px;color:#a5b4fc">소재 목록 (${creatives.length}개)</div>${rows}`;
+
+        const rect = triggerEl.getBoundingClientRect();
+        const tipW = 300;
+        let left = rect.left + window.scrollX;
+        if (left + tipW > window.innerWidth - 16) left = window.innerWidth - tipW - 16;
+        tip.style.left = left + 'px';
+        tip.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+        tip.style.opacity = '1';
+    };
+
+    window._mrHideUGCTip = function() {
+        _ugcHideTimer = setTimeout(function() {
+            const tip = document.getElementById('mr-ugc-tip');
+            if (tip) tip.style.opacity = '0';
+        }, 200);
+    };
+})();
+
 // 전역 노출
 window.renderAIInsights = renderAIInsights;
 // hover preview 시스템 — 다른 컨텐츠(제품별 소구포인트 인사이트 등)에서 재사용

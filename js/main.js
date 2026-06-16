@@ -4722,7 +4722,7 @@ function openModal(id, preloadedCreative) {
                 </div>
                 <h2>${c.creative_name}</h2>
                 <p class="subtitle"><i class="far fa-calendar mr-1"></i>${startDate} 시작 · ${c.status}</p>
-                ${c.media_type === 'video' && c.media_url ? `<button class="modal-video-analyze-btn" onclick="window.acAnalyzeVideo('${(c.media_url||'').replace(/'/g,"\\'")}','${(c.creative_name||c.ad_name||'').replace(/'/g,"\\'")}')">🎬 영상 전체 분석 (AI)</button>` : ''}
+                ${c.media_type === 'video' && c.media_url ? `<button class="modal-video-analyze-btn" onclick="window.acAnalyzeVideo(decodeURIComponent('${encodeURIComponent(c.media_url||'')}'),decodeURIComponent('${encodeURIComponent(c.creative_name||c.ad_name||'')}'))">🎬 영상 전체 분석 (AI)</button>` : ''}
                 ${aiSectionHtml}
                 <div class="modal-metrics">
                     <div class="metric-box">
