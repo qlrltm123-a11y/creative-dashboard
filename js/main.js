@@ -115,6 +115,12 @@ window.updateDashboard = function() {
     Object.keys(_renderedSections).forEach(k => {
         if (k !== 'overview' && k !== _currentSection) _renderedSections[k] = false;
     });
+    // AI pre-render 타이머가 있으면 취소 (stale 데이터 방지)
+    if (_aiPreRenderTimer) {
+        if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(_aiPreRenderTimer);
+        else clearTimeout(_aiPreRenderTimer);
+        _aiPreRenderTimer = null;
+    }
 
     // ③ 필터 옵션 갱신 (select DOM 재구성 — 빠름)
     populatePlatformOptions();
@@ -540,6 +546,18 @@ function switchSection(sectionName) {
     if (!_renderedSections[sectionName]) {
         _renderedSections[sectionName] = true;
         const panel = document.querySelector(`.section-panel[data-panel="${sectionName}"]`);
+        if (sectionName === 'ai') {
+            // ★ AI 탭: 이미 idle pre-render 중이면 그대로 완료 대기, 아니면 즉시 실행
+            // requestAnimationFrame 래퍼 없이 바로 호출 (pre-render가 완료됐으면 no-op에 가까움)
+            if (_aiPreRenderTimer) {
+                // idle 예약을 취소하고 지금 바로 실행
+                if (typeof cancelIdleCallback !== 'undefined') cancelIdleCallback(_aiPreRenderTimer);
+                else clearTimeout(_aiPreRenderTimer);
+                _aiPreRenderTimer = null;
+            }
+            if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
+            if (panel) panel.classList.remove('section-loading');
+        } else {
         if (panel) panel.classList.add('section-loading');
         requestAnimationFrame(() => {
             if (sectionName === 'performance') {
@@ -551,8 +569,6 @@ function switchSection(sectionName) {
                 renderAppealInsight();
                 renderProductPerformance();
                 renderPlatformCreativeMatrix();
-            } else if (sectionName === 'ai') {
-                if (typeof window.renderAIInsights === 'function') window.renderAIInsights();
             } else if (sectionName === 'weekly') {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
             } else if (sectionName === 'kr') {
@@ -570,6 +586,7 @@ function switchSection(sectionName) {
             }
             if (panel) panel.classList.remove('section-loading');
         });
+        } // end else (non-AI sections)
     }
 
     // 차트 리사이즈 (display:none → block 전환 시 Chart.js가 캔버스 크기를 못 잡는 문제 방지)
@@ -1000,7 +1017,7 @@ function updateDashboard() {
     populateProductOptions();
     populateAppealInsightProductOptions();
     populatePlatformMatrixProductOptions();
-    // ★ 속도 개선: 활성 섹션만 렌더 (비활성 섹션은 진입 시 lazy render)
+    // ★ 속도 개선: 활성 섹션만 즉시 렌더, 비활성 섹션은 idle 시간에 미리 렌더
     if (_renderedSections.performance) {
         renderPerformanceCriteriaBadge();
         renderScatterChart();
@@ -1011,6 +1028,26 @@ function updateDashboard() {
     }
     if (_renderedSections.ai && typeof window.renderAIInsights === 'function') {
         window.renderAIInsights();
+    } else if (typeof window.renderAIInsights === 'function') {
+        // ★ AI 탭이 비활성 상태일 때도 idle 시간에 미리 렌더해서 탭 전환 시 즉시 표시
+        _scheduleAIPreRender();
+    }
+}
+
+let _aiPreRenderTimer = null;
+function _scheduleAIPreRender() {
+    if (_aiPreRenderTimer) return; // 이미 예약됨
+    const run = () => {
+        _aiPreRenderTimer = null;
+        if (typeof window.renderAIInsights === 'function') {
+            window.renderAIInsights();
+            _renderedSections.ai = true;
+        }
+    };
+    if (typeof requestIdleCallback !== 'undefined') {
+        _aiPreRenderTimer = requestIdleCallback(run, { timeout: 3000 });
+    } else {
+        _aiPreRenderTimer = setTimeout(run, 800);
     }
 }
 
