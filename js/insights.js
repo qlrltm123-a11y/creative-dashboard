@@ -2200,18 +2200,23 @@ function renderMarketResearchLinks(list) {
         .slice(0, 5);
 
     if (!topAppeals.length) { container.style.display = 'none'; return; }
+
+    // 시장조사 매핑 있는 항목만 필터링
+    const mappedAppeals = topAppeals
+        .map(entry => ({ ...entry, match: _mrMatchProduct(entry.kw) }))
+        .filter(entry => entry.match);
+
+    if (!mappedAppeals.length) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    const cards = topAppeals.map(({ kw, totalROAS, count, totalSpend }) => {
+    const cards = mappedAppeals.map(({ kw, totalROAS, count, totalSpend, match }) => {
         const avgROAS = Math.round(totalROAS / count * 100);
-        const match = _mrMatchProduct(kw);
-        const ceps = match ? _mrGetRelevantCEPs(match.data, kw) : [];
-        const ugcDirs = match?.data?.UGC방향성 || [];
-        // 가장 관련성 높은 UGC 방향 1개
+        const ceps = _mrGetRelevantCEPs(match.data, kw);
+        const ugcDirs = match.data?.UGC방향성 || match.data?.UGC방향 || [];
         const ugcMatch = ugcDirs.find(u => ceps.some(c => u.관련CEP?.toLowerCase().includes(c.type?.slice(0, 5)?.toLowerCase()))) || ugcDirs[0];
-        const ugcEx = match?.data?.UGC카피예시?.[0] || (match?.key === '탄탄크림' && mr.탄탄크림?.광고카피후보?.[0]?.kr) || null;
+        const ugcEx = match.data?.UGC카피예시?.[0] || (match.productKey === '탄탄크림' && mr.탄탄크림?.광고카피후보?.[0]?.kr) || null;
 
-        const chatQ = `소구포인트 "${kw}"의 고효율 소재 패턴 + ${match?.productKey || ''} 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
+        const chatQ = `소구포인트 "${kw}"의 고효율 소재 패턴 + ${match.productKey} 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
 
         return `
         <div class="mr-link-card">
@@ -2219,12 +2224,10 @@ function renderMarketResearchLinks(list) {
                 <span class="mr-link-kw">${kw}</span>
                 <span class="mr-link-roas">ROAS ${avgROAS}% <span class="mr-link-cnt">(${count}개 소재)</span></span>
             </div>
-            ${match ? `
             <div class="mr-link-product">${match.productKey} 시장조사 연계</div>
             ${ceps.length ? `<div class="mr-link-ceps">${ceps.map(c => `<span class="mr-link-cep-chip">CEP: ${c.type}</span>`).join('')}</div>` : ''}
             ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${ugcMatch.핵심메시지 || (ugcMatch.소비자심리 || '').slice(0, 40)}</div>` : ''}
             ${ugcEx ? `<div class="mr-link-copy">"${ugcEx}"</div>` : ''}
-            ` : `<div class="mr-link-no-match text-xs text-slate-400 mt-1">시장조사 매핑 없음 — AI에게 직접 분석 요청 가능</div>`}
             <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(${JSON.stringify(chatQ)})">
                 ✨ AI에게 소재 기획 요청
             </button>
