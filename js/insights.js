@@ -2195,47 +2195,55 @@ function renderMarketResearchLinks(list) {
         });
     });
 
-    // 소구포인트별 통계 계산
-    const allAppeals = [...aggMap.values()].map(e => {
-        const avg = e.roasList.reduce((s, r) => s + r, 0) / e.roasList.length;
-        const sorted = [...e.roasList].sort((a, b) => a - b);
-        return {
-            kw: e.kw,
-            avgRoas: Math.round(avg * 100),
-            minRoas: Math.round(sorted[0] * 100),
-            maxRoas: Math.round(sorted[sorted.length - 1] * 100),
-            count: e.roasList.length,
-            creatives: e.creatives.sort((a, b) => b.roas - a.roas).slice(0, 6),
-        };
-    }).sort((a, b) => b.avgRoas - a.avgRoas);
+    // 소구포인트별 시장조사 매핑 후 제품 단위로 통합 (중복 소재 제거)
+    const productGroups = new Map();
+    [...aggMap.values()].forEach(e => {
+        const match = _mrMatchProduct(e.kw);
+        if (!match) return;
+        const pk = match.productKey;
+        if (!productGroups.has(pk)) {
+            productGroups.set(pk, { productKey: pk, match, keywords: [], creativeMap: new Map() });
+        }
+        const g = productGroups.get(pk);
+        const kwAvg = e.roasList.reduce((s, r) => s + r, 0) / e.roasList.length;
+        g.keywords.push({ kw: e.kw, avgRoas: Math.round(kwAvg * 100), count: e.roasList.length });
+        e.creatives.forEach(c => {
+            if (!g.creativeMap.has(c.name)) g.creativeMap.set(c.name, c);
+        });
+    });
 
-    // 시장조사 매핑 있는 항목만
-    const mappedAppeals = allAppeals
-        .map(entry => ({ ...entry, match: _mrMatchProduct(entry.kw) }))
-        .filter(entry => entry.match);
+    // 제품별 집계 통계
+    const productCards = [...productGroups.values()].map(g => {
+        const creatives = [...g.creativeMap.values()].sort((a, b) => b.roas - a.roas);
+        const roasList = creatives.map(c => c.roas);
+        if (!roasList.length) return null;
+        const avgRoas = Math.round(roasList.reduce((s, r) => s + r, 0) / roasList.length);
+        const minRoas = Math.min(...roasList);
+        const maxRoas = Math.max(...roasList);
+        const topKws = g.keywords.sort((a, b) => b.avgRoas - a.avgRoas).slice(0, 5);
+        return { productKey: g.productKey, match: g.match, creatives: creatives.slice(0, 8), avgRoas, minRoas, maxRoas, topKws };
+    }).filter(Boolean).sort((a, b) => b.avgRoas - a.avgRoas).slice(0, 5);
 
-    if (!mappedAppeals.length) { container.style.display = 'none'; return; }
+    if (!productCards.length) { container.style.display = 'none'; return; }
     container.style.display = '';
 
-    // ROAS 패턴 구분: 고효율 / 중효율 / 성장가능
     const tierOf = (avgRoas) => avgRoas >= 200
         ? { label: '고효율', color: '#16a34a', bg: '#f0fdf4' }
         : avgRoas >= 100
         ? { label: '중효율', color: '#d97706', bg: '#fffbeb' }
         : { label: '성장가능', color: '#6366f1', bg: '#eef2ff' };
 
-    const cards = mappedAppeals.map(({ kw, avgRoas, minRoas, maxRoas, count, creatives, match }) => {
+    const cards = productCards.map(({ productKey, match, creatives, avgRoas, minRoas, maxRoas, topKws }) => {
         const tier = tierOf(avgRoas);
-        const ceps = _mrGetRelevantCEPs(match.data, kw);
         const ugcDirs = match.data?.UGC방향성 || match.data?.UGC방향 || [];
-        const ugcMatch = ugcDirs.find(u => ceps.some(c => u.관련CEP?.toLowerCase().includes(c.type?.slice(0, 5)?.toLowerCase()))) || ugcDirs[0];
+        const ugcMatch = ugcDirs[0];
         const tipData = encodeURIComponent(JSON.stringify(creatives));
-        const chatQ = `소구포인트 "${kw}"의 고효율 소재 패턴 + ${match.productKey} 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
+        const chatQ = `${productKey} 제품의 고효율 소재 패턴 (소구포인트: ${topKws.map(k=>k.kw).join(', ')}) + 시장 데이터 CEP 기반으로 신규 광고 소재/UGC 앵글 3개 기획해줘 (실제 ROAS 데이터 인용)`;
 
         return `
         <div class="mr-link-card" style="border-top: 3px solid ${tier.color}">
             <div class="mr-link-top">
-                <span class="mr-link-kw">${kw}</span>
+                <span class="mr-link-kw">${productKey}</span>
                 <span class="mr-link-tier" style="background:${tier.bg};color:${tier.color}">${tier.label}</span>
             </div>
             <div class="mr-link-roas-row"
@@ -2243,10 +2251,10 @@ function renderMarketResearchLinks(list) {
                  onmouseleave="window._mrHideUGCTip()">
                 <span class="mr-link-roas-avg" style="color:${tier.color}">평균 ${avgRoas}%</span>
                 <span class="mr-link-roas-range">범위 ${minRoas}~${maxRoas}%</span>
-                <span class="mr-link-cnt">${count}개 소재 ↗ hover</span>
+                <span class="mr-link-cnt">${creatives.length}개 소재 — hover로 확인</span>
             </div>
-            <div class="mr-link-product">${match.productKey} 시장조사 연계</div>
-            ${ceps.length ? `<div class="mr-link-ceps">${ceps.map(c => `<span class="mr-link-cep-chip">CEP: ${c.type}</span>`).join('')}</div>` : ''}
+            <div class="mr-link-product">${productKey} 시장조사 연계</div>
+            <div class="mr-link-ceps">${topKws.map(k => `<span class="mr-link-cep-chip" title="ROAS ${k.avgRoas}%">${k.kw}</span>`).join('')}</div>
             ${ugcMatch ? `<div class="mr-link-ugc"><b>UGC 앵글</b> — ${ugcMatch.테마}: ${(ugcMatch.핵심메시지 || '').slice(0, 40)}</div>` : ''}
             <button class="mr-link-btn" onclick="window.acAnalyzeAppeal && window.acAnalyzeAppeal(${JSON.stringify(chatQ)})">
                 ✨ AI에게 소재 기획 요청
