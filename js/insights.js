@@ -852,35 +852,31 @@ function renderAIInsights() {
     // ★ 모든 인사이트 차트/카드의 선정 기준을 "중앙값 광고비 이상"으로 통일
     const _insightThreshold = computeInsightThreshold(list);
 
-    // ★ 키워드 → 소재 매핑 빌드 (hover preview용) — 중앙값 기준 대표 소재 선정
-    buildKeywordCreativeMap(list);
-
-    // ★ 키워드 검색 — 고효율 소재 찾기
-    bindKeywordSearch();
-    renderKeywordSearch(list);
-
-    // 브랜드 ALL 상태일 때만 교차 인사이트 표시
-    const crossEl = document.getElementById('brandCrossInsight');
-    if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
-    renderBrandCrossInsight(window.allCreatives || list);
-
-    // 1차 배치: 즉시 — 화면에 바로 보이는 영역만
+    // 1차 배치: 즉시 — 화면 최상단 카드만 (첫 paint 최우선)
     renderSuccessPatterns(list);
     renderInsightThresholdBadge();
+    renderKeywordSearch(list);
+    bindKeywordSearch();
 
-    // 2차 배치: 첫 paint 이후 차트 (브라우저 입력 처리 여유)
+    // 2차 배치: 첫 paint 직후 — 주요 차트 + hover맵
     setTimeout(() => {
+        // hover preview용 키워드 맵 (1차 이후로 미룸)
+        buildKeywordCreativeMap(list);
         renderAppealRoasChart(list);
         renderAppealWordCloud(list);
         bindWordCloudMetricSelect();
-    }, 100);
+    }, 50);
 
     // 3차 배치: 나머지 차트
     setTimeout(() => {
         renderHookCtrChart(list);
         renderEmotionChart(list);
         renderTopMessages(list);
-    }, 300);
+        // 브랜드 교차 인사이트 (스크롤 아래 위치 → 늦게 렌더해도 무방)
+        const crossEl = document.getElementById('brandCrossInsight');
+        if (crossEl) crossEl.style.display = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? 'none' : '';
+        renderBrandCrossInsight(window.allCreatives || list);
+    }, 200);
 
     // 4차 배치: 무거운 히트맵 + 시장조사 연계 (idle 시점에 실행)
     const batch4 = () => {
@@ -891,9 +887,9 @@ function renderAIInsights() {
         renderMarketResearchLinks(list);
     };
     if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(batch4, { timeout: 1000 });
+        requestIdleCallback(batch4, { timeout: 1500 });
     } else {
-        setTimeout(batch4, 600);
+        setTimeout(batch4, 500);
     }
 }
 

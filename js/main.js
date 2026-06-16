@@ -402,7 +402,7 @@ function bindEvents() {
 
     // ★ 디바운스된 섹션 갱신 함수 (빠른 연속 클릭/변경 시 마지막 호출만)
     const debouncedRefreshPerf = debounce(refreshPerformanceSection, 120);
-    const debouncedRefreshAi = debounce(refreshAiSection, 120);
+    const debouncedRefreshAi = debounce(refreshAiSection, 50);
 
     // ★ 성과 분석 섹션 통합 필터 (복수 선택 multi-select)
     const _msEv = document.getElementById('ms-perf-event');
