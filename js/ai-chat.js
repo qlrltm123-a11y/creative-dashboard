@@ -249,19 +249,28 @@ ${JSON.stringify(ctx, null, 1)}`;
     contents.push({ role: 'user', parts: [{ text: question + '\n\n(반드시 한국어로, 실제 데이터 수치를 인용해서 답변. 소재_검색결과가 있으면 거기서 먼저 찾기)' }] });
 
     try {
-        const res = await fetch('/api/ai-chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents,
-                generationConfig: { temperature: 0.35, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
-            }),
-        });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 40000);
+        let res;
+        try {
+            res = await fetch('/api/ai-chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents,
+                    generationConfig: { temperature: 0.35, maxOutputTokens: 4096 },
+                }),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
         const data = await res.json();
         if (!res.ok) return { error: data.error || `서버 오류 (${res.status})` };
         if (!data.text) return { error: '응답이 비어 있습니다. 다시 시도해주세요.' };
         return { text: data.text };
     } catch (e) {
+        if (e.name === 'AbortError') return { error: '응답 시간이 초과되었습니다 (40초). 질문을 더 짧게 해주세요.' };
         return { error: `네트워크 오류: ${e.message}` };
     }
 }

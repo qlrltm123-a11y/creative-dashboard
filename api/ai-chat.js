@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
   // 후보 모델 순서 (만료 대비 폴백). GEMINI_MODEL 지정 시 최우선.
   const candidates = [];
   if (process.env.GEMINI_MODEL) candidates.push(process.env.GEMINI_MODEL);
-  candidates.push('gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-pro-latest');
+  candidates.push('gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest');
 
   try {
     let last = null;
