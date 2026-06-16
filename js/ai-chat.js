@@ -201,6 +201,20 @@ function _acBuildContext() {
                 UGC방향: compactUGC(mr.NAD크림?.UGC방향성),
                 카피예시: (mr.NAD크림?.UGC카피예시 || []).slice(0, 3).join(' / '),
             },
+            컬러그램_립틴트: {
+                전략: mr.컬러그램?.전략핵심,
+                반등포인트: mr.컬러그램?.반등포인트,
+                검색키워드: Object.entries(mr.컬러그램?.검색키워드 || {}).map(([k, v]) => k + (v.월검색량 ? `(${v.월검색량})` : '') + ': ' + v.인사이트).join(' / '),
+                CEP: compactCEPs(mr.컬러그램?.CEP),
+                UGC방향: compactUGC(mr.컬러그램?.UGC방향),
+            },
+            웨이크메이크_베이스: {
+                전략: mr.웨이크메이크?.전략핵심,
+                반등포인트: mr.웨이크메이크?.반등포인트,
+                검색키워드: Object.entries(mr.웨이크메이크?.검색키워드 || {}).map(([k, v]) => k + (v.월검색량 ? `(${v.월검색량})` : '') + ': ' + v.인사이트).join(' / '),
+                CEP: compactCEPs(mr.웨이크메이크?.CEP),
+                UGC방향: compactUGC(mr.웨이크메이크?.UGC방향),
+            },
             공통: {
                 소비자특성: (mr.공통전략?.일본소비자특성 || []).join(' / '),
                 고효율앵글: (mr.공통전략?.고효율소재앵글 || []).join(' / '),

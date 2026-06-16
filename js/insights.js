@@ -1994,6 +1994,18 @@ function renderMarketInsightSection(list) {
             matchKws: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기'],
             color: '#7c3aed', light: '#f5f3ff', border: '#ddd6fe',
         },
+        {
+            key: '컬러그램', label: '컬러그램 립틴트', icon: '💋',
+            data: mr.컬러그램,
+            matchKws: ['립틴트', '틴트', '발색', '지속력', '립', '마스크'],
+            color: '#db2777', light: '#fdf2f8', border: '#fbcfe8',
+        },
+        {
+            key: '웨이크메이크', label: '웨이크메이크 베이스', icon: '🌅',
+            data: mr.웨이크메이크,
+            matchKws: ['베이스', '파운데이션', '밀착', '피부표현', '커버', '지속'],
+            color: '#d97706', light: '#fffbeb', border: '#fde68a',
+        },
     ];
 
     // 실제 데이터에 있는 브랜드/제품 확인 (있는 탭만 활성)
@@ -2032,8 +2044,8 @@ function renderMarketInsightSection(list) {
             <div class="mr-insight-text">${d.검색인사이트}</div>
         </div>` : '');
 
-        // CEP 카드 그리드
-        const cepCards = (d.CEP요약 || []).map(cep => {
+        // CEP 카드 그리드 (CEP요약 또는 CEP 필드 호환)
+        const cepCards = (d.CEP요약 || d.CEP || []).map(cep => {
             const relKws = p.matchKws;
             const avgR = getAvgRoas(relKws);
             return `<div class="mr-cep-card" style="border-left-color:${p.color}">
@@ -2043,9 +2055,8 @@ function renderMarketInsightSection(list) {
             </div>`;
         }).join('');
 
-        // UGC 방향 × 성과 교차
-        const ugcCards = (d.UGC방향성 || []).map(u => {
-            // UGC 테마 관련 키워드로 성과 추정
+        // UGC 방향 × 성과 교차 (UGC방향성 또는 UGC방향 필드 호환)
+        const ugcCards = (d.UGC방향성 || d.UGC방향 || []).map(u => {
             const themeKws = (u.관련CEP || '').split(',').map(s => s.trim()).filter(Boolean);
             const matchedKws = [...p.matchKws, ...themeKws.slice(0,2)];
             const avgR = getAvgRoas(matchedKws);
@@ -2135,6 +2146,8 @@ function _mrMatchProduct(keyword) {
         { key: '탄탄크림', terms: ['탄력', '리프팅', '처짐', '탄탄', '탄크림', '하안부', '翌朝', '夜タン', '탄탄', '탄크', 'liftin', 'tightening', '눈가', '마리오네트', '페이스라인'] },
         { key: '겔미스트', terms: ['보습', '수분', '건조', '미스트', '젤리', '겔', '촉촉', '메이크업', '들뜸', '육아'] },
         { key: 'NAD크림', terms: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기', '나이트', '에너지'] },
+        { key: '컬러그램', terms: ['립틴트', '틴트', '립', '발색', '착색', '묻어남', '컬러그램', 'colorgram', 'lip', 'tint'] },
+        { key: '웨이크메이크', terms: ['베이스', '파운데이션', '피부표현', '철벽', '심리스', '밀착', '웨이크', 'wakemake', 'base', 'foundation', '커버'] },
     ];
     for (const m of maps) {
         if (m.terms.some(t => k.includes(t))) return { productKey: m.key, data: mr[m.key] };
@@ -2143,10 +2156,10 @@ function _mrMatchProduct(keyword) {
 }
 
 function _mrGetRelevantCEPs(productData, keyword) {
-    if (!productData?.CEP요약) return [];
+    const cepList = productData?.CEP요약 || productData?.CEP;
+    if (!cepList) return [];
     const k = (keyword || '').toLowerCase();
-    // CEP type/trigger 중 키워드 관련 있는 것 우선 정렬
-    const scored = productData.CEP요약.map(cep => {
+    const scored = cepList.map(cep => {
         const text = ((cep.type || '') + ' ' + (cep.트리거 || '')).toLowerCase();
         const score = k.split(/\s+/).filter(w => w.length >= 2).reduce((s, w) => s + (text.includes(w) ? 2 : 0), 0);
         return { ...cep, _score: score };
