@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>데이터 일치 검증 도구</title>
+    <!-- Vercel Speed Insights -->
+    <script>
+      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -135,7 +140,7 @@ async function runCheck() {
         html += '<div class="bg-white rounded-xl border border-slate-200 p-5 mb-5">';
         html += '<h2 class="text-lg font-bold text-slate-900 mb-3">📊 시트 원본 vs 대시보드 KPI 비교</h2>';
         html += '<table class="data-table w-full">';
-        html += '<thead><tr><th>지표</th><th class="text-right">시트 원본 (raw CSV 합계)</th><th class="text-right">대시보드 (파싱 후 합계)</th><th class="text-right">차이</th></tr></thead><tbody>';
+        html += '<thead><tr><th>지표</th><th class="text-right">시트 원본 (raw CSV 합계)</th><th class="text-right">대시보드 (파싱 후 합���)</th><th class="text-right">차이</th></tr></thead><tbody>';
         const metrics = [
             { key: 'impressions', label: '총 노출수' },
             { key: 'clicks', label: '총 클릭수' },
