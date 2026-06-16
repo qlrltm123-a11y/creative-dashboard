@@ -2008,8 +2008,15 @@ function renderMarketInsightSection(list) {
         },
     ];
 
-    // 실제 데이터에 있는 브랜드/제품 확인 (있는 탭만 활성)
-    const activeTabs = PRODUCTS;
+    // 현재 브랜드 필터에 맞는 탭만 활성화
+    const brandKey = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? currentBrand.toUpperCase() : 'ALL';
+    const BRAND_MAP = {
+        BOH: ['탄탄크림', '겔미스트', 'NAD크림'],
+        WM:  ['웨이크메이크'],
+        CG:  ['컬러그램'],
+    };
+    const allowed = BRAND_MAP[brandKey];
+    const activeTabs = allowed ? PRODUCTS.filter(p => allowed.includes(p.key)) : PRODUCTS;
 
     const tabId = 'mr-tab-' + Date.now();
 
