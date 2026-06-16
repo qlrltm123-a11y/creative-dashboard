@@ -889,6 +889,7 @@ function renderAIInsights() {
         bindInsightChartSelects();
         attachInsightHoverEvents();
         renderMarketResearchLinks(list);
+        renderMarketInsightSection(list);
     }, 100);
 }
 
@@ -1942,6 +1943,185 @@ if (typeof window.formatNumber !== 'function') {
         if (num >= 100000000) return (num / 100000000).toFixed(1) + '억';
         if (num >= 10000) return (num / 10000).toFixed(1) + '만';
         return Number(num).toLocaleString('ko-KR');
+    };
+}
+
+// ── 시장조사 × 성과 통합 인사이트 섹션 ──────────────────────────
+function renderMarketInsightSection(list) {
+    const el = document.getElementById('market-research-section');
+    if (!el) return;
+    const mr = window.MARKET_RESEARCH;
+    if (!mr) { el.style.display = 'none'; return; }
+    el.style.display = '';
+
+    // 현재 데이터에서 소구포인트별 평균ROAS 맵 생성
+    const appealRoasMap = new Map();
+    (list || []).forEach(c => {
+        if ((c.spend || 0) < currentInsightThreshold) return;
+        normalizeKeywords(c.appeal_points).forEach(kw => {
+            if (!kw || kw.startsWith('❌')) return;
+            const e = appealRoasMap.get(kw) || { sum: 0, cnt: 0 };
+            e.sum += (c.roas || 0); e.cnt++;
+            appealRoasMap.set(kw, e);
+        });
+    });
+    const getAvgRoas = (keywords) => {
+        let sum = 0, cnt = 0;
+        (keywords || []).forEach(kw => {
+            const e = appealRoasMap.get(kw);
+            if (e) { sum += e.sum; cnt += e.cnt; }
+        });
+        return cnt ? Math.round(sum / cnt * 100) : null;
+    };
+
+    // 탭별 데이터 정의
+    const PRODUCTS = [
+        {
+            key: '탄탄크림', label: '탄탄크림', icon: '🧴',
+            data: mr.탄탄크림,
+            matchKws: ['탄력', '리프팅', '하안부', '처짐', '탄탄', '翌朝', '夜タン'],
+            color: '#e11d48', light: '#fff1f2', border: '#fecdd3',
+        },
+        {
+            key: '겔미스트', label: '겔미스트', icon: '💧',
+            data: mr.겔미스트,
+            matchKws: ['보습', '수분', '건조', '미스트', '겔', '촉촉'],
+            color: '#0284c7', light: '#f0f9ff', border: '#bae6fd',
+        },
+        {
+            key: 'NAD크림', label: 'NAD크림', icon: '✨',
+            data: mr.NAD크림,
+            matchKws: ['nad', '안티에이징', '노화', '칙칙', '피로', '윤기'],
+            color: '#7c3aed', light: '#f5f3ff', border: '#ddd6fe',
+        },
+    ];
+
+    // 실제 데이터에 있는 브랜드/제품 확인 (있는 탭만 활성)
+    const activeTabs = PRODUCTS;
+
+    const tabId = 'mr-tab-' + Date.now();
+
+    const tabBtns = activeTabs.map((p, i) => {
+        const avgRoas = getAvgRoas(p.matchKws);
+        return `<button class="mr-tab-btn${i===0?' active':''}" data-tab="${p.key}"
+            style="${i===0?`border-bottom-color:${p.color};color:${p.color};`:''}"
+            onclick="window._mrSwitchTab('${tabId}','${p.key}',this,'${p.color}')">
+            ${p.icon} ${p.label}${avgRoas ? ` <span class="mr-tab-roas">ROAS ${avgRoas}%</span>` : ''}
+        </button>`;
+    }).join('');
+
+    const renderProductPanel = (p) => {
+        const d = p.data;
+        if (!d) return `<div class="mr-panel-empty">데이터 없음</div>`;
+
+        // 검색키워드 테이블 (탄탄크림만)
+        const kwTable = (d.검색키워드 && Object.keys(d.검색키워드).length) ? `
+        <div class="mr-block">
+            <div class="mr-block-title">🔍 일본 검색 키워드 트렌드 <span class="mr-block-sub">(리스닝마인드)</span></div>
+            <div class="mr-kw-table">
+                ${Object.entries(d.검색키워드).map(([kw, v]) => `
+                <div class="mr-kw-row">
+                    <span class="mr-kw-name">${kw}</span>
+                    ${v.월검색량 ? `<span class="mr-kw-vol">${v.월검색량.toLocaleString()}건/월</span>` : '<span class="mr-kw-vol mr-kw-vol-na">측정불가</span>'}
+                    <span class="mr-kw-insight">${v.인사이트}</span>
+                </div>`).join('')}
+            </div>
+        </div>` : (d.검색인사이트 ? `
+        <div class="mr-block">
+            <div class="mr-block-title">🔍 검색 인사이트 <span class="mr-block-sub">(리스닝마인드)</span></div>
+            <div class="mr-insight-text">${d.검색인사이트}</div>
+        </div>` : '');
+
+        // CEP 카드 그리드
+        const cepCards = (d.CEP요약 || []).map(cep => {
+            const relKws = p.matchKws;
+            const avgR = getAvgRoas(relKws);
+            return `<div class="mr-cep-card" style="border-left-color:${p.color}">
+                <div class="mr-cep-id" style="background:${p.color}">CEP-${cep.id}</div>
+                <div class="mr-cep-type">${cep.type}</div>
+                <div class="mr-cep-trigger">${cep.트리거}</div>
+            </div>`;
+        }).join('');
+
+        // UGC 방향 × 성과 교차
+        const ugcCards = (d.UGC방향성 || []).map(u => {
+            // UGC 테마 관련 키워드로 성과 추정
+            const themeKws = (u.관련CEP || '').split(',').map(s => s.trim()).filter(Boolean);
+            const matchedKws = [...p.matchKws, ...themeKws.slice(0,2)];
+            const avgR = getAvgRoas(matchedKws);
+            const ex = (u.UGC예시 || []).slice(0, 2);
+            return `<div class="mr-ugc-card" style="border-color:${p.border};background:${p.light}">
+                <div class="mr-ugc-top">
+                    <span class="mr-ugc-theme" style="color:${p.color}">${u.테마}</span>
+                    ${avgR ? `<span class="mr-ugc-roas">실 소재 ROAS ${avgR}%</span>` : ''}
+                </div>
+                <div class="mr-ugc-cep">${u.관련CEP || ''}</div>
+                ${u.소비자심리 ? `<div class="mr-ugc-psych">${u.소비자심리}</div>` : ''}
+                ${u.핵심메시지 ? `<div class="mr-ugc-msg">💡 ${u.핵심메시지}</div>` : ''}
+                ${ex.length ? `<div class="mr-ugc-ex">${ex.map(e=>`<div>• ${e}</div>`).join('')}</div>` : ''}
+            </div>`;
+        }).join('');
+
+        // 광고 카피 후보 (탄탄크림만)
+        const copySection = (d.광고카피후보 || []).length ? `
+        <div class="mr-block">
+            <div class="mr-block-title">✍️ 광고 카피 후보</div>
+            <div class="mr-copy-grid">
+                ${(d.광고카피후보 || []).map(c => `
+                <div class="mr-copy-card">
+                    <span class="mr-copy-badge">${c.유형}</span>
+                    <div class="mr-copy-jp">${c.jp}</div>
+                    <div class="mr-copy-kr">${c.kr}</div>
+                </div>`).join('')}
+            </div>
+        </div>` : '';
+
+        // 전략 요약 (탄탄크림)
+        const stratBanner = d.전략핵심 ? `<div class="mr-strat-banner" style="border-left-color:${p.color}">${d.전략핵심}</div>` : '';
+
+        return `
+        ${stratBanner}
+        ${kwTable}
+        ${cepCards.length ? `<div class="mr-block">
+            <div class="mr-block-title">📍 소비자 진입 시점 (CEP) <span class="mr-block-sub">— 이런 상황에서 제품을 떠올린다</span></div>
+            <div class="mr-cep-grid">${cepCards}</div>
+        </div>` : ''}
+        ${ugcCards.length ? `<div class="mr-block">
+            <div class="mr-block-title">🎬 UGC 방향 × 실 성과 교차</div>
+            <div class="mr-ugc-grid">${ugcCards}</div>
+        </div>` : ''}
+        ${copySection}`;
+    };
+
+    const panels = activeTabs.map((p, i) => `
+        <div class="mr-panel${i===0?'':' hidden'}" data-panel="${p.key}">
+            ${renderProductPanel(p)}
+        </div>`).join('');
+
+    el.innerHTML = `
+        <div class="mr-section-header">
+            <span><i class="fas fa-magnifying-glass-chart mr-1 text-violet-500"></i>시장조사 × 성과 데이터 통합 인사이트</span>
+            <span class="mr-section-sub">리스닝마인드 CEP·UGC × 실 광고 ROAS 교차 분석</span>
+        </div>
+        <div class="mr-tabs" id="${tabId}">${tabBtns}</div>
+        <div class="mr-panels">${panels}</div>`;
+
+    window._mrSwitchTab = function(tabId, key, btn, color) {
+        const wrap = document.getElementById(tabId);
+        if (!wrap) return;
+        wrap.querySelectorAll('.mr-tab-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.borderBottomColor = '';
+            b.style.color = '';
+        });
+        btn.classList.add('active');
+        btn.style.borderBottomColor = color;
+        btn.style.color = color;
+        const panelWrap = wrap.closest('.chart-card').querySelector('.mr-panels');
+        if (!panelWrap) return;
+        panelWrap.querySelectorAll('.mr-panel').forEach(p => p.classList.add('hidden'));
+        const target = panelWrap.querySelector(`[data-panel="${key}"]`);
+        if (target) target.classList.remove('hidden');
     };
 }
 

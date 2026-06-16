@@ -7243,6 +7243,107 @@ img.mw-cr-thumb {
 }
 .mr-link-btn:hover { opacity: 0.85; }
 
+/* ── 시장조사 × 성과 통합 인사이트 섹션 ── */
+.mr-section-header {
+    font-size:14px; font-weight:700; color:#1e293b;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:14px;
+}
+.mr-section-sub { font-size:11px; font-weight:400; color:#94a3b8; }
+.mr-tabs {
+    display:flex; gap:0; border-bottom:2px solid #e2e8f0; margin-bottom:18px; flex-wrap:wrap;
+}
+.mr-tab-btn {
+    padding:8px 18px; font-size:13px; font-weight:600; color:#64748b;
+    background:none; border:none; border-bottom:3px solid transparent;
+    cursor:pointer; margin-bottom:-2px; transition:color .15s,border-color .15s;
+    display:flex; align-items:center; gap:6px;
+}
+.mr-tab-btn.active { font-weight:700; }
+.mr-tab-btn:hover { color:#334155; }
+.mr-tab-roas {
+    font-size:10px; font-weight:600; color:#059669;
+    background:#d1fae5; border-radius:4px; padding:1px 6px;
+}
+.mr-panel.hidden { display:none; }
+.mr-strat-banner {
+    background:#f8fafc; border-left:4px solid #e11d48;
+    border-radius:0 8px 8px 0; padding:10px 14px;
+    font-size:13px; font-weight:600; color:#1e293b;
+    margin-bottom:16px; line-height:1.6;
+}
+.mr-block { margin-bottom:20px; }
+.mr-block-title {
+    font-size:13px; font-weight:700; color:#334155;
+    margin-bottom:10px; display:flex; align-items:center; gap:6px;
+}
+.mr-block-sub { font-size:11px; font-weight:400; color:#94a3b8; }
+/* 검색 키워드 테이블 */
+.mr-kw-table { display:flex; flex-direction:column; gap:6px; }
+.mr-kw-row {
+    display:grid; grid-template-columns:220px 90px 1fr; gap:10px; align-items:start;
+    padding:8px 10px; background:#f8fafc; border-radius:8px; font-size:12px;
+}
+.mr-kw-name { font-weight:700; color:#1e293b; }
+.mr-kw-vol { font-weight:700; color:#0284c7; white-space:nowrap; }
+.mr-kw-vol-na { color:#94a3b8; font-weight:400; }
+.mr-kw-insight { color:#475569; line-height:1.5; }
+.mr-insight-text {
+    font-size:12px; color:#475569; background:#f8fafc;
+    border-radius:8px; padding:12px 14px; line-height:1.7;
+}
+/* CEP 카드 그리드 */
+.mr-cep-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px;
+}
+.mr-cep-card {
+    background:#fff; border:1px solid #e2e8f0; border-left:3px solid #e11d48;
+    border-radius:8px; padding:10px 12px;
+}
+.mr-cep-id {
+    display:inline-block; font-size:10px; font-weight:700; color:#fff;
+    border-radius:4px; padding:2px 7px; margin-bottom:5px;
+}
+.mr-cep-type { font-size:12px; font-weight:700; color:#1e293b; margin-bottom:4px; }
+.mr-cep-trigger { font-size:11px; color:#64748b; line-height:1.5; }
+/* UGC 방향 카드 */
+.mr-ugc-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px;
+}
+.mr-ugc-card {
+    border:1px solid #e9d5ff; border-radius:10px; padding:12px 14px;
+    display:flex; flex-direction:column; gap:6px;
+}
+.mr-ugc-top { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.mr-ugc-theme { font-size:13px; font-weight:700; }
+.mr-ugc-roas {
+    font-size:10px; font-weight:700; color:#059669;
+    background:#d1fae5; border-radius:4px; padding:2px 7px; white-space:nowrap;
+}
+.mr-ugc-cep { font-size:10px; color:#94a3b8; }
+.mr-ugc-psych { font-size:11px; color:#475569; line-height:1.5; }
+.mr-ugc-msg {
+    font-size:11px; font-weight:600; color:#1e293b;
+    background:#fff; border-radius:6px; padding:5px 8px;
+}
+.mr-ugc-ex {
+    font-size:11px; color:#7c3aed; font-style:italic; line-height:1.6;
+}
+/* 광고 카피 후보 */
+.mr-copy-grid {
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px;
+}
+.mr-copy-card {
+    background:#fff8f1; border:1px solid #fed7aa; border-radius:8px; padding:10px 12px;
+    display:flex; flex-direction:column; gap:5px;
+}
+.mr-copy-badge {
+    font-size:10px; font-weight:700; color:#c2410c;
+    background:#ffedd5; border-radius:4px; padding:2px 7px; width:fit-content;
+}
+.mr-copy-jp { font-size:12px; font-weight:600; color:#1e293b; line-height:1.6; }
+.mr-copy-kr { font-size:11px; color:#64748b; }
+.mr-panel-empty { font-size:13px; color:#94a3b8; padding:20px; text-align:center; }
+
 .kw-search-vbadge {
     position: absolute;
     top: 50%;
