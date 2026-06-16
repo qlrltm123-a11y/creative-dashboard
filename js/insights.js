@@ -2035,12 +2035,31 @@ function renderMarketResearchLinks(list) {
         });
     });
 
-    // 제품 필터 활성 시 허용 MR키 계산 (CSV product명 → MR키 직접 매핑)
-    const activeAiProducts = (typeof aiProducts !== 'undefined' && Array.isArray(aiProducts)) ? aiProducts : [];
+    // 브랜드 필터 기반 허용 MR키 (브랜드탭 우선 적용)
+    const BRAND_MR_KEYS = {
+        BOH: ['탄탄크림', '겔미스트', 'NAD크림'],
+        WM:  ['웨이크메이크'],
+        CG:  ['컬러그램'],
+    };
+    const activeBrand = (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL')
+        ? currentBrand.toUpperCase() : null;
     const allowedMRKeys = new Set();
+    if (activeBrand && BRAND_MR_KEYS[activeBrand]) {
+        BRAND_MR_KEYS[activeBrand].forEach(k => allowedMRKeys.add(k));
+    }
+
+    // 제품 필터까지 활성이면 추가 좁히기 (CSV product명 → MR키 직접 매핑)
+    const activeAiProducts = (typeof aiProducts !== 'undefined' && Array.isArray(aiProducts)) ? aiProducts : [];
     if (activeAiProducts.length) {
         const listProds = [...new Set(validList.map(c => (c.product || '').trim()).filter(Boolean))];
-        listProds.forEach(p => { const k = _csvProductToMRKey(p); if (k) allowedMRKeys.add(k); });
+        const prodKeys = new Set(listProds.map(p => _csvProductToMRKey(p)).filter(Boolean));
+        if (prodKeys.size === 0) { container.style.display = 'none'; return; }
+        // 브랜드 허용 키와 교집합
+        if (allowedMRKeys.size) {
+            [...allowedMRKeys].forEach(k => { if (!prodKeys.has(k)) allowedMRKeys.delete(k); });
+        } else {
+            prodKeys.forEach(k => allowedMRKeys.add(k));
+        }
         if (allowedMRKeys.size === 0) { container.style.display = 'none'; return; }
     }
 
