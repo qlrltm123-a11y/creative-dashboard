@@ -18,31 +18,6 @@
     <!-- FontAwesome: 비동기 로딩으로 렌더 블로킹 제거 -->
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
-    <!-- ⚡ INP 개선: Tailwind MutationObserver 디바운스 패치 (Tailwind CDN보다 먼저 실행) -->
-    <script>
-    (function() {
-        var OrigMO = window.MutationObserver;
-        window.MutationObserver = function MutationObserverDebounced(callback) {
-            var self = this;
-            var timer = null;
-            var pending = [];
-            var flush = function() {
-                var recs = pending.splice(0);
-                if (recs.length) callback(recs, self._inst);
-            };
-            var wrapped = function(records) {
-                for (var i = 0; i < records.length; i++) pending.push(records[i]);
-                clearTimeout(timer);
-                timer = setTimeout(flush, 80);
-            };
-            self._inst = new OrigMO(wrapped);
-            self.observe   = function(t, o) { self._inst.observe(t, o); };
-            self.disconnect = function()    { self._inst.disconnect(); clearTimeout(timer); };
-            self.takeRecords = function()   { return self._inst.takeRecords(); };
-        };
-        window.MutationObserver.prototype = Object.create(OrigMO.prototype);
-    })();
-    </script>
     <!-- Tailwind: async로 파싱 블로킹 제거 -->
     <script async src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
