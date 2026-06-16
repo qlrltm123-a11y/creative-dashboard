@@ -214,7 +214,7 @@ function bindEvents() {
             if (window._aiMsProduct)    window._aiMsProduct.setSelected([]);
             if (window._aiMsCampaign)   window._aiMsCampaign.setSelected([]);
             invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     });
 
@@ -248,7 +248,7 @@ function bindEvents() {
             if (platformSel) platformSel.value = '';
             populateRetailOptions();
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
 
@@ -278,7 +278,7 @@ function bindEvents() {
             if (retailSel) retailSel.value = '';
             populatePlatformOptions();
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
 
@@ -303,7 +303,7 @@ function bindEvents() {
             currentEvent = '';
             if (eventSel) eventSel.value = '';
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
 
@@ -335,7 +335,7 @@ function bindEvents() {
             dateResetBtn.classList.remove('visible');
             if (dateRangeWrap) dateRangeWrap.classList.remove('active');
             invalidatePerformancePoolCache();
-            updateDashboard();
+            debouncedUpdateDashboard();
         });
     }
 

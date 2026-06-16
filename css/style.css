@@ -2,6 +2,56 @@
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
+/* ============================
+   ⚡ CLS 방지: 동적 콘텐츠 영역 최소 높이 예약
+   레이아웃 이동(CLS 0.81)을 줄이기 위해 주요 섹션에 공간 확보
+   ============================ */
+#kpi-section {
+    min-height: 120px;
+}
+#winning-elements-content {
+    min-height: 200px;
+}
+#appeal-insight-content {
+    min-height: 300px;
+    contain: layout;
+}
+#ai-insights-section {
+    min-height: 400px;
+}
+#mr-links-section,
+#market-research-section {
+    contain: layout;
+}
+/* 차트 캔버스 컨테이너: 높이 미리 잡아 CLS 방지 */
+.chart-card canvas {
+    display: block;
+}
+.chart-wrapper,
+[id$="-chart"] {
+    contain: layout style;
+}
+
+/* ============================
+   ⚡ content-visibility: 화면 밖 섹션 렌더링 지연 (LCP/FCP 개선)
+   ============================ */
+#ai-insights-section,
+#mr-links-section,
+#market-research-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+}
+
+/* 이미지 비율 고정으로 CLS 방지 */
+.creative-thumb,
+.gallery-card img,
+.ugc-card img,
+.ref-img-thumb img {
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    width: 100%;
+}
+
 /* ★ 성과 분석 탭 공통 선정 기준 배지 (모든 컨텐츠 통일) */
 .perf-criteria-badge {
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
