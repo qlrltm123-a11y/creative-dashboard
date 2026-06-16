@@ -2157,6 +2157,17 @@ function _mrMatchProduct(keyword) {
     return null;
 }
 
+// CSV product 컬럼 값 → 시장조사 제품키 직접 매핑 (제품 필터 연동용)
+function _csvProductToMRKey(productName) {
+    const n = (productName || '').toLowerCase().replace(/[-_\s]/g, '');
+    if (/gelmist|겔미스트/.test(n)) return '겔미스트';
+    if (/nadcream|nad크림/.test(n) || /\bnad\b/.test((productName||'').toLowerCase())) return 'NAD크림';
+    if (/collagencream|탄탄크림|asachuru|tankream/.test(n)) return '탄탄크림';
+    if (/colorgram|컬러그램|liptint/.test(n)) return '컬러그램';
+    if (/wakemake|웨이크메이크/.test(n)) return '웨이크메이크';
+    return null;
+}
+
 function _mrGetRelevantCEPs(productData, keyword) {
     const cepList = productData?.CEP요약 || productData?.CEP;
     if (!cepList) return [];
@@ -2212,6 +2223,15 @@ function renderMarketResearchLinks(list) {
         });
     });
 
+    // 제품 필터 활성 시 허용 MR키 계산 (CSV product명 → MR키 직접 매핑)
+    const activeAiProducts = (typeof aiProducts !== 'undefined' && Array.isArray(aiProducts)) ? aiProducts : [];
+    const allowedMRKeys = new Set();
+    if (activeAiProducts.length) {
+        const listProds = [...new Set(validList.map(c => (c.product || '').trim()).filter(Boolean))];
+        listProds.forEach(p => { const k = _csvProductToMRKey(p); if (k) allowedMRKeys.add(k); });
+        if (allowedMRKeys.size === 0) { container.style.display = 'none'; return; }
+    }
+
     // 제품별 집계 통계
     const productCards = [...productGroups.values()].map(g => {
         const creatives = [...g.creativeMap.values()].sort((a, b) => b.roas - a.roas);
@@ -2222,7 +2242,9 @@ function renderMarketResearchLinks(list) {
         const maxRoas = Math.max(...roasList);
         const topKws = g.keywords.sort((a, b) => b.avgRoas - a.avgRoas).slice(0, 5);
         return { productKey: g.productKey, match: g.match, creatives: creatives.slice(0, 8), avgRoas, minRoas, maxRoas, topKws };
-    }).filter(Boolean).sort((a, b) => b.avgRoas - a.avgRoas).slice(0, 5);
+    }).filter(Boolean)
+      .filter(g => !allowedMRKeys.size || allowedMRKeys.has(g.productKey))
+      .sort((a, b) => b.avgRoas - a.avgRoas).slice(0, 5);
 
     if (!productCards.length) { container.style.display = 'none'; return; }
     container.style.display = '';
