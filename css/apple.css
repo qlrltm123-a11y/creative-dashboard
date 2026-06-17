@@ -1,0 +1,1180 @@
+/* ============================================================
+   Apple Design System Override
+   DESIGN-apple.md 토큰 기반 — style.css 위에 로드
+   ============================================================ */
+
+/* ── 0. 폰트 & 전역 ── */
+*, *::before, *::after {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif !important;
+}
+
+body {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  color: #1d1d1f !important;
+}
+
+/* ── 1. 글로벌 내비 (Header) ── */
+header {
+  background: #000000 !important;
+  border-bottom: none !important;
+  height: 44px !important;
+  padding: 0 !important;
+}
+
+header > div {
+  height: 44px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center !important;
+}
+
+/* 로고 영역 */
+header .w-10 {
+  background: transparent !important;
+  background-image: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 0 !important;
+}
+
+header .w-10 i {
+  color: #ffffff !important;
+  font-size: 14px !important;
+}
+
+header h1 {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  letter-spacing: -0.12px !important;
+  line-height: 1 !important;
+}
+
+header p {
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 11px !important;
+}
+
+#data-source, #last-updated {
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+}
+
+header .text-xs.text-slate-500 {
+  color: rgba(255,255,255,0.45) !important;
+  font-size: 10px !important;
+}
+
+header .border-l {
+  border-color: rgba(255,255,255,0.15) !important;
+}
+
+/* 헤더 버튼들 */
+header button {
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.12px !important;
+  box-shadow: none !important;
+  padding: 4px 8px !important;
+}
+
+header button:hover {
+  color: #ffffff !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+#btn-refresh {
+  background: #0066cc !important;
+  color: #ffffff !important;
+  border-radius: 9999px !important;
+  padding: 6px 14px !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+#btn-refresh:hover {
+  background: #0077ed !important;
+}
+
+#btn-sheet-config {
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  border-radius: 6px !important;
+  padding: 4px 10px !important;
+}
+
+/* 환율 입력 */
+#fx-rate-input {
+  background: rgba(255,255,255,0.1) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  border-radius: 6px !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+}
+
+#btn-apply-fx {
+  background: rgba(255,255,255,0.15) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  color: #ffffff !important;
+}
+
+/* 용어 버튼 */
+header button[title="마케팅 용어 쉬운 설명"] {
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  border-radius: 6px !important;
+}
+
+/* ── 2. 브랜드 탭 → 필 칩 ── */
+#brand-tabs {
+  background: #ffffff;
+  padding: 12px 24px;
+  border-bottom: 0.5px solid #e0e0e0;
+  margin-bottom: 0 !important;
+}
+
+.brand-tab {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 1px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #1d1d1f !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  padding: 7px 16px !important;
+  box-shadow: none !important;
+  transition: all 0.15s !important;
+}
+
+.brand-tab:hover {
+  border-color: #999 !important;
+  color: #1d1d1f !important;
+  transform: none !important;
+}
+
+.brand-tab.active {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-color: #0066cc !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.brand-dot {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+/* 날짜 필터 */
+.date-range-filter {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+}
+
+.date-range-filter:focus-within {
+  border-color: #0066cc !important;
+  box-shadow: 0 0 0 2px rgba(0,102,204,0.15) !important;
+}
+
+.date-range-input {
+  color: #1d1d1f !important;
+  font-size: 12px !important;
+}
+
+.retail-divider { background: #d2d2d7 !important; }
+
+/* ── 3. 섹션 탭 내비 ── */
+.section-tabs {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  padding: 6px 8px !important;
+  margin-bottom: 0 !important;
+}
+
+.tab-group {
+  border-right-color: #e0e0e0 !important;
+  gap: 4px !important;
+}
+
+.group-label {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #6e6e73 !important;
+  letter-spacing: 0.3px !important;
+}
+
+.section-tab {
+  border-radius: 11px !important;
+  padding: 10px 14px !important;
+  transition: background 0.15s !important;
+}
+
+.section-tab i {
+  color: #6e6e73 !important;
+  font-size: 15px !important;
+}
+
+.section-tab .label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.12px !important;
+}
+
+.section-tab .sub {
+  font-size: 11px !important;
+  color: #6e6e73 !important;
+  font-weight: 400 !important;
+}
+
+.section-tab:hover {
+  background: #f5f5f7 !important;
+}
+
+.section-tab.active {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  border-color: #d2d2d7 !important;
+  box-shadow: none !important;
+}
+
+.section-tab.active i { color: #0066cc !important; }
+.section-tab.active .label { color: #0066cc !important; }
+.section-tab.active .sub { color: #6e6e73 !important; }
+
+.section-tab.active::after {
+  background: #0066cc !important;
+  background-image: none !important;
+  height: 2px !important;
+  border-radius: 1px !important;
+}
+
+/* ── 4. KPI 카드 ── */
+.kpi-card {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  padding: 20px !important;
+}
+
+.kpi-card:hover {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.kpi-highlight {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-color: #0066cc !important;
+}
+
+.kpi-label {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: #6e6e73 !important;
+  letter-spacing: -0.12px !important;
+}
+
+.kpi-highlight .kpi-label { color: rgba(255,255,255,0.75) !important; }
+
+.kpi-value {
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.374px !important;
+}
+
+.kpi-highlight .kpi-value { color: #ffffff !important; }
+
+.kpi-trend { font-size: 11px !important; }
+
+.kpi-currency-amount {
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.374px !important;
+}
+
+.kpi-highlight .kpi-currency-amount { color: #ffffff !important; }
+.kpi-highlight .kpi-currency-symbol { color: rgba(255,255,255,0.7) !important; }
+.kpi-highlight .kpi-currency-sub { color: rgba(255,255,255,0.7) !important; }
+
+.kpi-currency-symbol {
+  color: #6e6e73 !important;
+  font-weight: 400 !important;
+}
+
+.kpi-currency-sub { color: #6e6e73 !important; }
+
+/* ── 5. 차트 카드 ── */
+.chart-card {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+  padding: 24px !important;
+}
+
+.chart-title {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.374px !important;
+}
+
+.chart-title i {
+  color: #0066cc !important;
+}
+
+/* ── 6. 필터 섹션 바 ── */
+.section-filter-bar > div {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  padding: 10px 20px !important;
+}
+
+/* 필터 내 작은 아이콘 뱃지 */
+.section-filter-bar .inline-flex.items-center.justify-center.w-7 {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 8px !important;
+}
+
+.section-filter-bar .text-sm.font-bold { color: #1d1d1f !important; }
+
+/* 필터 초기화 버튼 */
+#performance-filter-reset,
+#ai-filter-reset {
+  color: #0066cc !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+#performance-filter-reset:hover,
+#ai-filter-reset:hover {
+  background: #f5f5f7 !important;
+  color: #0066cc !important;
+}
+
+/* ── 7. select / filter 공통 ── */
+.filter-select,
+select.filter-select,
+.platform-filter-select,
+.wr-select,
+.wr-date-input,
+.insight-chart-metric-sel {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #1d1d1f !important;
+  font-size: 12px !important;
+  padding: 6px 14px !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+.filter-select:focus,
+.insight-chart-metric-sel:focus {
+  outline: none !important;
+  border-color: #0066cc !important;
+  box-shadow: 0 0 0 2px rgba(0,102,204,0.15) !important;
+}
+
+/* ── 8. 소재(Creative) 카드 ── */
+.creative-card {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.creative-card:hover {
+  border-color: #d2d2d7 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.creative-name {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.12px !important;
+}
+
+.meta-chip {
+  background: #f5f5f7 !important;
+  color: #6e6e73 !important;
+  border-radius: 9999px !important;
+  font-size: 10px !important;
+}
+
+.meta-chip.platform {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+}
+
+.stat-value { color: #1d1d1f !important; }
+.stat-value.good { color: #1d9e75 !important; }
+.stat-value.warn { color: #ba7517 !important; }
+.stat-value.bad  { color: #d85a30 !important; }
+
+/* 브랜드 뱃지 */
+.brand-badge.BOH { background: #1d1d1f !important; }
+.brand-badge.WM  { background: #3b6d11 !important; }
+.brand-badge.CG  { background: #854f0b !important; }
+
+/* 미디어 뱃지 */
+.media-badge {
+  background: rgba(0,0,0,0.75) !important;
+  border-radius: 6px !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* ── 9. 성공 패턴 카드 (AI 인사이트) ── */
+.pattern-card {
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.pattern-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.pattern-purple {
+  background: #1d1d1f !important;
+  background-image: none !important;
+}
+
+.pattern-cyan {
+  background: #272729 !important;
+  background-image: none !important;
+}
+
+.pattern-rose {
+  background: #2a2a2c !important;
+  background-image: none !important;
+}
+
+.pattern-icon {
+  background: rgba(255,255,255,0.12) !important;
+  border-radius: 8px !important;
+}
+
+.pattern-recommend {
+  background: rgba(255,255,255,0.1) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* ── 10. 메시지 행 ── */
+.message-row {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.message-row:hover {
+  border-color: #d2d2d7 !important;
+  transform: none !important;
+}
+
+.message-rank { color: #0066cc !important; }
+
+.appeal-chip {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 9999px !important;
+}
+
+.stat-pill {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 9999px !important;
+}
+
+.stat-pill b { color: #1d1d1f !important; }
+.stat-pill span { color: #6e6e73 !important; }
+
+/* ── 11. 랭크 행 (BEST/WORST) ── */
+.rank-row {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.rank-row-best:hover {
+  border-color: #1d9e75 !important;
+  background: #f5f5f7 !important;
+  transform: none !important;
+}
+
+.rank-row-worst:hover {
+  border-color: #d85a30 !important;
+  background: #f5f5f7 !important;
+  transform: none !important;
+}
+
+.rank-row-best .rank-medal  { color: #1d9e75 !important; }
+.rank-row-worst .rank-medal { color: #d85a30 !important; }
+.rank-row-best .rank-value  { color: #1d9e75 !important; }
+.rank-row-worst .rank-value { color: #d85a30 !important; }
+
+.rank-name { color: #1d1d1f !important; font-weight: 600 !important; }
+.rank-meta { color: #6e6e73 !important; }
+
+.rank-appeal-chip {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 9999px !important;
+  background-image: none !important;
+}
+
+.rank-row-worst .rank-appeal-chip {
+  background: rgba(216,90,48,0.08) !important;
+  color: #d85a30 !important;
+}
+
+.rank-agg-badge {
+  background: #f5f5f7 !important;
+  color: #6e6e73 !important;
+  border-color: #e0e0e0 !important;
+  border-radius: 9999px !important;
+}
+
+/* 랭크 코멘트 */
+.rank-comment {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  border-color: #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.rank-row-best .rank-comment.expanded {
+  background: #f5f5f7 !important;
+  border-color: #d2d2d7 !important;
+}
+
+.rank-row-worst .rank-comment.expanded {
+  background: #f5f5f7 !important;
+  border-color: #d2d2d7 !important;
+}
+
+.rank-comment-toggle {
+  background: #ffffff !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #6e6e73 !important;
+}
+
+.rank-row-best .rank-comment-toggle {
+  border-color: #d2d2d7 !important;
+  color: #1d9e75 !important;
+  background: #ffffff !important;
+}
+
+.rank-row-worst .rank-comment-toggle {
+  border-color: #d2d2d7 !important;
+  color: #d85a30 !important;
+  background: #ffffff !important;
+}
+
+.rank-comment-toggle:hover {
+  background: #f5f5f7 !important;
+  border-color: #999 !important;
+}
+
+/* ── 12. 제품 KPI 카드 ── */
+.product-kpi-card,
+.product-kpi-card-compact {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.product-kpi-card:hover,
+.product-kpi-card-compact:hover {
+  border-color: #d2d2d7 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.product-kpi-title { color: #1d1d1f !important; }
+.product-kpi-title i { color: #0066cc !important; }
+.product-kpi-count { background: #f5f5f7 !important; color: #6e6e73 !important; border-radius: 9999px !important; }
+
+.product-kpi-header { border-bottom-color: #e0e0e0 !important; }
+
+.product-kpi-spend,
+.product-kpi-roas {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.product-kpi-spend .value,
+.product-kpi-roas .value {
+  color: #1d1d1f !important;
+  font-weight: 600 !important;
+}
+
+.product-kpi-roas.roas-good {
+  background: rgba(29,158,117,0.08) !important;
+  background-image: none !important;
+  border-color: rgba(29,158,117,0.3) !important;
+}
+.product-kpi-roas.roas-good .value { color: #0f6e56 !important; }
+
+.product-kpi-roas.roas-warn {
+  background: rgba(186,117,23,0.08) !important;
+  background-image: none !important;
+  border-color: rgba(186,117,23,0.3) !important;
+}
+.product-kpi-roas.roas-warn .value { color: #854f0b !important; }
+
+.product-kpi-roas.roas-bad {
+  background: rgba(216,90,48,0.08) !important;
+  background-image: none !important;
+  border-color: rgba(216,90,48,0.3) !important;
+}
+.product-kpi-roas.roas-bad .value { color: #993c1d !important; }
+
+/* pkc */
+.pkc-title { color: #1d1d1f !important; }
+.pkc-title i { color: #0066cc !important; }
+.pkc-count { background: #f5f5f7 !important; color: #6e6e73 !important; border-radius: 9999px !important; }
+
+/* ── 13. ROAS 랭킹 바 ── */
+.roas-rank-row { border-bottom-color: #e0e0e0 !important; }
+.roas-rank-no { background: #f5f5f7 !important; color: #6e6e73 !important; }
+.roas-rank-name { color: #1d1d1f !important; }
+.roas-rank-bar-wrap { background: #f5f5f7 !important; }
+
+.roas-rank-bar-good { background: #1d9e75 !important; background-image: none !important; }
+.roas-rank-bar-warn { background: #ba7517 !important; background-image: none !important; }
+.roas-rank-bar-bad  { background: #d85a30 !important; background-image: none !important; }
+
+.roas-rank-share {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 9999px !important;
+}
+.roas-rank-spend { color: #6e6e73 !important; }
+
+/* ── 14. 모달 ── */
+.modal-overlay {
+  background: rgba(0,0,0,0.55) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.modal-container {
+  background: #ffffff !important;
+  border-radius: 18px !important;
+  box-shadow: rgba(0,0,0,0.22) 3px 5px 30px 0px !important;
+}
+
+.modal-close {
+  background: rgba(255,255,255,0.9) !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 50% !important;
+}
+
+.modal-close:hover {
+  background: #f5f5f7 !important;
+  transform: rotate(90deg) !important;
+}
+
+.modal-media { background: #1d1d1f !important; border-radius: 18px 0 0 18px !important; }
+
+.modal-info h2 { color: #1d1d1f !important; font-weight: 600 !important; letter-spacing: -0.374px !important; }
+.modal-info .subtitle { color: #6e6e73 !important; }
+
+.tag {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 9999px !important;
+}
+
+.modal-desc {
+  background: #f5f5f7 !important;
+  border-radius: 12px !important;
+}
+
+.metric-box {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.metric-box .label { color: #6e6e73 !important; }
+.metric-box .value { color: #1d1d1f !important; font-weight: 600 !important; }
+
+.metric-box.highlight {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-color: #0066cc !important;
+}
+
+.metric-box.highlight .label,
+.metric-box.highlight .value { color: #ffffff !important; }
+
+/* ATC 섹션 */
+.modal-atc-section {
+  background: rgba(29,158,117,0.06) !important;
+  background-image: none !important;
+  border-color: rgba(29,158,117,0.3) !important;
+  border-radius: 12px !important;
+}
+
+.modal-atc-header { color: #0f6e56 !important; }
+
+/* AI 섹션 */
+.modal-ai-section {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+}
+
+.modal-ai-header { color: #0066cc !important; }
+.modal-video-analyze-btn {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 9999px !important;
+}
+
+.modal-message-box {
+  background: #ffffff !important;
+  border-left-color: #0066cc !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.ai-chip.purple { background: rgba(0,102,204,0.08) !important; color: #0066cc !important; }
+.ai-chip.cyan   { background: rgba(29,158,117,0.08) !important; color: #0f6e56 !important; }
+.ai-chip.rose   { background: rgba(216,90,48,0.08) !important; color: #d85a30 !important; }
+
+/* ── 15. 워드 클라우드 ── */
+.word-item:hover { transform: scale(1.1) !important; }
+
+/* ── 16. 위닝 요소 섹션 헤더 ── */
+section h2.text-lg,
+.section-panel h2.text-lg {
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.374px !important;
+}
+
+/* 위닝 요소 아이콘 뱃지 */
+.inline-flex.items-center.justify-center.w-8.rounded-lg {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 8px !important;
+}
+
+/* ── 17. 성과 기준 배지 ── */
+.perf-criteria-badge {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+.perf-criteria-main { color: #1d1d1f !important; }
+.perf-criteria-main b { color: #1d1d1f !important; }
+.perf-criteria-main > i.fas { color: #0066cc !important; }
+.perf-criteria-divider { color: #d2d2d7 !important; }
+.perf-criteria-sub { color: #6e6e73 !important; border-top-color: #e0e0e0 !important; }
+
+/* ── 18. BEST/WORST 섹션 컨테이너 ── */
+.bg-white.rounded-xl.border-2.border-emerald-200 {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.bg-white.rounded-xl.border-2.border-red-200 {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+/* BEST 타이틀 아이콘 */
+.bg-gradient-to-br.from-emerald-500.to-green-600 {
+  background: #1d9e75 !important;
+  background-image: none !important;
+  border-radius: 8px !important;
+}
+
+.bg-gradient-to-br.from-red-500.to-rose-600 {
+  background: #d85a30 !important;
+  background-image: none !important;
+  border-radius: 8px !important;
+}
+
+.bg-gradient-to-br.from-amber-400.to-orange-500 {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 8px !important;
+}
+
+.bg-gradient-to-br.from-indigo-500.to-purple-600 {
+  background: #0066cc !important;
+  background-image: none !important;
+}
+
+.bg-gradient-to-br.from-purple-500.to-pink-500 {
+  background: #272729 !important;
+  background-image: none !important;
+}
+
+.bg-gradient-to-br.from-indigo-500.to-purple-600.text-white,
+.bg-gradient-to-br.from-purple-500.to-pink-500.text-white {
+  color: #ffffff !important;
+}
+
+/* ── 19. 섹션 필터 바 내 배지 ── */
+.bg-gradient-to-r.from-indigo-50.to-purple-50,
+.bg-gradient-to-r.from-purple-50.to-pink-50 {
+  background: #ffffff !important;
+  background-image: none !important;
+}
+
+/* 인디고 버튼들 → 애플 블루 */
+.bg-indigo-500,
+.bg-indigo-600 {
+  background-color: #0066cc !important;
+  background-image: none !important;
+}
+
+.hover\:bg-indigo-700:hover { background-color: #0077ed !important; }
+
+/* 인디고 텍스트 → 애플 블루 */
+.text-indigo-500,
+.text-indigo-600,
+.text-indigo-700 {
+  color: #0066cc !important;
+}
+
+/* 퍼플 계열 */
+.text-purple-500,
+.text-purple-600,
+.text-purple-700 { color: #0066cc !important; }
+
+.bg-purple-500 { background-color: #0066cc !important; background-image: none !important; }
+
+/* emerald 성공 */
+.text-emerald-600 { color: #1d9e75 !important; }
+.bg-emerald-600   { background-color: #1d9e75 !important; background-image: none !important; }
+.text-emerald-500 { color: #1d9e75 !important; }
+
+/* amber */
+.text-amber-500 { color: #ba7517 !important; }
+.bg-amber-500   { background-color: #ba7517 !important; background-image: none !important; }
+
+/* rose */
+.text-rose-500 { color: #d85a30 !important; }
+.bg-rose-500   { background-color: #d85a30 !important; background-image: none !important; }
+
+/* ── 20. AI 챗봇 ── */
+.ac-fab {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 50% !important;
+  box-shadow: rgba(0,0,0,0.22) 0px 4px 20px !important;
+}
+
+.ac-panel {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: rgba(0,0,0,0.12) 0px 8px 32px !important;
+}
+
+.ac-header {
+  background: #1d1d1f !important;
+  background-image: none !important;
+  border-radius: 18px 18px 0 0 !important;
+  border-bottom: none !important;
+}
+
+.ac-title { color: #ffffff !important; font-weight: 600 !important; letter-spacing: -0.12px !important; }
+
+.ac-icon-btn {
+  color: rgba(255,255,255,0.7) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.ac-icon-btn:hover { color: #ffffff !important; }
+
+.ac-messages { background: #f5f5f7 !important; }
+
+.ac-welcome-icon { font-size: 28px !important; }
+.ac-welcome-title { color: #1d1d1f !important; font-weight: 600 !important; }
+.ac-welcome-sub { color: #6e6e73 !important; }
+
+.ac-chip {
+  background: #ffffff !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #0066cc !important;
+  font-size: 12px !important;
+}
+
+.ac-chip:hover {
+  background: #f5f5f7 !important;
+  border-color: #0066cc !important;
+}
+
+.ac-input-bar {
+  background: #ffffff !important;
+  border-top: 0.5px solid #e0e0e0 !important;
+  border-radius: 0 0 18px 18px !important;
+}
+
+.ac-input {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #1d1d1f !important;
+  font-size: 14px !important;
+  padding: 8px 16px !important;
+}
+
+.ac-send {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 50% !important;
+  color: #ffffff !important;
+}
+
+/* ── 21. 시트 연동 모달 ── */
+.bg-emerald-50.border-emerald-200 {
+  background: rgba(29,158,117,0.06) !important;
+  background-image: none !important;
+  border-color: rgba(29,158,117,0.25) !important;
+  border-radius: 12px !important;
+}
+
+.bg-amber-50.border-amber-200 {
+  background: rgba(186,117,23,0.06) !important;
+  background-image: none !important;
+  border-color: rgba(186,117,23,0.25) !important;
+  border-radius: 12px !important;
+}
+
+.bg-blue-50.border-blue-200 {
+  background: rgba(0,102,204,0.06) !important;
+  background-image: none !important;
+  border-color: rgba(0,102,204,0.2) !important;
+  border-radius: 12px !important;
+}
+
+#btn-connect-sheet {
+  background: #0066cc !important;
+  background-image: none !important;
+  border-radius: 9999px !important;
+}
+
+#btn-connect-sheet:hover { background: #0077ed !important; }
+
+#btn-disconnect-sheet {
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: #6e6e73 !important;
+}
+
+/* ── 22. 주간 보고서 필터 ── */
+.wr-filter-bar {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+}
+
+.wr-filter-label { color: #6e6e73 !important; }
+
+.wr-quick-btn {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  color: #0066cc !important;
+  font-size: 12px !important;
+}
+
+.wr-quick-btn:hover { background: #e8e8ed !important; }
+.wr-quick-btn-reset { color: #6e6e73 !important; }
+
+.wr-body {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+}
+
+/* ── 23. 플랫폼 필터 ── */
+.platform-filter-wrap {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+}
+
+.platform-filter-label { color: #6e6e73 !important; }
+.platform-filter-label i { color: #0066cc !important; }
+.platform-filter-reset:hover { border-color: #d85a30 !important; color: #d85a30 !important; background: rgba(216,90,48,0.06) !important; }
+
+/* ── 24. 인트로 배너 ── */
+.intro-banner {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+/* ── 25. 퍼포먼스 선정 기준 배지 ── */
+.summary-filter-chip {
+  background: #f5f5f7 !important;
+  background-image: none !important;
+  color: #0066cc !important;
+  border-color: #d2d2d7 !important;
+  border-radius: 9999px !important;
+}
+
+/* ── 26. 소구포인트 × 히트맵 & 플랫폼 매트릭스 ── */
+#platform-creative-top-combos > div,
+.platform-matrix-wrap {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+/* ── 27. embed-frame ── */
+.embed-frame {
+  border-radius: 18px !important;
+  border: 0.5px solid #e0e0e0 !important;
+}
+
+/* ── 28. 드라이브 오픈 버튼 ── */
+.dv-open-btn {
+  background: rgba(0,102,204,0.9) !important;
+  background-image: none !important;
+  border-radius: 9999px !important;
+}
+
+.dv-open-btn:hover { background: #0066cc !important; }
+
+/* ── 29. 인플루언서(KR) 섹션 ── */
+#kr-count-badge {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 9999px !important;
+}
+
+/* ── 30. 텍스트 링크 ── */
+a { color: #0066cc !important; }
+a:hover { color: #0077ed !important; }
+
+/* ── 31. 진행바 (영상 분석) ── */
+.vid-prog-fill {
+  background: #0066cc !important;
+  background-image: none !important;
+}
+
+/* ── 32. Tailwind 보조 클래스 잔여 색상 정리 ── */
+.text-slate-900 { color: #1d1d1f !important; }
+.text-slate-800 { color: #1d1d1f !important; }
+.text-slate-700 { color: #333333 !important; }
+.text-slate-600 { color: #6e6e73 !important; }
+.text-slate-500 { color: #6e6e73 !important; }
+.text-slate-400 { color: #999999 !important; }
+
+.bg-slate-100 { background: #f5f5f7 !important; }
+.bg-slate-50  { background: #f5f5f7 !important; }
+.bg-white      { background: #ffffff !important; }
+
+.border-slate-200 { border-color: #e0e0e0 !important; }
+.border-indigo-400 { border-color: #0066cc !important; }
+
+/* 카드 섹션 */
+.bg-white.rounded-xl.border.border-slate-200 {
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+.bg-white.rounded-xl.border-2 {
+  border-width: 0.5px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+/* ── 33. main 패딩 & 섹션 간격 ── */
+main {
+  padding-top: 0 !important;
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+#brand-tabs.mb-5 { margin-bottom: 0 !important; }
+#section-tabs.mb-5 { margin-top: 0 !important; margin-bottom: 0 !important; }
+
+.section-tabs {
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: 0.5px solid #e0e0e0 !important;
+  padding: 0 24px !important;
+  margin-left: -24px !important;
+  margin-right: -24px !important;
+}
+
+.section-panel.active {
+  padding-top: 24px !important;
+}
+
+/* ── 34. 전환율 호버 효과 제거 (Apple는 scale만) ── */
+.kpi-card:hover,
+.chart-card:hover,
+.creative-card:hover,
+.product-kpi-card:hover,
+.message-row:hover {
+  box-shadow: none !important;
+}
+
+button:active,
+.brand-tab:active,
+.btn-pill:active {
+  transform: scale(0.95) !important;
+}
+
+/* ── 35. 섹션 탭 — 모바일 ── */
+@media (max-width: 768px) {
+  .section-tabs {
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    padding: 0 16px !important;
+  }
+
+  #brand-tabs { padding: 10px 16px !important; }
+  main { padding-left: 16px !important; padding-right: 16px !important; }
+}
