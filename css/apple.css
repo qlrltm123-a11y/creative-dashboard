@@ -8,6 +8,15 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif !important;
 }
 
+/* FontAwesome 아이콘 폰트 복원 — 와일드카드 덮어쓰기 방지 */
+.fa, .fas, .far, .fal, .fab, .fad,
+i.fa, i.fas, i.far, i.fal, i.fab, i.fad {
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands', 'Font Awesome 5 Free', 'FontAwesome' !important;
+}
+.fa::before, .fas::before, .far::before, .fal::before, .fab::before, .fad::before {
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands', 'Font Awesome 5 Free', 'FontAwesome' !important;
+}
+
 body {
   background: #f5f5f7 !important;
   background-image: none !important;
