@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소재 리포트 · 핵심 요약</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --sub:#6e6e73;
+    --line:#e5e5ea; --good:#34c759; --mid:#ff9f0a; --low:#ff3b30;
+    --boh:#FF6B35; --wm:#10b981; --cg:#f59e0b; --accent:#0071e3;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro KR","Apple SD Gothic Neo","Pretendard","Segoe UI",sans-serif;
+    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+    line-height:1.5; padding-bottom:80px;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+
+  /* ===== Header ===== */
+  header{padding:48px 0 24px}
+  .eyebrow{font-size:13px; font-weight:600; color:var(--accent); letter-spacing:.2px}
+  h1{font-size:34px; font-weight:700; letter-spacing:-.5px; margin:6px 0 8px}
+  .lead{font-size:16px; color:var(--sub); max-width:680px}
+  .meta-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px}
+  .brand-toggle{display:inline-flex; background:#ececf0; border-radius:12px; padding:4px; gap:2px}
+  .brand-toggle button{
+    border:0; background:transparent; font-size:14px; font-weight:600; color:var(--sub);
+    padding:7px 18px; border-radius:9px; cursor:pointer; transition:.18s; display:flex; align-items:center; gap:7px;
+  }
+  .brand-toggle button .dot{width:8px;height:8px;border-radius:50%}
+  .brand-toggle button.active{background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .freshness{font-size:13px; color:var(--sub); display:flex; align-items:center; gap:6px; margin-left:auto}
+  .freshness .live{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(52,199,89,.18)}
+  .filter-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .fsel{position:relative; display:inline-flex; align-items:center; background:var(--card); border:1px solid var(--line);
+        border-radius:11px; box-shadow:0 1px 2px rgba(0,0,0,.04); transition:.15s}
+  .fsel:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,113,227,.12)}
+  .fsel-ic{padding:0 2px 0 12px; color:var(--sub); font-size:13px}
+  .fsel select{appearance:none; -webkit-appearance:none; border:0; background:transparent; outline:0;
+        font-size:13.5px; font-weight:600; color:var(--ink); padding:9px 30px 9px 8px; cursor:pointer; max-width:240px}
+  .fsel::after{content:"\f078"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:10px; color:var(--sub);
+        position:absolute; right:12px; pointer-events:none}
+  .freset{border:0; background:transparent; color:var(--sub); font-size:13px; font-weight:600; cursor:pointer;
+        padding:9px 10px; border-radius:9px; display:inline-flex; align-items:center; gap:6px; transition:.15s}
+  .freset:hover{background:#ececf0; color:var(--ink)}
+
+  /* ===== Section ===== */
+  section.block{margin-top:40px}
+  .block-head{display:flex; align-items:baseline; gap:10px; margin-bottom:4px}
+  .block-head h2{font-size:22px; font-weight:700; letter-spacing:-.3px}
+  .block-head .count{font-size:14px; color:var(--sub); font-weight:500}
+  .block-sub{font-size:14px; color:var(--sub); margin-bottom:18px}
+
+  /* ===== Top creatives ===== */
+  .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:18px}
+  @media(max-width:840px){.cards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.cards{grid-template-columns:1fr}}
+  .ccard{
+    background:var(--card); border-radius:18px; overflow:hidden; box-shadow:var(--shadow);
+    display:flex; flex-direction:column; transition:.2s; position:relative;
+  }
+  .ccard:hover{transform:translateY(-3px); box-shadow:0 6px 16px rgba(0,0,0,.1),0 16px 40px rgba(0,0,0,.08)}
+  .rank-badge{
+    position:absolute; top:12px; left:12px; z-index:2;
+    width:30px;height:30px;border-radius:50%; display:flex;align-items:center;justify-content:center;
+    font-size:14px; font-weight:700; color:#fff; background:rgba(0,0,0,.55); backdrop-filter:blur(6px);
+  }
+  .ccard.gold .rank-badge{background:linear-gradient(135deg,#FFD15C,#F8A100)}
+  .ccard.silver .rank-badge{background:linear-gradient(135deg,#cfd3da,#9aa1ab)}
+  .ccard.bronze .rank-badge{background:linear-gradient(135deg,#e0a371,#b97433)}
+  .thumb{aspect-ratio:1/1; width:100%; background:#eef0f3; position:relative; overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b0b4bb;font-size:30px}
+  .vid-tag{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;display:flex;align-items:center;gap:5px}
+  .cbody{padding:14px 16px 16px; display:flex; flex-direction:column; gap:10px; flex:1}
+  .cname{font-size:14.5px; font-weight:600; letter-spacing:-.2px; line-height:1.35;
+         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; min-height:2.7em}
+  .roas-line{display:flex; align-items:flex-end; gap:8px}
+  .roas-big{font-size:30px; font-weight:800; letter-spacing:-1px; line-height:1}
+  .roas-big.good{color:var(--good)} .roas-big.mid{color:var(--mid)} .roas-big.low{color:var(--low)}
+  .roas-cap{font-size:12px; color:var(--sub); padding-bottom:3px}
+  .stat-row{display:flex; gap:14px; padding-top:10px; border-top:1px solid var(--line); font-size:12.5px}
+  .stat-row .s{display:flex;flex-direction:column;gap:1px}
+  .stat-row .s .k{color:var(--sub)} .stat-row .s .v{font-weight:600}
+  .appeal-chips{display:flex; flex-wrap:wrap; gap:5px}
+  .chip{font-size:11.5px; font-weight:500; color:#3a3a3c; background:#f0f0f2; border-radius:7px; padding:3px 8px}
+
+  /* ===== Appeal ranking ===== */
+  .appeal-list{background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden}
+  .appeal-row{display:grid; grid-template-columns:36px 1fr 130px; align-items:center; gap:16px;
+              padding:16px 22px; border-bottom:1px solid var(--line)}
+  .appeal-row:last-child{border-bottom:0}
+  .appeal-rank{font-size:16px; font-weight:700; color:var(--sub); text-align:center}
+  .appeal-row.top1 .appeal-rank{color:#F8A100}
+  .appeal-main{min-width:0}
+  .appeal-kw{font-size:16px; font-weight:600; letter-spacing:-.2px; margin-bottom:7px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .appeal-kw .meta{font-size:12px; font-weight:500; color:var(--sub)}
+  .bar{height:8px; background:#ececed; border-radius:5px; overflow:hidden}
+  .bar > i{display:block; height:100%; border-radius:5px; background:linear-gradient(90deg,#5ac8fa,#0071e3)}
+  .appeal-num{text-align:right}
+  .appeal-num .big{font-size:22px; font-weight:800; letter-spacing:-.5px}
+  .appeal-num .big.good{color:var(--good)} .appeal-num .big.mid{color:var(--mid)} .appeal-num .big.low{color:var(--low)}
+  .appeal-num .cap{font-size:11.5px; color:var(--sub)}
+
+  /* ===== misc ===== */
+  .empty{background:var(--card);border-radius:18px;padding:54px 20px;text-align:center;color:var(--sub);box-shadow:var(--shadow)}
+  .empty i{font-size:30px; opacity:.5; margin-bottom:12px; display:block}
+  .footer-link{margin-top:48px; text-align:center}
+  .footer-link a{font-size:14px; font-weight:600; color:var(--accent); text-decoration:none; display:inline-flex; align-items:center; gap:7px}
+  .footer-link a:hover{text-decoration:underline}
+  .loading{padding:60px;text-align:center;color:var(--sub)}
+  .loading i{font-size:26px;margin-bottom:12px;display:block}
+  .legend{font-size:12px;color:var(--sub);margin-top:14px;display:flex;gap:16px;flex-wrap:wrap}
+  .legend b{font-weight:600;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CREATIVE REPORT</div>
+    <h1>소재 핵심 요약</h1>
+    <p class="lead">광고 소재 중 <b>지금 가장 잘 나가는 것</b>과, 소비자에게 <b>잘 먹힌 표현·강조점</b>만 모았습니다. 자세한 수치는 전체 대시보드에서 볼 수 있어요.</p>
+    <div class="meta-row">
+      <div class="brand-toggle" id="brand-toggle">
+        <button data-brand="BOH" class="active"><span class="dot" style="background:var(--boh)"></span>BOH</button>
+        <button data-brand="WM"><span class="dot" style="background:var(--wm)"></span>WM</button>
+        <button data-brand="CG"><span class="dot" style="background:var(--cg)"></span>CG</button>
+      </div>
+      <div class="freshness" id="freshness"><span class="live"></span><span>데이터 불러오는 중…</span></div>
+    </div>
+    <div class="filter-row">
+      <label class="fsel">
+        <span class="fsel-ic"><i class="fas fa-bullhorn"></i></span>
+        <select id="f-event"><option value="">전체 이벤트</option></select>
+      </label>
+      <label class="fsel">
+        <span class="fsel-ic"><i class="fas fa-box"></i></span>
+        <select id="f-product"><option value="">전체 제품</option></select>
+      </label>
+      <button id="f-reset" class="freset" title="필터 초기화"><i class="fas fa-rotate-left"></i> 초기화</button>
+    </div>
+  </header>
+
+  <!-- 1. 잘 나가는 소재 TOP -->
+  <section class="block">
+    <div class="block-head">
+      <h2>🏆 잘 나가는 소재 TOP</h2>
+      <span class="count" id="top-count"></span>
+    </div>
+    <p class="block-sub">광고비 대비 매출(ROAS)이 높은 순서. 숫자가 클수록 광고비 1원으로 더 많이 벌었다는 뜻입니다.</p>
+    <div id="top-creatives"><div class="loading"><i class="fas fa-circle-notch fa-spin"></i>불러오는 중…</div></div>
+  </section>
+
+  <!-- 2. 잘 먹힌 표현·강조점 -->
+  <section class="block">
+    <div class="block-head">
+      <h2>💡 잘 먹힌 표현·강조점</h2>
+      <span class="count" id="appeal-count"></span>
+    </div>
+    <p class="block-sub">소재에 쓰인 강조 메시지(소구포인트)별로 광고 효율을 모은 결과. 어떤 메시지가 실제 매출로 이어졌는지 보여줍니다.</p>
+    <div id="appeal-ranking"><div class="loading"><i class="fas fa-circle-notch fa-spin"></i>불러오는 중…</div></div>
+    <div class="legend">
+      <span><b>ROAS</b> = 매출 ÷ 광고비 (광고비 1원당 벌어들인 금액)</span>
+      <span><b style="color:var(--good)">초록</b> 효율 좋음 · <b style="color:var(--mid)">주황</b> 보통 · <b style="color:var(--low)">빨강</b> 낮음</span>
+    </div>
+  </section>
+
+  <div class="footer-link">
+    <a href="index.html">전체 소재 대시보드에서 자세히 보기 <i class="fas fa-arrow-right"></i></a>
+  </div>
+</div>
+
+<!-- 동일 데이터 소스 재사용 (전체 대시보드와 같은 Google Sheets) -->
+<script src="js/data.js"></script>
+<script src="js/drive-converter.js"></script>
+<script src="js/sheets.js"></script>
+<script>
+/* ============================================================
+   report.html — 팀장·비마케터용 간략 리포트
+   전체 대시보드(index.html)와 동일한 데이터(Google Sheets)를 사용하되
+   "잘 나가는 소재 TOP" + "잘 먹힌 표현·강조점" 두 가지만 보여준다.
+   ============================================================ */
+const MIN_SPEND = 10000;          // 광고비 1만원 미만은 ROAS 비교에서 제외 (전체 대시보드와 동일 기준)
+const TOP_N = 6;                  // 소재 카드 개수
+const APPEAL_TOP_N = 8;           // 표현 랭킹 개수
+let ALL = [];                     // 로드된 전체 소재
+let curBrand = 'BOH';
+let curEvent = '';                // 선택된 이벤트 ('' = 전체)
+let curProduct = '';              // 선택된 제품 ('' = 전체)
+
+/* ── 유틸 ── */
+function won(n){
+  n = Number(n)||0;
+  if(n>=100000000) return (n/100000000).toFixed(1).replace(/\.0$/,'')+'억';
+  if(n>=10000)     return Math.round(n/10000).toLocaleString()+'만';
+  return n.toLocaleString();
+}
+// ROAS를 항상 "배수"로 정규화 (데이터가 5.2 / 520 / 비율 등 섞여 있어도 일관 처리)
+function roasMultiple(c){
+  const sp = Number(c.spend)||0, rv = Number(c.revenue)||0;
+  if(sp>0 && rv>0) return rv/sp;               // 가장 신뢰: 매출/광고비
+  let r = Number(c.roas)||0;
+  if(r>20) r = r/100;                          // 520 같은 % 표기 → 5.2배
+  return r;
+}
+function roasGrade(mult){ return mult>=6 ? 'good' : mult>=3 ? 'mid' : 'low'; }
+function nameOf(c){ return c.creative_name || c.ad_name || c.title || '이름 없는 소재'; }
+function thumbOf(c){ return c.thumbnail_url || c.media_url || ''; }
+function isVideo(c){ return (c.media_type==='video') || /\.(mp4|mov|webm)(\?|$)/i.test(c.media_url||''); }
+// Google Drive 링크 → 표시 가능한 이미지 URL로 변환 + 폴백 체인 (drive-converter.js 재사용)
+function imgChain(url){
+  if(!url) return [];
+  if(typeof getDriveUrlFallbackChain==='function' && typeof isDriveUrl==='function' && isDriveUrl(url))
+    return getDriveUrlFallbackChain(url);
+  return [url];
+}
+// onerror 시 다음 후보 URL로 교체, 모두 실패하면 플레이스홀더 표시
+window._imgFallback = function(img){
+  const chain = JSON.parse(img.dataset.chain || '[]');
+  let i = (Number(img.dataset.idx)||0) + 1;
+  if(i < chain.length){ img.dataset.idx = i; img.src = chain[i]; }
+  else { img.style.display='none'; const ph=img.nextElementSibling; if(ph) ph.style.display='flex'; }
+};
+function kwList(v){
+  if(!v) return [];
+  if(Array.isArray(v)) return v.flatMap(x=>String(x).split(/[,、，·・/]/)).map(s=>s.trim()).filter(Boolean);
+  return String(v).split(/[,、，·・/]/).map(s=>s.trim()).filter(Boolean);
+}
+function median(arr){
+  if(!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b), m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+/* ── 샘플 데이터 폴백: data.js의 CREATIVES+PERFORMANCE를 평탄화 ── */
+function buildSampleFlat(){
+  if(typeof CREATIVES==='undefined') return [];
+  return CREATIVES.map(c=>{
+    const p = (typeof getCreativePerf==='function') ? getCreativePerf(c.id, 'ALL') : null;
+    return Object.assign({}, c, {
+      creative_name:c.title, media_url:c.media_url, thumbnail_url:c.media_url,
+      media_type:c.type, appeal_points:c.concept ? [c.concept] : [],
+      impressions:p?.impressions||0, clicks:p?.clicks||0, spend:p?.spend||0,
+      revenue:p?.revenue||0, conversions:p?.conversions||0, roas:p?.roas||0
+    });
+  });
+}
+
+/* ── 데이터 로드 ── */
+async function load(){
+  let data = null;
+  try{
+    if(typeof window.tryLoadSavedSheet==='function') data = await window.tryLoadSavedSheet();
+  }catch(e){ console.warn('시트 로드 실패', e); }
+
+  let live = true;
+  if(!data || !data.length){ data = buildSampleFlat(); live = false; }
+  ALL = data || [];
+
+  const fr = document.getElementById('freshness');
+  fr.querySelector('span:last-child').textContent =
+    live ? `실시간 연동 · ${new Date().toLocaleDateString('ko-KR')} 기준`
+         : '샘플 데이터 (시트 미연동)';
+  if(!live) fr.querySelector('.live').style.background = '#ff9f0a';
+
+  render();
+}
+
+/* ── 필터 ── */
+function brandList(){ return ALL.filter(c => (c.brand||'').toUpperCase() === curBrand); }
+
+// 이벤트/제품 옵션 채우기 (현재 브랜드 기준, 전체 대시보드와 동일 방식)
+function populateFilters(){
+  const base = brandList();
+  // 이벤트: 소재 수 많은 순
+  const evMap = new Map();
+  base.forEach(c=>{ const e=(c.event||'').toString().trim(); if(e) evMap.set(e,(evMap.get(e)||0)+1); });
+  const events = [...evMap.entries()].sort((a,b)=>b[1]-a[1]);
+  // 제품: 가나다 순
+  const products = [...new Set(base.map(c=>(c.product||'').toString().trim()).filter(Boolean))].sort();
+
+  const evSel = document.getElementById('f-event');
+  const prSel = document.getElementById('f-product');
+  evSel.innerHTML = '<option value="">전체 이벤트</option>' +
+    events.map(([n,c])=>`<option value="${n.replace(/"/g,'&quot;')}">${n} (${c})</option>`).join('');
+  prSel.innerHTML = '<option value="">전체 제품</option>' +
+    products.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
+
+  // 이전 선택 유지 (브랜드 바뀌어도 같은 값이 있으면)
+  evSel.value = events.some(([n])=>n===curEvent) ? curEvent : (curEvent='', '');
+  prSel.value = products.includes(curProduct) ? curProduct : (curProduct='', '');
+
+  // 옵션이 1개(전체만)면 해당 필터 숨김
+  evSel.closest('.fsel').style.display = events.length ? '' : 'none';
+  prSel.closest('.fsel').style.display = products.length ? '' : 'none';
+}
+
+function applyFilters(list){
+  return list.filter(c =>
+    (!curEvent   || (c.event||'').toString().trim()   === curEvent) &&
+    (!curProduct || (c.product||'').toString().trim() === curProduct)
+  );
+}
+
+/* ── 렌더 ── */
+function render(){
+  populateFilters();
+  const list = applyFilters(brandList());
+  renderTop(list);
+  renderAppeals(list);
+}
+
+function renderTop(list){
+  // 1) 광고비가 집행된 소재만 후보로
+  const spent = list.filter(c => (Number(c.spend)||0) >= MIN_SPEND && roasMultiple(c) > 0);
+  // 2) 후보들의 광고비 "중앙값" 이상만 통과 (소액 집행 극단 ROAS 배제)
+  const med = median(spent.map(c => Number(c.spend)||0));
+  const ranked = spent
+    .filter(c => (Number(c.spend)||0) >= med)
+    .sort((a,b)=> roasMultiple(b) - roasMultiple(a))   // 3) ROAS 높은 순
+    .slice(0, TOP_N);
+
+  const sub = document.querySelector('#top-creatives').closest('.block').querySelector('.block-sub');
+  if(sub) sub.innerHTML = `<b>광고비 중앙값(${won(med)}원) 이상</b> 집행된 소재 중 ROAS 높은 순. 충분히 검증된 소재만 보여줍니다.`;
+
+  const box = document.getElementById('top-creatives');
+  document.getElementById('top-count').textContent = ranked.length ? `상위 ${ranked.length}개` : '';
+
+  if(!ranked.length){
+    box.innerHTML = `<div class="empty"><i class="fas fa-image"></i>이 조건에 맞는 소재가 없어요. 필터를 바꿔보세요.</div>`;
+    return;
+  }
+
+  box.innerHTML = `<div class="cards">${ranked.map((c,i)=>{
+    const m = roasMultiple(c), g = roasGrade(m);
+    const medal = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const chain = imgChain(thumbOf(c));
+    const chips = kwList(c.appeal_points).slice(0,3).map(k=>`<span class="chip">${k}</span>`).join('');
+    return `<div class="ccard ${medal}">
+      <span class="rank-badge">${i+1}</span>
+      <div class="thumb">
+        ${chain.length ? `<img src="${chain[0]}" alt="" loading="lazy" referrerpolicy="no-referrer" data-idx="0" data-chain='${JSON.stringify(chain).replace(/'/g,"&#39;")}' onerror="window._imgFallback(this)"><div class="ph" style="display:none"><i class="fas fa-image"></i></div>`
+            : `<div class="ph"><i class="fas fa-image"></i></div>`}
+        ${isVideo(c) ? `<span class="vid-tag"><i class="fas fa-play"></i>영상</span>` : ``}
+      </div>
+      <div class="cbody">
+        <div class="cname">${nameOf(c)}</div>
+        ${chips ? `<div class="appeal-chips">${chips}</div>` : ``}
+        <div class="roas-line">
+          <span class="roas-big ${g}">${m.toFixed(1)}<span style="font-size:16px">배</span></span>
+          <span class="roas-cap">광고비 1원<br>→ ${m.toFixed(1)}원 매출</span>
+        </div>
+        <div class="stat-row">
+          <div class="s"><span class="k">매출</span><span class="v">${won(c.revenue)}원</span></div>
+          <div class="s"><span class="k">광고비</span><span class="v">${won(c.spend)}원</span></div>
+          <div class="s"><span class="k">구매</span><span class="v">${(Number(c.conversions)||0).toLocaleString()}건</span></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderAppeals(list){
+  // 소구포인트(appeal_points) 키워드별로 매출/광고비 합산 → ROAS
+  const agg = new Map(); // kw → {spend, revenue, count}
+  list.forEach(c=>{
+    const sp = Number(c.spend)||0, rv = Number(c.revenue)||0;
+    if(sp < MIN_SPEND) return;
+    kwList(c.appeal_points).forEach(kw=>{
+      const k = kw.length>1 ? kw : null;
+      if(!k) return;
+      const cur = agg.get(k) || {spend:0, revenue:0, count:0};
+      cur.spend += sp; cur.revenue += rv; cur.count += 1;
+      agg.set(k, cur);
+    });
+  });
+
+  let rows = [...agg.entries()]
+    .map(([kw,v])=>({kw, ...v, mult: v.spend>0 ? v.revenue/v.spend : 0}))
+    .filter(r => r.spend >= MIN_SPEND && r.mult > 0)
+    .sort((a,b)=> b.mult - a.mult)
+    .slice(0, APPEAL_TOP_N);
+
+  const box = document.getElementById('appeal-ranking');
+  document.getElementById('appeal-count').textContent = rows.length ? `상위 ${rows.length}개 표현` : '';
+
+  if(!rows.length){
+    box.innerHTML = `<div class="empty"><i class="fas fa-lightbulb"></i>${curBrand} 브랜드의 소구포인트 데이터가 아직 없어요.<br><span style="font-size:13px">시트에 <b>소구포인트(appeal_points)</b> 열을 채우면 여기에 표시됩니다.</span></div>`;
+    return;
+  }
+
+  const max = rows[0].mult || 1;
+  box.innerHTML = `<div class="appeal-list">${rows.map((r,i)=>{
+    const g = roasGrade(r.mult);
+    return `<div class="appeal-row ${i===0?'top1':''}">
+      <div class="appeal-rank">${i+1}</div>
+      <div class="appeal-main">
+        <div class="appeal-kw">${r.kw} <span class="meta">· 소재 ${r.count}개 · 매출 ${won(r.revenue)}원</span></div>
+        <div class="bar"><i style="width:${Math.max(6,(r.mult/max)*100)}%"></i></div>
+      </div>
+      <div class="appeal-num">
+        <div class="big ${g}">${r.mult.toFixed(1)}배</div>
+        <div class="cap">광고비 대비 매출</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+/* ── 브랜드 토글 ── */
+document.getElementById('brand-toggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  curBrand = btn.dataset.brand;
+  document.querySelectorAll('#brand-toggle button').forEach(b=>b.classList.toggle('active', b===btn));
+  render();
+});
+
+/* ── 이벤트/제품 필터 ── */
+document.getElementById('f-event').addEventListener('change', e=>{ curEvent = e.target.value; render(); });
+document.getElementById('f-product').addEventListener('change', e=>{ curProduct = e.target.value; render(); });
+document.getElementById('f-reset').addEventListener('click', ()=>{ curEvent=''; curProduct=''; render(); });
+
+load();
+</script>
+</body>
+</html>
