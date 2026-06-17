@@ -33,19 +33,46 @@ module.exports = async function handler(req, res) {
   }
 
   // ── 2) 영상 다운로드 ──
+  const MAX = 80 * 1024 * 1024; // 80 MB
   let videoBuffer, mimeType;
   try {
-    const dlRes = await fetch(downloadUrl, { redirect: 'follow' });
+    let dlRes = await fetch(downloadUrl, { redirect: 'follow' });
+    let ct = (dlRes.headers.get('content-type') || '').toLowerCase();
+
+    // Drive 바이러스 스캔 경고 HTML 처리 (GOOGLE_API_KEY 없이 uc 다운로드 시 대용량 파일)
+    if (driveId && !DRIVE_KEY && ct.includes('text/html')) {
+      const warnHtml = await dlRes.text();
+      // confirm 토큰 추출 (여러 형태 대응)
+      const m = warnHtml.match(/confirm=([0-9A-Za-z_\-]+)/) ||
+                warnHtml.match(/name="confirm"\s+value="([^"]+)"/) ||
+                warnHtml.match(/&amp;confirm=([0-9A-Za-z_\-]+)/);
+      if (m) {
+        const retryUrl = `https://drive.google.com/uc?export=download&id=${driveId}&confirm=${m[1]}`;
+        dlRes = await fetch(retryUrl, { redirect: 'follow' });
+        ct = (dlRes.headers.get('content-type') || '').toLowerCase();
+      }
+    }
+
     if (!dlRes.ok) {
       return res.status(502).json({
         error: `영상 다운로드 실패 (HTTP ${dlRes.status}). ` +
-               `Drive 파일이 "링크 있는 모든 사용자 — 뷰어"로 공유되어 있는지 확인해주세요.`,
+               `Drive 파일이 "링크 있는 모든 사용자 — 뷰어"로 공유돼 있는지 확인하거나, GOOGLE_API_KEY 환경변수를 설정해주세요.`,
       });
     }
-    mimeType = (dlRes.headers.get('content-type') || 'video/mp4').split(';')[0].trim();
+
+    // 여전히 HTML이면 (권한 없음/대용량 우회 실패)
+    if (ct.includes('text/html')) {
+      return res.status(502).json({
+        error: `Drive에서 영상 대신 HTML이 반환됐습니다. ` +
+               (DRIVE_KEY
+                 ? `파일 공유 권한("링크 있는 모든 사용자 — 뷰어")을 확인해주세요.`
+                 : `대용량 영상은 GOOGLE_API_KEY 환경변수(Drive API 활성화) 설정이 필요합니다.`),
+      });
+    }
+
+    mimeType = (ct || 'video/mp4').split(';')[0].trim();
     if (!mimeType.startsWith('video/') && !mimeType.startsWith('image/')) mimeType = 'video/mp4';
 
-    const MAX = 80 * 1024 * 1024; // 80 MB
     const cl = parseInt(dlRes.headers.get('content-length') || '0');
     if (cl > MAX) return res.status(413).json({ error: `영상이 너무 큽니다 (${Math.round(cl/1024/1024)}MB). 80MB 이하만 가능합니다.` });
 

@@ -518,8 +518,10 @@ async function _vidAnalyzeOne(v) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ videoUrl: v.url, creativeName: v.name, question: '' }),
         });
-        const data = await res.json();
-        if (res.ok && data.text) {
+        const raw = await res.text();
+        let data = null;
+        try { data = JSON.parse(raw); } catch (_) {}
+        if (res.ok && data?.text) {
             // 메타(ROAS/광고비/브랜드/제품) 함께 저장 → 누적 종합 시 활용
             const entry = {
                 text: data.text, name: v.name, analyzedAt: Date.now(),
@@ -529,7 +531,12 @@ async function _vidAnalyzeOne(v) {
             const c2 = _vidLoadCache(); c2[v.url] = entry; _vidSaveCache(c2);
             return entry;
         }
-        return { error: data.error || `HTTP ${res.status}`, name: v.name };
+        // 비JSON(HTML) 응답 = API 라우트 미작동(로컬 정적 서버 등)
+        const isHtml = !data && /<!doctype|<html|cannot (get|post)/i.test(raw);
+        const errMsg = data?.error
+            || (isHtml ? 'API 라우트 응답 아님(HTML) — 배포 환경 필요' : '')
+            || `HTTP ${res.status}`;
+        return { error: errMsg, name: v.name };
     } catch (e) {
         return { error: e.message, name: v.name };
     }
@@ -569,7 +576,7 @@ window.acBatchAnalyzeVideos = async function() {
     if (btn) { btn.disabled = true; btn.dataset.orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>분석 중...'; }
 
     const total = videos.length;
-    let done = 0, ok = 0, fail = 0;
+    let done = 0, ok = 0, fail = 0, firstError = '';
     const analyzed = [];
     const update = () => _vidSetProgress(
         `<div class="vid-prog-bar"><div class="vid-prog-fill" style="width:${Math.round(done / total * 100)}%"></div></div>
@@ -583,7 +590,7 @@ window.acBatchAnalyzeVideos = async function() {
             const v = queue.shift();
             const r = await _vidAnalyzeOne(v);
             done++;
-            if (r.error) fail++;
+            if (r.error) { fail++; if (!firstError) firstError = r.error; }
             else { ok++; analyzed.push({ name: v.name, text: r.text, roas: v.roas, spend: v.spend }); }
             update();
         }
@@ -592,7 +599,25 @@ window.acBatchAnalyzeVideos = async function() {
 
     if (!analyzed.length) {
         _vidSetProgress('');
-        _vidSetResult('<span style="color:#e11d48">영상 분석에 모두 실패했습니다. Drive 파일이 "링크 있는 모든 사용자 — 뷰어"로 공유됐는지 확인해주세요.</span>');
+        const isApiHtml = /<!doctype|<html|api 라우트|cannot (get|post)|404|405/i.test(firstError);
+        const isKeyErr = /GEMINI_API_KEY|환경변수/i.test(firstError);
+        const isDownErr = /다운로드|HTTP 4|HTTP 5|공유|뷰어/i.test(firstError);
+        let guide;
+        if (isApiHtml) {
+            guide = '서버 API(/api/analyze-video)가 응답하지 않습니다. <b>로컬 미리보기가 아닌 Vercel 배포 주소</b>에서 실행해야 합니다 (서버리스 함수 필요).';
+        } else if (isKeyErr) {
+            guide = 'Vercel 프로젝트 → Settings → Environment Variables에 <b>GEMINI_API_KEY</b>를 등록한 뒤 재배포해주세요.';
+        } else if (isDownErr) {
+            guide = 'Drive 영상 다운로드 실패. 파일을 "링크 있는 모든 사용자 — 뷰어"로 공유하고, 큰 영상은 <b>GOOGLE_API_KEY</b> 환경변수 설정을 권장합니다.';
+        } else {
+            guide = '잠시 후 다시 시도해주세요. 문제가 계속되면 Vercel 함수 로그를 확인해주세요.';
+        }
+        _vidSetResult(
+            `<div style="color:#e11d48;line-height:1.6">
+                <b>영상 분석 실패 (${fail}건)</b><br>
+                <span style="font-family:monospace;font-size:12px;color:#b91c1c">원인: ${(firstError || '알 수 없는 오류').slice(0, 200)}</span><br>
+                <span style="color:#64748b;font-size:12px">👉 ${guide}</span>
+            </div>`);
         if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || '🎬 영상 전체 자동분석'; }
         return;
     }
