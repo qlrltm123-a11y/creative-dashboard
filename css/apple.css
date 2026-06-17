@@ -1132,49 +1132,212 @@ main {
   padding-top: 0 !important;
   padding-left: 24px !important;
   padding-right: 24px !important;
+  padding-bottom: 60px !important;
 }
 
 #brand-tabs.mb-5 { margin-bottom: 0 !important; }
-#section-tabs.mb-5 { margin-top: 0 !important; margin-bottom: 0 !important; }
-
-.section-tabs {
-  border-radius: 0 !important;
-  border-left: none !important;
-  border-right: none !important;
-  border-top: none !important;
-  border-bottom: 0.5px solid #e0e0e0 !important;
-  padding: 0 24px !important;
-  margin-left: -24px !important;
-  margin-right: -24px !important;
-}
+#section-tabs.mb-5 { margin-top: 0 !important; margin-bottom: 24px !important; }
 
 .section-panel.active {
-  padding-top: 24px !important;
+  padding-top: 0 !important;
 }
 
-/* ── 34. 전환율 호버 효과 제거 (Apple는 scale만) ── */
-.kpi-card:hover,
-.chart-card:hover,
-.creative-card:hover,
-.product-kpi-card:hover,
-.message-row:hover {
+/* ── 34. 섹션 탭 — Apple sub-nav 언더라인 스타일 ── */
+.section-tabs {
+  border-radius: 0 !important;
+  border: none !important;
+  border-bottom: 0.5px solid #e0e0e0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  background: #ffffff !important;
+}
+
+.section-tab {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 10px 20px !important;
+  white-space: nowrap !important;
+}
+
+/* 아이콘 숨김 — Apple은 텍스트 내비 */
+.section-tab > i { display: none !important; }
+
+.section-tab:hover {
+  background: #f5f5f7 !important;
+}
+
+.section-tab.active {
+  background: transparent !important;
+  background-image: none !important;
+  border-bottom: 2px solid #0066cc !important;
   box-shadow: none !important;
 }
 
-button:active,
-.brand-tab:active,
-.btn-pill:active {
-  transform: scale(0.95) !important;
+.section-tab.active::after { display: none !important; }
+.section-tab.active .label { color: #0066cc !important; }
+.section-tab.active i { color: #0066cc !important; }
+.section-tab.active .sub { color: #6e6e73 !important; }
+
+/* ── 35. 브랜드 탭 컨테이너 개선 ── */
+#brand-tabs {
+  background: #ffffff !important;
+  padding: 10px 24px !important;
+  border-bottom: 0.5px solid #e0e0e0 !important;
+  margin: 0 -24px !important;
 }
 
-/* ── 35. 섹션 탭 — 모바일 ── */
-@media (max-width: 768px) {
-  .section-tabs {
-    margin-left: -16px !important;
-    margin-right: -16px !important;
-    padding: 0 16px !important;
-  }
+/* ── 36. 섹션 패널 상단 여백 ── */
+.section-filter-bar { margin-top: 20px !important; }
+#kpi-section { margin-top: 20px !important; }
 
-  #brand-tabs { padding: 10px 16px !important; }
+/* ── 37. 호버 효과 Apple 방식 ── */
+.kpi-card:hover,
+.chart-card:hover,
+.product-kpi-card:hover,
+.message-row:hover {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.creative-card:hover {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+button:active { transform: scale(0.95) !important; }
+.brand-tab:active { transform: scale(0.95) !important; }
+
+/* ── 38. KPI 섹션 타이포 강화 ── */
+.kpi-value {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.374px !important;
+  line-height: 1.15 !important;
+}
+
+.kpi-label {
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: #6e6e73 !important;
+  letter-spacing: -0.12px !important;
+  margin-bottom: 6px !important;
+}
+
+/* ── 39. 차트 카드 섹션 타이틀 ── */
+.chart-title {
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  color: #1d1d1f !important;
+  letter-spacing: -0.374px !important;
+}
+
+/* ── 40. 성과 필터바 개선 ── */
+.section-filter-bar > div {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 14px !important;
+  padding: 10px 16px !important;
+  gap: 12px !important;
+}
+
+/* ── 41. 인트로 배너 ── */
+.intro-banner {
+  background: #ffffff !important;
+  border: 0.5px solid #e0e0e0 !important;
+  border-radius: 14px !important;
+  margin-bottom: 16px !important;
+}
+
+/* ── 42. 산점도/차트 섹션 여백 ── */
+.chart-card.mb-6 {
+  margin-bottom: 16px !important;
+}
+
+/* ── 43. BEST/WORST 헤더 ── */
+.section-panel section > div.bg-white,
+.section-panel .bg-white.rounded-xl {
+  border-radius: 14px !important;
+}
+
+/* ── 44. 브랜드 도트 → 단색 중성 ── */
+.brand-dot {
+  width: 5px !important;
+  height: 5px !important;
+  background: currentColor !important;
+  opacity: 0.5 !important;
+}
+.brand-tab.active .brand-dot { opacity: 0.8 !important; }
+
+/* ── 45. 멀티셀렉트 스타일 ── */
+.ms-wrap,
+.ms-wrap * {
+  font-family: system-ui, -apple-system, sans-serif !important;
+}
+.ms-trigger,
+.ms-dropdown {
+  background: #f5f5f7 !important;
+  border: 0.5px solid #d2d2d7 !important;
+  border-radius: 9999px !important;
+  font-size: 12px !important;
+  color: #1d1d1f !important;
+  box-shadow: none !important;
+}
+.ms-dropdown {
+  border-radius: 14px !important;
+  padding: 6px !important;
+}
+.ms-option:hover {
+  background: #f5f5f7 !important;
+  border-radius: 8px !important;
+  color: #0066cc !important;
+}
+.ms-option.selected {
+  background: rgba(0,102,204,0.08) !important;
+  color: #0066cc !important;
+  border-radius: 8px !important;
+}
+.ms-option.selected::before,
+.ms-checkbox,
+[type="checkbox"] {
+  accent-color: #0066cc !important;
+}
+
+/* ── 46. 선정 기준 배지 내 아이콘 색 ── */
+.perf-criteria-badge .fas,
+.perf-criteria-badge .fa { color: #0066cc !important; }
+
+/* ── 47. 인트로 배너 볼드 강조 ── */
+.intro-banner-body b { color: #0066cc !important; font-weight: 600 !important; }
+
+/* ── 48. 섹션 패널 타이틀 영역 ── */
+.section-panel .text-lg.font-bold,
+.section-panel h2 {
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.374px !important;
+  color: #1d1d1f !important;
+}
+
+/* ── 49. AI 챗봇 내 퍼플 요소 → 블루 ── */
+#video-flow-result .ac-h { color: #0066cc !important; }
+#video-flow-result .ac-li::before { color: #0066cc !important; }
+#video-flow-result .ac-num { color: #0066cc !important; }
+.dv-loading .fa-spinner { color: #0066cc !important; }
+
+/* ── 50. 플로팅 active-filter-chip ── */
+.active-filter-chip {
+  background: rgba(255,255,255,0.12) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  border-radius: 9999px !important;
+  color: rgba(255,255,255,0.85) !important;
+  font-size: 11px !important;
+}
+
+/* ── 51. 모바일 ── */
+@media (max-width: 768px) {
   main { padding-left: 16px !important; padding-right: 16px !important; }
+  #brand-tabs { padding: 10px 16px !important; margin: 0 -16px !important; }
+  #section-tabs { margin: 0 -16px !important; }
 }

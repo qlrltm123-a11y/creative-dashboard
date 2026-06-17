@@ -15,9 +15,8 @@
     <!-- 폰트: preload + swap으로 렌더 블로킹 제거 -->
     <link rel="preload" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"></noscript>
-    <!-- FontAwesome: 비동기 로딩으로 렌더 블로킹 제거 -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
+    <!-- FontAwesome: 동기 로딩 (아이콘 즉시 렌더) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <!-- Tailwind: async로 파싱 블로킹 제거 -->
     <script async src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -28,66 +27,52 @@
         import { inject } from 'https://cdn.jsdelivr.net/npm/@vercel/analytics@2.0.1/dist/index.mjs';
         inject();
     </script>
-    <!-- FOUC 방지: Tailwind 로드 전 기본 레이아웃 유지 -->
+    <!-- Apple Design: 즉시 적용 (Tailwind 덮어쓰기 방지) -->
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; }
-        header { background: #fff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 40; }
-        main { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
+        * { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif !important; }
+        body { background: #f5f5f7 !important; }
+        header { background: #000000 !important; border-bottom: none !important; height: 44px !important; position: sticky; top: 0; z-index: 50; }
+        main { max-width: 1600px; margin: 0 auto; padding: 0 24px 40px; }
     </style>
 </head>
 <body class="bg-slate-50">
     <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div class="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;">
-                    <i class="fas fa-chart-line" style="color:#ffffff;font-size:14px;"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-slate-900">Performance Creative Dashboard</h1>
-                    <p class="text-xs text-slate-500">광고 소재 효율 모니터링 시스템</p>
-                </div>
+    <!-- Apple Global Nav -->
+    <header style="background:#000!important;height:44px!important;border:none!important;display:flex;align-items:center;padding:0 22px;position:sticky;top:0;z-index:50;gap:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex:none;">
+            <i class="fas fa-chart-line" style="color:#fff;font-size:13px;"></i>
+            <span style="color:#fff;font-size:14px;font-weight:600;letter-spacing:-0.2px;white-space:nowrap;">Creative</span>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:28px;">
+            <span style="color:rgba(255,255,255,0.85);font-size:12px;letter-spacing:-0.12px;cursor:pointer;" id="data-source">샘플 데이터</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:12px;">|</span>
+            <span style="color:rgba(255,255,255,0.6);font-size:11px;" id="last-updated">-</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex:none;">
+            <span id="active-filter-chip"></span>
+            <!-- 환율 -->
+            <div style="display:flex;align-items:center;gap:4px;">
+                <span style="color:rgba(255,255,255,0.45);font-size:11px;">¥1=</span>
+                <input id="fx-rate-input" type="number" step="0.01" min="0.01" value="9.5"
+                    style="width:44px;background:rgba(255,255,255,0.1);border:none;border-radius:4px;color:#fff;font-size:11px;padding:2px 6px;text-align:center;">
+                <span style="color:rgba(255,255,255,0.45);font-size:11px;">원</span>
+                <button id="btn-apply-fx" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:11px;cursor:pointer;padding:2px 4px;" title="환율 적용">✓</button>
             </div>
-            <div class="flex items-center gap-3">
-                <div class="text-right">
-                    <p class="text-xs text-slate-500">데이터 소스</p>
-                    <p class="text-sm font-semibold text-slate-700" id="data-source">샘플 데이터</p>
-                </div>
-                <div class="text-right border-l border-slate-200 pl-3">
-                    <p class="text-xs text-slate-500">최종 업데이트</p>
-                    <p class="text-sm font-semibold text-slate-700" id="last-updated">-</p>
-                </div>
-                <!-- 현재 적용 필터 칩 -->
-                <span id="active-filter-chip" class="active-filter-chip" title="현재 적용된 필터"></span>
-                <!-- 용어 설명 -->
-                <button onclick="window._glOpen && window._glOpen()" class="px-3 py-2 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 text-sm font-medium rounded-lg flex items-center gap-1.5 transition" title="마케팅 용어 쉬운 설명">
-                    <i class="fas fa-circle-question"></i><span>용어</span>
-                </button>
-                <!-- 환율 설정 -->
-                <div class="border-l border-slate-200 pl-3 flex items-center gap-2">
-                    <div class="text-right">
-                        <p class="text-xs text-slate-500">환율 (¥→₩)</p>
-                        <div class="flex items-center gap-1">
-                            <span class="text-xs text-slate-400">¥1 =</span>
-                            <input id="fx-rate-input" type="number" step="0.01" min="0.01"
-                                class="w-16 px-2 py-0.5 text-sm font-semibold text-slate-700 border border-slate-200 rounded focus:outline-none focus:border-indigo-400"
-                                value="9.5">
-                            <span class="text-xs text-slate-400">원</span>
-                        </div>
-                    </div>
-                    <button id="btn-apply-fx" class="px-2 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded transition" title="환율 적용">
-                        <i class="fas fa-check"></i>
-                    </button>
-                </div>
-                <button id="btn-sheet-config" class="px-4 py-2 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 text-sm font-medium rounded-lg flex items-center gap-2 transition">
-                    <i class="fas fa-table"></i>
-                    <span>시트 연동</span>
-                </button>
-                <button id="btn-refresh" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition">
-                    <i class="fas fa-sync-alt"></i>
-                    <span>새로고침</span>
-                </button>
-            </div>
+            <span style="width:1px;height:16px;background:rgba(255,255,255,0.2);"></span>
+            <!-- 용어 -->
+            <button onclick="window._glOpen && window._glOpen()"
+                style="background:none;border:none;color:rgba(255,255,255,0.75);font-size:12px;cursor:pointer;letter-spacing:-0.12px;padding:0;"
+                title="마케팅 용어 설명">용어</button>
+            <!-- 시트 연동 -->
+            <button id="btn-sheet-config"
+                style="background:none;border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:rgba(255,255,255,0.85);font-size:12px;cursor:pointer;padding:4px 10px;letter-spacing:-0.12px;">
+                시트 연동
+            </button>
+            <!-- 새로고침 -->
+            <button id="btn-refresh"
+                style="background:#0066cc;border:none;border-radius:9999px;color:#fff;font-size:12px;font-weight:400;cursor:pointer;padding:6px 14px;letter-spacing:-0.12px;">
+                <i class="fas fa-sync-alt" style="font-size:10px;margin-right:4px;"></i>새로고침
+            </button>
         </div>
     </header>
 
@@ -132,48 +117,38 @@
             </div>
         </section>
 
-        <!-- Section Tabs Navigation (4클러스터: 분석·제작·운영·보고) -->
-        <nav id="section-tabs" class="section-tabs mb-5">
-            <div class="tab-group" data-group="분석">
-                <span class="group-label">📊 분석</span>
-                <button class="section-tab active" data-section="performance">
-                    <i class="fas fa-trophy"></i>
-                    <span class="label">성과 분석</span>
-                    <span class="sub">어떤 광고가 잘됐나</span>
+        <!-- Apple Sub-Nav -->
+        <nav id="section-tabs" class="section-tabs mb-5" style="background:#fff!important;border-bottom:0.5px solid #e0e0e0!important;border-top:none!important;border-left:none!important;border-right:none!important;border-radius:0!important;padding:0 0!important;margin:0 -24px 0!important;display:flex!important;align-items:stretch!important;overflow-x:auto!important;gap:0!important;scrollbar-width:none!important;">
+            <div class="tab-group" data-group="분석" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
+                <button class="section-tab active" data-section="performance" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:none!important;border-right:0.5px solid #f0f0f0!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">성과 분석</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">어떤 광고가 잘됐나</span>
                 </button>
-                <button class="section-tab" data-section="funnel">
-                    <i class="fas fa-filter"></i>
-                    <span class="label">퍼널</span>
-                    <span class="sub">유입→구매 전환</span>
+                <button class="section-tab" data-section="funnel" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">퍼널</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">유입→구매 전환</span>
                 </button>
-                <button class="section-tab" data-section="kr">
-                    <i class="fas fa-user-circle"></i>
-                    <span class="label">인플루언서</span>
-                    <span class="sub">인물 등장 소재</span>
+                <button class="section-tab" data-section="kr" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">인플루언서</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">인물 등장 소재</span>
                 </button>
             </div>
-            <div class="tab-group" data-group="제작">
-                <span class="group-label">✨ 제작</span>
-                <button class="section-tab" data-section="ai">
-                    <i class="fas fa-magic-wand-sparkles"></i>
-                    <span class="label">AI 인사이트</span>
-                    <span class="sub">잘 먹힌 강조·표현</span>
+            <div class="tab-group" data-group="제작" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
+                <button class="section-tab" data-section="ai" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">AI 인사이트</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">잘 먹힌 강조·표현</span>
                 </button>
             </div>
-            <div class="tab-group" data-group="운영">
-                <span class="group-label">🔥 운영</span>
-                <button class="section-tab" data-section="gmv">
-                    <i class="fas fa-gauge-high"></i>
-                    <span class="label">GMV</span>
-                    <span class="sub">실시간 매출 시뮬</span>
+            <div class="tab-group" data-group="운영" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
+                <button class="section-tab" data-section="gmv" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">GMV</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">실시간 매출 시뮬</span>
                 </button>
             </div>
-            <div class="tab-group" data-group="보고">
-                <span class="group-label">📋 보고</span>
-                <button class="section-tab" data-section="weekly">
-                    <i class="fas fa-clipboard-list"></i>
-                    <span class="label">주간 업무</span>
-                    <span class="sub">보고서 · 복사/공유</span>
+            <div class="tab-group" data-group="보고" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
+                <button class="section-tab" data-section="weekly" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:none!important;">
+                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">주간 업무</span>
+                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">보고서 · 공유</span>
                 </button>
             </div>
         </nav>
