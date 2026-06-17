@@ -351,31 +351,6 @@
             </div>
         </section>
 
-        <!-- ★ 장바구니 이탈 손실액 랭킹 -->
-        <section class="chart-card mb-6">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div>
-                    <h3 class="chart-title"><i class="fas fa-cart-arrow-down mr-2 text-amber-500"></i>놓친 매출 순위 (장바구니 이탈) <span class="info-tip" tabindex="0" data-tip="이탈�� = (담은 건수 − 구매 건수) ÷ 담은 건수 = 담아놓고 안 산 비율. 놓친 매출 = 이탈 건수 × 1인당 구매액. 금액 큰 제품부터 결제 단계 개선 효과가 커요.">ⓘ</span></h3>
-                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: '거의 살 뻔했는데 놓친' 매출이 큰 제품. 여기부터 가격·쿠폰·재고·결제 화면을 고치면 매출 회복 효과 큼</p>
-                    <p class="text-xs text-slate-400 mt-0.5">📐 <b>이탈률</b> = (담은 건수 − 구매 건수) ÷ 담은 건수 = <b>담아놓고 안 산 비율</b> · <b>놓친 매출</b> = 이탈 건수 × 1인당 구매액</p>
-                </div>
-                <span id="leak-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
-            </div>
-            <div id="leak-ranking"></div>
-        </section>
-
-        <!-- ★ ROAS 진단 (제품별 최약 레버) -->
-        <section class="chart-card mb-6">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div>
-                    <h3 class="chart-title"><i class="fas fa-stethoscope mr-2 text-rose-500"></i>효율 진단 — 제품별 약점 찾기 <span class="info-tip" tabindex="0" data-tip="광고 효율이 낮은 이유를 자동으로 찾아줘요. '클릭이 안 됨(소재 문제)' vs '담았는데 안 삼(가격·결제 문제)' vs '적게 삼(상품 구성 문제)'으로 구분합니다.">ⓘ</span></h3>
-                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 어느 제품의 어느 단계가 약한지 → 빨간 칸 = 지금 바로 개선 필요한 곳 · 약점별 개선 담당도 자동 안내</p>
-                </div>
-                <span id="roasdx-info" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full"></span>
-            </div>
-            <div id="roasdx-table" class="mw-table-wrap"></div>
-        </section>
-
         <!-- 제품별 소구포인트 인사이트 (이 소구는 좋았다 → 다음에 이렇게) -->
         <section class="chart-card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -426,22 +401,6 @@
                     </h3>
                 </div>
                 <div id="best-creatives-list" class="space-y-2"></div>
-            </div>
-        </section>
-
-        <!-- 제품별 WORST 5 -->
-        <section class="mb-6">
-            <div class="bg-white rounded-xl border-2 border-red-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-white text-xs">
-                            <i class="fas fa-arrow-trend-down"></i>
-                        </span>
-                        WORST TOP 5 · 원인 진단
-                    </h3>
-                    <span id="worst-summary" class="text-xs text-slate-400"></span>
-                </div>
-                <div id="worst-creatives-list" class="space-y-2"></div>
             </div>
         </section>
 

@@ -2,6 +2,33 @@
 // State Management
 // ============================
 let allCreatives = [];
+
+// ============================
+// 제품명 통합 정규화 — 같은 제품의 표기/버전 변형을 하나로 묶음
+//   (필터·차트·집계 전체에 일관 적용. 데이터 로드 시 1회 멱등 적용)
+// ============================
+const PRODUCT_NAME_MAP = {
+    // GiftBox 계열 (GiftBox_3D / GiftBox_Collagen / GiftBox_h / 3D-GiftBox → GiftBox)
+    'giftbox': 'GiftBox', 'giftbox3d': 'GiftBox', 'giftboxcollagen': 'GiftBox',
+    'giftboxh': 'GiftBox', '3dgiftbox': 'GiftBox',
+    // Refill 계열 (3D Refill / 3D-Refill / 3D-refill → Refill)
+    'refill': 'Refill', '3drefill': 'Refill',
+    // 대소문자 변형
+    'tanghuru': 'Tanghuru',
+};
+function normalizeProductName(raw) {
+    const p = (raw || '').trim();
+    if (!p) return p;
+    const key = p.toLowerCase().replace(/[\s_\-]/g, '');
+    return PRODUCT_NAME_MAP[key] || p;
+}
+function normalizeAllProducts(list) {
+    if (!Array.isArray(list)) return list;
+    list.forEach(c => { if (c && c.product) c.product = normalizeProductName(c.product); });
+    return list;
+}
+window.normalizeProductName = normalizeProductName;
+window.normalizeAllProducts = normalizeAllProducts;
 let currentBrand = 'BOH';   // 전체(ALL) 탭 제거됨 → 기본 BOH
 let currentCampaign = ''; // ★ 전역 캠페인 필터 ('' = 전체) — UI 제거됐지만 호환용 유지
 let currentPlatform = ''; // ★ 전역 매체(Platform) 필터 ('' = 전체) — 브랜드별로 동적 구성
@@ -75,7 +102,7 @@ async function loadData() {
     if (typeof window.tryLoadSavedSheet === 'function') {
         const sheetData = await window.tryLoadSavedSheet();
         if (sheetData && sheetData.length) {
-            allCreatives = sheetData;
+            allCreatives = normalizeAllProducts(sheetData);
             window.allCreatives = allCreatives;
             return;
         }
@@ -84,7 +111,7 @@ async function loadData() {
     try {
         const res = await fetch('tables/creatives?limit=100');
         const json = await res.json();
-        allCreatives = json.data || [];
+        allCreatives = normalizeAllProducts(json.data || []);
         window.allCreatives = allCreatives;
         if (typeof window.updateDataSourceLabel === 'function') window.updateDataSourceLabel(false);
     } catch (e) {
@@ -96,6 +123,7 @@ async function loadData() {
 // 시트 연동 후 전역 갱신을 위해 노출
 window.updateDashboard = function() {
     allCreatives = window.allCreatives || allCreatives;
+    normalizeAllProducts(allCreatives);  // ★ 제품명 통합 정규화 (멱등)
     invalidatePerformancePoolCache();
     if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache();
 
