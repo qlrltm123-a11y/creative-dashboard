@@ -25,10 +25,12 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'contents 배열이 필요합니다.' });
   }
 
-  const payload = JSON.stringify({
-    contents: body.contents,
-    generationConfig: body.generationConfig || { temperature: 0.4, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
-  });
+  // generationConfig 정규화 — 클라이언트가 뭘 보내든 thinking 끄고 토큰 한도 보장
+  // (gemini-2.5-flash는 thinking 모델이라 thinkingBudget을 안 끄면 사고 토큰이 본문을 잡아먹어 답변이 잘림)
+  const gc = Object.assign({ temperature: 0.4 }, body.generationConfig || {});
+  if (gc.thinkingConfig == null) gc.thinkingConfig = { thinkingBudget: 0 };
+  if (!gc.maxOutputTokens || gc.maxOutputTokens < 8192) gc.maxOutputTokens = 8192;
+  const payload = JSON.stringify({ contents: body.contents, generationConfig: gc });
 
   const callModel = async (model) => {
     const r = await fetch(
@@ -55,6 +57,10 @@ module.exports = async function handler(req, res) {
         // 사고 토큰으로 본문이 잘린 경우 안내
         if (!text && finish === 'MAX_TOKENS') {
           return res.status(200).json({ text: '⚠️ 답변 생성 중 토큰 한도에 도달했습니다. 질문을 더 구체적으로(예: 특정 브랜드·기간) 좁혀주세요.', model: m, finishReason: finish });
+        }
+        // 본문은 있으나 한도로 끊긴 경우 — 끝에 안내 덧붙임
+        if (text && finish === 'MAX_TOKENS') {
+          return res.status(200).json({ text: text + '\n\n---\n⚠️ *답변이 길어 일부에서 끊겼습니다. 더 필요한 부분을 콕 집어 물어보세요.*', model: m, finishReason: finish });
         }
         return res.status(200).json({ text, model: m, finishReason: finish });
       }

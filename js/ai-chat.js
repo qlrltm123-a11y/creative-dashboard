@@ -318,7 +318,7 @@ ${(() => { const s = JSON.stringify(ctx); return s.length > 40000 ? s.slice(0, 4
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents,
-                    generationConfig: { temperature: 0.35, maxOutputTokens: 4096 },
+                    generationConfig: { temperature: 0.35, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
                 }),
                 signal: controller.signal,
             });
@@ -671,7 +671,7 @@ ${corpus}`;
     try {
         const res = await fetch('/api/ai-chat', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents, generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }),
+            body: JSON.stringify({ contents, generationConfig: { temperature: 0.4, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } } }),
         });
         const data = await res.json();
         if (res.ok && data.text) {
