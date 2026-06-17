@@ -857,8 +857,6 @@ function renderAIInsights() {
     renderInsightThresholdBadge();
     renderKeywordSearch(list);
     bindKeywordSearch();
-    // 영상 흐름 종합 — 캐시된 결과/진행 현황 표시
-    if (typeof window.acRenderCachedVideoSynth === 'function') window.acRenderCachedVideoSynth();
 
     // 2차 배치: 첫 paint 직후 — 주요 차트 + hover맵
     setTimeout(() => {
@@ -880,10 +878,9 @@ function renderAIInsights() {
         renderBrandCrossInsight(window.allCreatives || list);
     }, 200);
 
-    // 4차 배치: 무거운 히트맵 + 시장조사 연계 (idle 시점에 실행)
+    // 4차 배치: 시장조사 연계 (idle 시점에 실행)
     const batch4 = () => {
         renderAppealFunnelChart(list);
-        renderAppealHookHeatmap(list);
         bindInsightChartSelects();
         attachInsightHoverEvents();
         renderMarketResearchLinks(list);
@@ -926,18 +923,6 @@ function bindInsightChartSelects() {
         if (lbl) lbl.textContent = (INSIGHT_METRIC_CFG[chartMetrics[chartKey]] || INSIGHT_METRIC_CFG.roas).label;
     });
 
-    // 히트맵 지표 셀렉트 바인딩
-    const heatmapMetricSel = document.getElementById('heatmap-metric-select');
-    if (heatmapMetricSel && heatmapMetricSel.dataset.bound !== '1') {
-        heatmapMetricSel.dataset.bound = '1';
-        heatmapMetricSel.addEventListener('change', () => {
-            const container = document.getElementById('appealHookHeatmap');
-            if (container) container.dataset.metric = heatmapMetricSel.value;
-            if (typeof renderAppealHookHeatmap === 'function' && window.allCreatives) {
-                renderAppealHookHeatmap(window.allCreatives);
-            }
-        });
-    }
 }
 
 // 선정 기준 안내 (헤더 옆에 칩으로 표시)

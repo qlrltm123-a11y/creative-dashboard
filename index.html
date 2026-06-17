@@ -404,59 +404,6 @@
             </div>
         </section>
 
-        <!-- ★ 매체 × 소재 조합 분석 -->
-        <section class="chart-card mb-6">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div>
-                    <h3 class="chart-title">
-                        <i class="fas fa-grip mr-2 text-indigo-500"></i>매체별 잘 된 소재 조합 <span class="info-tip" tabindex="0" data-tip="Meta·TikTok 등 매체마다 어떤 소재(강조 포인트)가 잘 작동했는지 표로 보여줘요.">ⓘ</span>
-                    </h3>
-                    <p class="text-xs text-slate-500 mt-1">어느 매체에서 어떤 소재(소구포인트)가 잘 작동했는지 확인하세요</p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <i class="fas fa-sort-amount-down text-slate-400 text-sm"></i>
-                    <span class="text-xs font-semibold text-slate-600">지표</span>
-                    <select id="platform-matrix-metric" class="filter-select text-sm">
-                        <option value="ctr" selected>클릭률(CTR)</option>
-                        <option value="roas">광고효율(ROAS)</option>
-                        <option value="cvr">구매전환율(CVR)</option>
-                        <option value="revenue">매출</option>
-                        <option value="atc_rate">장바구니 담기율(ATC)</option>
-                        <option value="cost_per_atc">장바구니 1건당 광고비</option>
-                    </select>
-                    <!-- 상단 통합 필터와 동기화 (호환용 hidden) -->
-                    <select id="platform-matrix-product-select" class="hidden">
-                        <option value="">전체 제품</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- 선정 기준 배지 -->
-            <div id="platform-matrix-threshold" class="mb-3"></div>
-
-            <!-- TOP 매체×소재 조합 카드 (3개) -->
-            <div class="mb-5">
-                <div class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
-                    <i class="fas fa-trophy text-amber-500"></i>
-                    <span>워킹한 매체 × 소구 조합 TOP 3</span>
-                </div>
-                <div id="platform-creative-top-combos" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <!-- 동적 생성 -->
-                </div>
-            </div>
-
-            <!-- 매트릭스 히트맵 (매체 × 소구포인트) -->
-            <div>
-                <div class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
-                    <i class="fas fa-table-cells text-indigo-500"></i>
-                    <span>매체 × 소구포인트 히트맵</span>
-                    <span class="text-xs text-slate-400 font-normal">셀 색이 진할수록 성과 우위</span>
-                </div>
-                <div id="platform-creative-matrix" class="platform-matrix-wrap">
-                    <!-- 동적 생성 -->
-                </div>
-            </div>
-        </section>
         </div>
         <!-- ============ /SECTION: PERFORMANCE ============ -->
 
@@ -533,25 +480,6 @@
                 <div id="keyword-search-empty" class="text-center text-slate-400 text-sm py-10">검색어를 입력하면 일치하는 강조 포인트·소재명·메시지의 소재를 효율(ROAS) 순으로 보여줘요</div>
             </div>
 
-            <!-- 영상 소재 흐름 종합 인사이트 (전체 영상 자동 분석) -->
-            <div class="chart-card mb-4" id="videoFlowCard">
-                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                    <h3 class="chart-title"><i class="fas fa-film mr-2 text-fuchsia-500"></i>영상 소재 흐름 종합 인사이트
-                        <span class="info-tip" tabindex="0" data-tip="영상 소재의 전체 내용(썸네일이 아닌 영상 전체)을 AI가 보고 시작→중간→마무리 흐름, 후킹, 소구포인트를 분석합니다. 버튼을 누르면 현재 필터의 영상 소재를 모두 자동 분석하고 결과는 저장됩니다 (영상 1건당 30초 내외).">ⓘ</span>
-                        <span id="video-flow-hint" class="text-xs font-normal text-slate-400 ml-2"></span>
-                    </h3>
-                    <div class="flex items-center gap-1.5">
-                        <button class="text-xs text-slate-500 hover:text-fuchsia-600 transition px-2 py-1.5 rounded-lg hover:bg-slate-100" title="누적 분석 데이터 백업 (JSON 내보내기)" onclick="window.acExportVideoData && window.acExportVideoData()"><i class="fas fa-download"></i></button>
-                        <label class="text-xs text-slate-500 hover:text-fuchsia-600 transition px-2 py-1.5 rounded-lg hover:bg-slate-100 cursor-pointer" title="백업 데이터 불러오기 (누적 병합)">
-                            <i class="fas fa-upload"></i>
-                            <input type="file" accept="application/json,.json" class="hidden" onchange="window.acImportVideoData && window.acImportVideoData(this)">
-                        </label>
-                        <button id="video-batch-btn" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white hover:opacity-90 transition shadow-sm" onclick="window.acBatchAnalyzeVideos && window.acBatchAnalyzeVideos()">🎬 영상 전체 자동분석</button>
-                    </div>
-                </div>
-                <div id="video-flow-progress" class="hidden mb-3"></div>
-                <div id="video-flow-result" class="text-sm text-slate-600 leading-relaxed"></div>
-            </div>
 
             <!-- 시장조사 연계 인사이트 (성과 연계 카드) -->
             <div class="chart-card mb-4" id="mr-links-section" style="display:none;"></div>
@@ -662,21 +590,6 @@
                 </div>
             </div>
 
-            <!-- 소구포인트 × 후킹 조합 히트맵 -->
-            <div class="chart-card mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <div>
-                        <h3 class="chart-title"><i class="fas fa-th mr-2 text-indigo-500"></i>강조 포인트 × 시선 끄는 방식 — 잘 맞는 조합 <span class="info-tip" tabindex="0" data-tip="어떤 '강조 포인트(소구점)'와 '시선 끄는 방식(후킹)'을 함께 썼을 때 가장 잘 팔렸는지 색이 진할수록 효율 좋음.">ⓘ</span></h3>
-                        <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 다음 소재에 쓰면 좋은 '강조점 + 표현방식' 조합 (진한 칸이 고효율)</p>
-                    </div>
-                    <select id="heatmap-metric-select" class="filter-select text-sm">
-                        <option value="roas" selected>광고효율(ROAS)</option>
-                        <option value="ctr">클릭률(CTR)</option>
-                        <option value="cvr">구매전환율(CVR)</option>
-                    </select>
-                </div>
-                <div id="appealHookHeatmap"></div>
-            </div>
 
             <!-- Key Messages Best -->
             <div class="chart-card">

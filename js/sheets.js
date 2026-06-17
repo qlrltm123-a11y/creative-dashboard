@@ -242,6 +242,31 @@ function csvToObjects(csvText) {
     //       "Meta"                 → "Meta"   (그대로)
     //       "TikTok"               → "Tiktok" (Title Case)
     //       "X"                    → "X"
+    const normalizeProductName = (raw) => {
+        if (raw == null) return '';
+        const s = String(raw).trim();
+        if (!s) return '';
+        const MAP = {
+            // GiftBox 계열
+            '3D-GiftBox': 'GiftBox', 'GiftBox_3D': 'GiftBox', 'GiftBox_Collagen': 'GiftBox',
+            'GiftBox_h': 'GiftBox', 'Gift': 'GiftBox', 'GIFT': 'GiftBox', '3D Gift': 'GiftBox',
+            'CG-Gift': 'GiftBox', 'Box-set': 'GiftBox',
+            // Mixed-Line 계열
+            'Mixed': 'Mixed-Line', 'Mixed-Line_GiftBox': 'Mixed-Line',
+            // 3D-Refill 계열
+            '3D Refill': '3D-Refill', '3D-refill': '3D-Refill',
+            // FoundationBrush 계열
+            'FdBrush': 'FoundationBrush',
+            // Collagen 계열
+            'Collagen': 'CollagenMist',
+            // NAD 계열
+            'NAD': 'NAD크림', 'NADCream': 'NAD크림', 'NADset': 'NAD크림',
+            // 대소문자 정규화
+            'tanghuru': 'Tanghuru', 'color': 'Color',
+        };
+        return MAP[s] || s;
+    };
+
     const normalizePlatform = (raw) => {
         if (raw == null) return '';
         const s = String(raw).trim().replace(/\s+/g, ' ');
@@ -270,6 +295,11 @@ function csvToObjects(csvText) {
             }
             obj[key] = val;
         });
+
+        // ★ Product 정규화 — 표기 혼재 제품명을 통일
+        if (obj.product) {
+            obj.product = normalizeProductName(obj.product);
+        }
 
         // ★ Platform 정규화 — 원본은 platform_raw로 보존
         if (obj.platform) {
