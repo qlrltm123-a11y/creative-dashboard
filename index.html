@@ -36,6 +36,48 @@
     </style>
 </head>
 <body class="bg-slate-50">
+    <!-- ===== 좌측 사이드바 네비게이션 (nugoona 스타일) ===== -->
+    <aside id="app-sidebar">
+        <div class="sb-logo">
+            <span class="sb-logo-icon"><i class="fas fa-chart-line"></i></span>
+            <span class="sb-logo-text">Creative</span>
+        </div>
+        <nav class="sb-nav">
+            <div class="sb-group-label">분석</div>
+            <button class="section-tab active" data-section="performance">
+                <i class="fas fa-chart-simple sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">성과 분석</span><span class="sb-sub">어떤 광고가 잘됐나</span></span>
+            </button>
+            <button class="section-tab" data-section="funnel">
+                <i class="fas fa-filter sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">퍼널</span><span class="sb-sub">유입→구매 전환</span></span>
+            </button>
+            <button class="section-tab" data-section="kr">
+                <i class="fas fa-user sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">인플루언서</span><span class="sb-sub">인물 등장 소재</span></span>
+            </button>
+            <div class="sb-group-label">제작</div>
+            <button class="section-tab" data-section="ai">
+                <i class="fas fa-wand-magic-sparkles sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">AI 인사이트</span><span class="sb-sub">잘 먹힌 강조·표현</span></span>
+            </button>
+            <div class="sb-group-label">운영 · 보고</div>
+            <button class="section-tab" data-section="gmv">
+                <i class="fas fa-chart-line sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">GMV</span><span class="sb-sub">실시간 매출 시뮬</span></span>
+            </button>
+            <button class="section-tab" data-section="weekly">
+                <i class="fas fa-calendar-check sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">주간 업무</span><span class="sb-sub">보고서 · 공유</span></span>
+            </button>
+        </nav>
+        <div class="sb-footer">
+            <button class="sb-foot-btn" onclick="window._glOpen && window._glOpen()" title="마케팅 용어 설명">
+                <i class="fas fa-book"></i><span>용어 가이드</span>
+            </button>
+        </div>
+    </aside>
+
     <!-- Header -->
     <!-- Apple Global Nav -->
     <header style="background:#000!important;height:44px!important;border:none!important;display:flex;align-items:center;padding:0 22px;position:sticky;top:0;z-index:50;gap:0;">
@@ -117,41 +159,7 @@
             </div>
         </section>
 
-        <!-- Apple Sub-Nav -->
-        <nav id="section-tabs" class="section-tabs mb-5" style="background:#fff!important;border-bottom:0.5px solid #e0e0e0!important;border-top:none!important;border-left:none!important;border-right:none!important;border-radius:0!important;padding:0 0!important;margin:0 -24px 0!important;display:flex!important;align-items:stretch!important;overflow-x:auto!important;gap:0!important;scrollbar-width:none!important;">
-            <div class="tab-group" data-group="분석" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
-                <button class="section-tab active" data-section="performance" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:none!important;border-right:0.5px solid #f0f0f0!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">성과 분석</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">어떤 광고가 잘됐나</span>
-                </button>
-                <button class="section-tab" data-section="funnel" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">퍼널</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">유입→구매 전환</span>
-                </button>
-                <button class="section-tab" data-section="kr" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">인플루언서</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">인물 등장 소재</span>
-                </button>
-            </div>
-            <div class="tab-group" data-group="제작" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
-                <button class="section-tab" data-section="ai" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">AI 인사이트</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">잘 먹힌 강조·표현</span>
-                </button>
-            </div>
-            <div class="tab-group" data-group="운영" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
-                <button class="section-tab" data-section="gmv" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:0.5px solid #f0f0f0!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">GMV</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">실시간 매출 시뮬</span>
-                </button>
-            </div>
-            <div class="tab-group" data-group="보고" style="border-right:none!important;padding:0!important;gap:0!important;display:flex!important;align-items:stretch!important;">
-                <button class="section-tab" data-section="weekly" style="flex-direction:column!important;padding:10px 20px!important;border-radius:0!important;gap:2px!important;white-space:nowrap!important;border-bottom:2px solid transparent!important;border-top:none!important;border-left:none!important;border-right:none!important;">
-                    <span class="label" style="font-size:13px!important;font-weight:600!important;letter-spacing:-0.12px!important;">주간 업무</span>
-                    <span class="sub" style="font-size:11px!important;color:#6e6e73!important;">보고서 · 공유</span>
-                </button>
-            </div>
-        </nav>
+        <!-- 섹션 탭 → 좌측 사이드바로 이동됨 -->
 
         <!-- 첫 방문 안내 배너 (1회, 모든 탭 공통) -->
         <div id="intro-banner" class="intro-banner" style="display:none">
