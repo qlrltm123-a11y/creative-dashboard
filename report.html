@@ -4,128 +4,182 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>소재 리포트 · 핵심 요약</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 <style>
   :root{
-    --bg:#f5f5f7; --card:#ffffff; --ink:#1d1d1f; --sub:#6e6e73;
-    --line:#e5e5ea; --good:#34c759; --mid:#ff9f0a; --low:#ff3b30;
-    --boh:#FF6B35; --wm:#10b981; --cg:#f59e0b; --accent:#0071e3;
-    --shadow:0 1px 3px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.05);
+    --bg:#f1f1f4; --card:#ffffff; --ink:#17171c; --sub:#74747e; --faint:#9a9aa3;
+    --line:#ececed; --hair:#f3f3f5;
+    --good:#0fa34a; --mid:#e08600; --low:#e5484d; --gold:#d9a300;
+    --boh:#FF6B35; --wm:#10b981; --cg:#f59e0b;
+    --accent:#6d4aff;
+    --hero-a:#201d2b; --hero-b:#3a2742; --hero-c:#4a2b3e;
+    --shadow-sm:0 1px 2px rgba(20,20,30,.05),0 4px 12px rgba(20,20,30,.05);
+    --shadow-md:0 2px 6px rgba(20,20,30,.06),0 14px 38px rgba(20,20,30,.08);
+    --shadow-lg:0 8px 20px rgba(20,20,30,.12),0 28px 60px rgba(20,20,30,.14);
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,"SF Pro KR","Apple SD Gothic Neo","Pretendard","Segoe UI",sans-serif;
-    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
-    line-height:1.5; padding-bottom:80px;
+    font-family:"Pretendard","Pretendard Variable",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",sans-serif;
+    background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    line-height:1.5; padding-bottom:96px; letter-spacing:-.01em;
   }
-  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+  .wrap{max-width:1120px; margin:0 auto; padding:0 22px}
 
-  /* ===== Header ===== */
-  header{padding:48px 0 24px}
-  .eyebrow{font-size:13px; font-weight:600; color:var(--accent); letter-spacing:.2px}
-  h1{font-size:34px; font-weight:700; letter-spacing:-.5px; margin:6px 0 8px}
-  .lead{font-size:16px; color:var(--sub); max-width:680px}
-  .meta-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px}
-  .brand-toggle{display:inline-flex; background:#ececf0; border-radius:12px; padding:4px; gap:2px}
-  .brand-toggle button{
-    border:0; background:transparent; font-size:14px; font-weight:600; color:var(--sub);
-    padding:7px 18px; border-radius:9px; cursor:pointer; transition:.18s; display:flex; align-items:center; gap:7px;
+  /* ===== Hero ===== */
+  .hero{
+    position:relative; overflow:hidden; color:#fff; border-radius:26px; margin-top:24px;
+    padding:38px 40px 30px;
+    background:linear-gradient(135deg,var(--hero-a) 0%,var(--hero-b) 58%,var(--hero-c) 100%);
+    box-shadow:var(--shadow-md);
   }
-  .brand-toggle button .dot{width:8px;height:8px;border-radius:50%}
-  .brand-toggle button.active{background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  .freshness{font-size:13px; color:var(--sub); display:flex; align-items:center; gap:6px; margin-left:auto}
-  .freshness .live{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(52,199,89,.18)}
-  .filter-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .hero::before{content:""; position:absolute; top:-40%; right:-8%; width:460px; height:460px; border-radius:50%;
+    background:radial-gradient(circle,rgba(168,120,200,.35),transparent 62%); pointer-events:none}
+  .hero::after{content:""; position:absolute; bottom:-55%; left:-6%; width:380px; height:380px; border-radius:50%;
+    background:radial-gradient(circle,rgba(255,150,110,.18),transparent 62%); pointer-events:none}
+  .hero > *{position:relative; z-index:1}
+  .eyebrow{font-size:12px; font-weight:700; letter-spacing:.22em; color:#f3c969; text-transform:uppercase}
+  .hero h1{font-size:33px; font-weight:800; letter-spacing:-.025em; margin:10px 0 10px; line-height:1.15}
+  .hero .lead{font-size:15.5px; color:rgba(255,255,255,.74); max-width:640px; line-height:1.6}
+  .hero .lead b{color:#fff; font-weight:700}
+
+  .hero-controls{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:24px}
+  .brand-toggle{display:inline-flex; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.14);
+    border-radius:13px; padding:4px; gap:2px; backdrop-filter:blur(6px)}
+  .brand-toggle button{border:0; background:transparent; font-size:13.5px; font-weight:700; color:rgba(255,255,255,.7);
+    padding:8px 18px; border-radius:10px; cursor:pointer; transition:.18s; display:flex; align-items:center; gap:7px}
+  .brand-toggle button .dot{width:8px;height:8px;border-radius:50%; box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+  .brand-toggle button.active{background:#fff; color:#1c1b22; box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .freshness{font-size:12.5px; color:rgba(255,255,255,.66); display:flex; align-items:center; gap:7px; margin-left:auto}
+  .freshness .live{width:7px;height:7px;border-radius:50%;background:#46e08a;box-shadow:0 0 0 4px rgba(70,224,138,.22)}
+
+  /* ===== Summary strip ===== */
+  .summary{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; margin-top:26px;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12); border-radius:16px; overflow:hidden}
+  .summary .s{padding:15px 20px; background:rgba(255,255,255,.015)}
+  .summary .s .k{font-size:11.5px; font-weight:600; color:rgba(255,255,255,.6); letter-spacing:.02em; display:flex; align-items:center; gap:6px}
+  .summary .s .v{font-size:25px; font-weight:800; letter-spacing:-.02em; margin-top:4px}
+  .summary .s .v small{font-size:14px; font-weight:600; color:rgba(255,255,255,.7); margin-left:2px}
+  .summary .s .v.accent{background:linear-gradient(90deg,#f3c969,#ff9e7a); -webkit-background-clip:text; background-clip:text; color:transparent}
+
+  /* ===== Filter bar ===== */
+  .filter-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:18px}
+  .filter-lead{font-size:12.5px; font-weight:600; color:var(--faint); display:flex; align-items:center; gap:6px; margin-right:2px}
   .fsel{position:relative; display:inline-flex; align-items:center; background:var(--card); border:1px solid var(--line);
-        border-radius:11px; box-shadow:0 1px 2px rgba(0,0,0,.04); transition:.15s}
-  .fsel:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,113,227,.12)}
-  .fsel-ic{padding:0 2px 0 12px; color:var(--sub); font-size:13px}
+    border-radius:12px; box-shadow:var(--shadow-sm); transition:.15s}
+  .fsel:hover{border-color:#dcdce0}
+  .fsel:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(109,74,255,.14)}
+  .fsel-ic{padding:0 2px 0 13px; color:var(--faint); font-size:12.5px}
   .fsel select{appearance:none; -webkit-appearance:none; border:0; background:transparent; outline:0;
-        font-size:13.5px; font-weight:600; color:var(--ink); padding:9px 30px 9px 8px; cursor:pointer; max-width:240px}
-  .fsel::after{content:"\f078"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:10px; color:var(--sub);
-        position:absolute; right:12px; pointer-events:none}
-  .freset{border:0; background:transparent; color:var(--sub); font-size:13px; font-weight:600; cursor:pointer;
-        padding:9px 10px; border-radius:9px; display:inline-flex; align-items:center; gap:6px; transition:.15s}
-  .freset:hover{background:#ececf0; color:var(--ink)}
+    font-size:13px; font-weight:600; color:var(--ink); padding:10px 32px 10px 8px; cursor:pointer; max-width:240px}
+  .fsel::after{content:"\f078"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:9px; color:var(--faint);
+    position:absolute; right:13px; pointer-events:none}
+  .freset{border:0; background:transparent; color:var(--faint); font-size:12.5px; font-weight:600; cursor:pointer;
+    padding:10px 12px; border-radius:10px; display:inline-flex; align-items:center; gap:6px; transition:.15s}
+  .freset:hover{background:#e7e7eb; color:var(--ink)}
 
   /* ===== Section ===== */
-  section.block{margin-top:40px}
-  .block-head{display:flex; align-items:baseline; gap:10px; margin-bottom:4px}
-  .block-head h2{font-size:22px; font-weight:700; letter-spacing:-.3px}
-  .block-head .count{font-size:14px; color:var(--sub); font-weight:500}
-  .block-sub{font-size:14px; color:var(--sub); margin-bottom:18px}
+  section.block{margin-top:46px}
+  .block-head{display:flex; align-items:center; gap:11px; margin-bottom:6px}
+  .block-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto}
+  .block-ic.win{background:linear-gradient(135deg,#fff1d6,#ffe0ad); color:#b67900}
+  .block-ic.msg{background:linear-gradient(135deg,#ece7ff,#ddd3ff); color:#5b3ed6}
+  .block-head h2{font-size:21px; font-weight:800; letter-spacing:-.02em}
+  .block-head .count{font-size:13px; color:var(--faint); font-weight:600; margin-left:2px}
+  .block-sub{font-size:13.5px; color:var(--sub); margin:0 0 20px 45px; line-height:1.55}
+  .block-sub b{color:var(--ink); font-weight:700}
 
   /* ===== Top creatives ===== */
   .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:18px}
-  @media(max-width:840px){.cards{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:560px){.cards{grid-template-columns:1fr}}
-  .ccard{
-    background:var(--card); border-radius:18px; overflow:hidden; box-shadow:var(--shadow);
-    display:flex; flex-direction:column; transition:.2s; position:relative;
-  }
-  .ccard:hover{transform:translateY(-3px); box-shadow:0 6px 16px rgba(0,0,0,.1),0 16px 40px rgba(0,0,0,.08)}
-  .rank-badge{
-    position:absolute; top:12px; left:12px; z-index:2;
-    width:30px;height:30px;border-radius:50%; display:flex;align-items:center;justify-content:center;
-    font-size:14px; font-weight:700; color:#fff; background:rgba(0,0,0,.55); backdrop-filter:blur(6px);
-  }
-  .ccard.gold .rank-badge{background:linear-gradient(135deg,#FFD15C,#F8A100)}
-  .ccard.silver .rank-badge{background:linear-gradient(135deg,#cfd3da,#9aa1ab)}
-  .ccard.bronze .rank-badge{background:linear-gradient(135deg,#e0a371,#b97433)}
-  .thumb{aspect-ratio:1/1; width:100%; background:#eef0f3; position:relative; overflow:hidden}
-  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-  .thumb .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#b0b4bb;font-size:30px}
-  .vid-tag{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;display:flex;align-items:center;gap:5px}
-  .cbody{padding:14px 16px 16px; display:flex; flex-direction:column; gap:10px; flex:1}
-  .cname{font-size:14.5px; font-weight:600; letter-spacing:-.2px; line-height:1.35;
-         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; min-height:2.7em}
-  .roas-line{display:flex; align-items:flex-end; gap:8px}
-  .roas-big{font-size:30px; font-weight:800; letter-spacing:-1px; line-height:1}
+  @media(max-width:860px){.cards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:540px){.cards{grid-template-columns:1fr}}
+  .ccard{background:var(--card); border-radius:20px; overflow:hidden; box-shadow:var(--shadow-sm);
+    display:flex; flex-direction:column; transition:transform .22s cubic-bezier(.2,.7,.3,1),box-shadow .22s; position:relative;
+    border:1px solid var(--hair)}
+  .ccard:hover{transform:translateY(-4px); box-shadow:var(--shadow-lg)}
+  .rank-badge{position:absolute; top:13px; left:13px; z-index:2; min-width:30px; height:30px; padding:0 9px;
+    border-radius:30px; display:flex; align-items:center; justify-content:center; gap:4px;
+    font-size:13px; font-weight:800; color:#fff; background:rgba(20,18,26,.62); backdrop-filter:blur(8px)}
+  .ccard.gold .rank-badge{background:linear-gradient(135deg,#FFD15C,#E8960A); color:#4a2e00}
+  .ccard.silver .rank-badge{background:linear-gradient(135deg,#dfe2e8,#9aa1ab); color:#2a2e35}
+  .ccard.bronze .rank-badge{background:linear-gradient(135deg,#e9b384,#bd7a3d); color:#3d2410}
+  .thumb{aspect-ratio:1/1; width:100%; background:#f0f0f3; position:relative; overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block; transition:transform .4s}
+  .ccard:hover .thumb img{transform:scale(1.04)}
+  .thumb .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c2c2cb;font-size:30px}
+  .thumb::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.18),transparent 28%,transparent 72%,rgba(0,0,0,.06)); pointer-events:none}
+  .vid-tag{position:absolute;bottom:11px;right:11px;z-index:2;background:rgba(20,18,26,.66);color:#fff;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:8px;display:flex;align-items:center;gap:5px;backdrop-filter:blur(6px)}
+  .cbody{padding:15px 17px 17px; display:flex; flex-direction:column; gap:11px; flex:1}
+  .cname{font-size:14px; font-weight:700; letter-spacing:-.01em; line-height:1.4; color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; min-height:2.8em}
+  .appeal-chips{display:flex; flex-wrap:wrap; gap:5px; margin-top:-2px}
+  .chip{font-size:11px; font-weight:600; color:#5b5b66; background:#f1f1f4; border-radius:8px; padding:3.5px 9px}
+  .roas-line{display:flex; align-items:flex-end; justify-content:space-between; gap:8px; padding-top:3px}
+  .roas-val{display:flex; align-items:baseline; gap:3px}
+  .roas-big{font-size:31px; font-weight:800; letter-spacing:-.03em; line-height:1}
   .roas-big.good{color:var(--good)} .roas-big.mid{color:var(--mid)} .roas-big.low{color:var(--low)}
-  .roas-cap{font-size:12px; color:var(--sub); padding-bottom:3px}
-  .stat-row{display:flex; gap:14px; padding-top:10px; border-top:1px solid var(--line); font-size:12.5px}
-  .stat-row .s{display:flex;flex-direction:column;gap:1px}
-  .stat-row .s .k{color:var(--sub)} .stat-row .s .v{font-weight:600}
-  .appeal-chips{display:flex; flex-wrap:wrap; gap:5px}
-  .chip{font-size:11.5px; font-weight:500; color:#3a3a3c; background:#f0f0f2; border-radius:7px; padding:3px 8px}
+  .roas-unit{font-size:15px; font-weight:700; color:var(--sub)}
+  .roas-cap{font-size:11px; color:var(--faint); text-align:right; line-height:1.4; font-weight:500}
+  .stat-row{display:flex; gap:0; padding-top:12px; margin-top:1px; border-top:1px solid var(--hair); font-size:12px}
+  .stat-row .s{display:flex;flex-direction:column;gap:2px; flex:1}
+  .stat-row .s + .s{border-left:1px solid var(--hair); padding-left:13px}
+  .stat-row .s .k{color:var(--faint); font-size:11px; font-weight:500} .stat-row .s .v{font-weight:700; font-size:13px}
 
   /* ===== Appeal ranking ===== */
-  .appeal-list{background:var(--card); border-radius:18px; box-shadow:var(--shadow); overflow:hidden}
-  .appeal-row{display:grid; grid-template-columns:36px 1fr 130px; align-items:center; gap:16px;
-              padding:16px 22px; border-bottom:1px solid var(--line)}
+  .appeal-list{background:var(--card); border-radius:20px; box-shadow:var(--shadow-sm); overflow:hidden; border:1px solid var(--hair)}
+  .appeal-row{display:grid; grid-template-columns:42px 1fr 120px; align-items:center; gap:18px;
+    padding:17px 24px; border-bottom:1px solid var(--hair); transition:background .15s}
+  .appeal-row:hover{background:#fafafb}
   .appeal-row:last-child{border-bottom:0}
-  .appeal-rank{font-size:16px; font-weight:700; color:var(--sub); text-align:center}
-  .appeal-row.top1 .appeal-rank{color:#F8A100}
+  .appeal-rank{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:14px; font-weight:800; color:var(--sub); background:#f1f1f4}
+  .appeal-row.r1 .appeal-rank{background:linear-gradient(135deg,#FFD15C,#E8960A); color:#4a2e00}
+  .appeal-row.r2 .appeal-rank{background:linear-gradient(135deg,#dfe2e8,#9aa1ab); color:#2a2e35}
+  .appeal-row.r3 .appeal-rank{background:linear-gradient(135deg,#e9b384,#bd7a3d); color:#3d2410}
   .appeal-main{min-width:0}
-  .appeal-kw{font-size:16px; font-weight:600; letter-spacing:-.2px; margin-bottom:7px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-  .appeal-kw .meta{font-size:12px; font-weight:500; color:var(--sub)}
-  .bar{height:8px; background:#ececed; border-radius:5px; overflow:hidden}
-  .bar > i{display:block; height:100%; border-radius:5px; background:linear-gradient(90deg,#5ac8fa,#0071e3)}
+  .appeal-kw{font-size:15.5px; font-weight:700; letter-spacing:-.01em; margin-bottom:8px; display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+  .appeal-kw .meta{font-size:11.5px; font-weight:500; color:var(--faint)}
+  .bar{height:7px; background:#eeeef1; border-radius:6px; overflow:hidden}
+  .bar > i{display:block; height:100%; border-radius:6px; background:linear-gradient(90deg,#8b6dff,#6d4aff)}
   .appeal-num{text-align:right}
-  .appeal-num .big{font-size:22px; font-weight:800; letter-spacing:-.5px}
+  .appeal-num .big{font-size:23px; font-weight:800; letter-spacing:-.02em}
   .appeal-num .big.good{color:var(--good)} .appeal-num .big.mid{color:var(--mid)} .appeal-num .big.low{color:var(--low)}
-  .appeal-num .cap{font-size:11.5px; color:var(--sub)}
+  .appeal-num .cap{font-size:11px; color:var(--faint); margin-top:1px}
 
   /* ===== misc ===== */
-  .empty{background:var(--card);border-radius:18px;padding:54px 20px;text-align:center;color:var(--sub);box-shadow:var(--shadow)}
-  .empty i{font-size:30px; opacity:.5; margin-bottom:12px; display:block}
-  .footer-link{margin-top:48px; text-align:center}
-  .footer-link a{font-size:14px; font-weight:600; color:var(--accent); text-decoration:none; display:inline-flex; align-items:center; gap:7px}
-  .footer-link a:hover{text-decoration:underline}
-  .loading{padding:60px;text-align:center;color:var(--sub)}
-  .loading i{font-size:26px;margin-bottom:12px;display:block}
-  .legend{font-size:12px;color:var(--sub);margin-top:14px;display:flex;gap:16px;flex-wrap:wrap}
-  .legend b{font-weight:600;color:var(--ink)}
+  .empty{background:var(--card);border-radius:20px;padding:58px 20px;text-align:center;color:var(--sub);box-shadow:var(--shadow-sm);border:1px solid var(--hair)}
+  .empty i{font-size:30px; opacity:.4; margin-bottom:14px; display:block}
+  .legend{font-size:11.5px;color:var(--sub);margin:16px 0 0 2px;display:flex;gap:10px;flex-wrap:wrap}
+  .legend .pill{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; box-shadow:var(--shadow-sm)}
+  .legend b{font-weight:700;color:var(--ink)}
+  .dotc{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .footer-link{margin-top:54px; text-align:center}
+  .footer-link a{font-size:13.5px; font-weight:700; color:var(--ink); text-decoration:none; display:inline-flex; align-items:center; gap:8px;
+    background:var(--card); border:1px solid var(--line); padding:12px 22px; border-radius:30px; box-shadow:var(--shadow-sm); transition:.18s}
+  .footer-link a:hover{transform:translateY(-2px); box-shadow:var(--shadow-md)}
+  .loading{padding:64px;text-align:center;color:var(--faint)}
+  .loading i{font-size:24px;margin-bottom:12px;display:block}
+  @media(max-width:600px){
+    .hero{padding:30px 24px 26px; border-radius:22px}
+    .hero h1{font-size:27px}
+    .summary{grid-template-columns:1fr 1fr}
+    .summary .s:last-child{grid-column:1/-1}
+    .block-sub{margin-left:0}
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="eyebrow">CREATIVE REPORT</div>
+
+  <!-- ===== HERO ===== -->
+  <header class="hero">
+    <div class="eyebrow">Creative Report</div>
     <h1>소재 핵심 요약</h1>
     <p class="lead">광고 소재 중 <b>지금 가장 잘 나가는 것</b>과, 소비자에게 <b>잘 먹힌 표현·강조점</b>만 모았습니다. 자세한 수치는 전체 대시보드에서 볼 수 있어요.</p>
-    <div class="meta-row">
+
+    <div class="hero-controls">
       <div class="brand-toggle" id="brand-toggle">
         <button data-brand="BOH" class="active"><span class="dot" style="background:var(--boh)"></span>BOH</button>
         <button data-brand="WM"><span class="dot" style="background:var(--wm)"></span>WM</button>
@@ -133,40 +187,51 @@
       </div>
       <div class="freshness" id="freshness"><span class="live"></span><span>데이터 불러오는 중…</span></div>
     </div>
-    <div class="filter-row">
-      <label class="fsel">
-        <span class="fsel-ic"><i class="fas fa-bullhorn"></i></span>
-        <select id="f-event"><option value="">전체 이벤트</option></select>
-      </label>
-      <label class="fsel">
-        <span class="fsel-ic"><i class="fas fa-box"></i></span>
-        <select id="f-product"><option value="">전체 제품</option></select>
-      </label>
-      <button id="f-reset" class="freset" title="필터 초기화"><i class="fas fa-rotate-left"></i> 초기화</button>
+
+    <div class="summary" id="summary">
+      <div class="s"><div class="k"><i class="fas fa-won-sign"></i> 총 매출</div><div class="v" id="sum-revenue">–</div></div>
+      <div class="s"><div class="k"><i class="fas fa-coins"></i> 광고비</div><div class="v" id="sum-spend">–</div></div>
+      <div class="s"><div class="k"><i class="fas fa-chart-line"></i> 평균 ROAS</div><div class="v accent" id="sum-roas">–</div></div>
     </div>
   </header>
 
-  <!-- 1. 잘 나가는 소재 TOP -->
+  <!-- ===== FILTER BAR ===== -->
+  <div class="filter-row">
+    <span class="filter-lead"><i class="fas fa-sliders"></i> 필터</span>
+    <label class="fsel">
+      <span class="fsel-ic"><i class="fas fa-bullhorn"></i></span>
+      <select id="f-event"><option value="">전체 이벤트</option></select>
+    </label>
+    <label class="fsel">
+      <span class="fsel-ic"><i class="fas fa-box"></i></span>
+      <select id="f-product"><option value="">전체 제품</option></select>
+    </label>
+    <button id="f-reset" class="freset" title="필터 초기화"><i class="fas fa-rotate-left"></i> 초기화</button>
+  </div>
+
+  <!-- ===== 1. 잘 나가는 소재 TOP ===== -->
   <section class="block">
     <div class="block-head">
-      <h2>🏆 잘 나가는 소재 TOP</h2>
+      <span class="block-ic win">🏆</span>
+      <h2>잘 나가는 소재 TOP</h2>
       <span class="count" id="top-count"></span>
     </div>
     <p class="block-sub">광고비 대비 매출(ROAS)이 높은 순서. 숫자가 클수록 광고비 1원으로 더 많이 벌었다는 뜻입니다.</p>
     <div id="top-creatives"><div class="loading"><i class="fas fa-circle-notch fa-spin"></i>불러오는 중…</div></div>
   </section>
 
-  <!-- 2. 잘 먹힌 표현·강조점 -->
+  <!-- ===== 2. 잘 먹힌 표현·강조점 ===== -->
   <section class="block">
     <div class="block-head">
-      <h2>💡 잘 먹힌 표현·강조점</h2>
+      <span class="block-ic msg">💡</span>
+      <h2>잘 먹힌 표현·강조점</h2>
       <span class="count" id="appeal-count"></span>
     </div>
     <p class="block-sub">소재에 쓰인 강조 메시지(소구포인트)별로 광고 효율을 모은 결과. 어떤 메시지가 실제 매출로 이어졌는지 보여줍니다.</p>
     <div id="appeal-ranking"><div class="loading"><i class="fas fa-circle-notch fa-spin"></i>불러오는 중…</div></div>
     <div class="legend">
-      <span><b>ROAS</b> = 매출 ÷ 광고비 (광고비 1원당 벌어들인 금액)</span>
-      <span><b style="color:var(--good)">초록</b> 효율 좋음 · <b style="color:var(--mid)">주황</b> 보통 · <b style="color:var(--low)">빨강</b> 낮음</span>
+      <span class="pill"><b>ROAS</b> = 매출 ÷ 광고비 (광고비 1원당 벌어들인 금액)</span>
+      <span class="pill"><span class="dotc" style="background:var(--good)"></span>효율 좋음 <span class="dotc" style="background:var(--mid)"></span>보통 <span class="dotc" style="background:var(--low)"></span>낮음</span>
     </div>
   </section>
 
@@ -244,7 +309,7 @@ function buildSampleFlat(){
     const p = (typeof getCreativePerf==='function') ? getCreativePerf(c.id, 'ALL') : null;
     return Object.assign({}, c, {
       creative_name:c.title, media_url:c.media_url, thumbnail_url:c.media_url,
-      media_type:c.type, appeal_points:c.concept ? [c.concept] : [],
+      media_type:c.type, appeal_points:c.concept ? [c.concept] : [], event:c.concept||'', product:c.title||'',
       impressions:p?.impressions||0, clicks:p?.clicks||0, spend:p?.spend||0,
       revenue:p?.revenue||0, conversions:p?.conversions||0, roas:p?.roas||0
     });
@@ -266,7 +331,7 @@ async function load(){
   fr.querySelector('span:last-child').textContent =
     live ? `실시간 연동 · ${new Date().toLocaleDateString('ko-KR')} 기준`
          : '샘플 데이터 (시트 미연동)';
-  if(!live) fr.querySelector('.live').style.background = '#ff9f0a';
+  if(!live) fr.querySelector('.live').style.background = '#f3c969';
 
   render();
 }
@@ -274,28 +339,32 @@ async function load(){
 /* ── 필터 ── */
 function brandList(){ return ALL.filter(c => (c.brand||'').toUpperCase() === curBrand); }
 
-// 이벤트/제품 옵션 채우기 (현재 브랜드 기준, 전체 대시보드와 동일 방식)
+// 이벤트/제품 옵션 채우기
+// - 이벤트: 현재 브랜드 전체 기준
+// - 제품: "선택된 이벤트에서 실제 나온 제품"만 (이벤트 미선택 시 브랜드 전체)
 function populateFilters(){
   const base = brandList();
   // 이벤트: 소재 수 많은 순
   const evMap = new Map();
   base.forEach(c=>{ const e=(c.event||'').toString().trim(); if(e) evMap.set(e,(evMap.get(e)||0)+1); });
   const events = [...evMap.entries()].sort((a,b)=>b[1]-a[1]);
-  // 제품: 가나다 순
-  const products = [...new Set(base.map(c=>(c.product||'').toString().trim()).filter(Boolean))].sort();
+  // 제품: 선택 이벤트 범위로 한정
+  const prodBase = curEvent ? base.filter(c=>(c.event||'').toString().trim()===curEvent) : base;
+  const products = [...new Set(prodBase.map(c=>(c.product||'').toString().trim()).filter(Boolean))].sort();
 
   const evSel = document.getElementById('f-event');
   const prSel = document.getElementById('f-product');
   evSel.innerHTML = '<option value="">전체 이벤트</option>' +
     events.map(([n,c])=>`<option value="${n.replace(/"/g,'&quot;')}">${n} (${c})</option>`).join('');
-  prSel.innerHTML = '<option value="">전체 제품</option>' +
+  const prLabel = curEvent ? `${curEvent} 전체 제품` : '전체 제품';
+  prSel.innerHTML = `<option value="">${prLabel}</option>` +
     products.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
 
-  // 이전 선택 유지 (브랜드 바뀌어도 같은 값이 있으면)
+  // 이전 선택 유지 (없으면 해제)
   evSel.value = events.some(([n])=>n===curEvent) ? curEvent : (curEvent='', '');
   prSel.value = products.includes(curProduct) ? curProduct : (curProduct='', '');
 
-  // 옵션이 1개(전체만)면 해당 필터 숨김
+  // 옵션 없으면 숨김
   evSel.closest('.fsel').style.display = events.length ? '' : 'none';
   prSel.closest('.fsel').style.display = products.length ? '' : 'none';
 }
@@ -311,8 +380,19 @@ function applyFilters(list){
 function render(){
   populateFilters();
   const list = applyFilters(brandList());
+  renderSummary(list);
   renderTop(list);
   renderAppeals(list);
+}
+
+function renderSummary(list){
+  const spent = list.filter(c => (Number(c.spend)||0) >= MIN_SPEND);
+  const rev = spent.reduce((s,c)=>s+(Number(c.revenue)||0),0);
+  const sp  = spent.reduce((s,c)=>s+(Number(c.spend)||0),0);
+  const roas = sp>0 ? rev/sp : 0;
+  document.getElementById('sum-revenue').innerHTML = `${won(rev)}<small>원</small>`;
+  document.getElementById('sum-spend').innerHTML   = `${won(sp)}<small>원</small>`;
+  document.getElementById('sum-roas').innerHTML    = `${roas.toFixed(1)}<small>배</small>`;
 }
 
 function renderTop(list){
@@ -342,7 +422,7 @@ function renderTop(list){
     const chain = imgChain(thumbOf(c));
     const chips = kwList(c.appeal_points).slice(0,3).map(k=>`<span class="chip">${k}</span>`).join('');
     return `<div class="ccard ${medal}">
-      <span class="rank-badge">${i+1}</span>
+      <span class="rank-badge">${i<3?'<i class="fas fa-crown" style="font-size:10px"></i>':''}${i+1}</span>
       <div class="thumb">
         ${chain.length ? `<img src="${chain[0]}" alt="" loading="lazy" referrerpolicy="no-referrer" data-idx="0" data-chain='${JSON.stringify(chain).replace(/'/g,"&#39;")}' onerror="window._imgFallback(this)"><div class="ph" style="display:none"><i class="fas fa-image"></i></div>`
             : `<div class="ph"><i class="fas fa-image"></i></div>`}
@@ -352,7 +432,7 @@ function renderTop(list){
         <div class="cname">${nameOf(c)}</div>
         ${chips ? `<div class="appeal-chips">${chips}</div>` : ``}
         <div class="roas-line">
-          <span class="roas-big ${g}">${m.toFixed(1)}<span style="font-size:16px">배</span></span>
+          <span class="roas-val"><span class="roas-big ${g}">${m.toFixed(1)}</span><span class="roas-unit">배</span></span>
           <span class="roas-cap">광고비 1원<br>→ ${m.toFixed(1)}원 매출</span>
         </div>
         <div class="stat-row">
@@ -390,17 +470,17 @@ function renderAppeals(list){
   document.getElementById('appeal-count').textContent = rows.length ? `상위 ${rows.length}개 표현` : '';
 
   if(!rows.length){
-    box.innerHTML = `<div class="empty"><i class="fas fa-lightbulb"></i>${curBrand} 브랜드의 소구포인트 데이터가 아직 없어요.<br><span style="font-size:13px">시트에 <b>소구포인트(appeal_points)</b> 열을 채우면 여기에 표시됩니다.</span></div>`;
+    box.innerHTML = `<div class="empty"><i class="fas fa-lightbulb"></i>이 조건의 소구포인트 데이터가 아직 없어요.<br><span style="font-size:13px">시트에 <b>소구포인트(appeal_points)</b> 열을 채우면 여기에 표시됩니다.</span></div>`;
     return;
   }
 
   const max = rows[0].mult || 1;
   box.innerHTML = `<div class="appeal-list">${rows.map((r,i)=>{
     const g = roasGrade(r.mult);
-    return `<div class="appeal-row ${i===0?'top1':''}">
+    return `<div class="appeal-row ${i<3?'r'+(i+1):''}">
       <div class="appeal-rank">${i+1}</div>
       <div class="appeal-main">
-        <div class="appeal-kw">${r.kw} <span class="meta">· 소재 ${r.count}개 · 매출 ${won(r.revenue)}원</span></div>
+        <div class="appeal-kw">${r.kw} <span class="meta">소재 ${r.count}개 · 매출 ${won(r.revenue)}원</span></div>
         <div class="bar"><i style="width:${Math.max(6,(r.mult/max)*100)}%"></i></div>
       </div>
       <div class="appeal-num">
@@ -420,7 +500,7 @@ document.getElementById('brand-toggle').addEventListener('click', e=>{
 });
 
 /* ── 이벤트/제품 필터 ── */
-document.getElementById('f-event').addEventListener('change', e=>{ curEvent = e.target.value; render(); });
+document.getElementById('f-event').addEventListener('change', e=>{ curEvent = e.target.value; curProduct=''; render(); });
 document.getElementById('f-product').addEventListener('change', e=>{ curProduct = e.target.value; render(); });
 document.getElementById('f-reset').addEventListener('click', ()=>{ curEvent=''; curProduct=''; render(); });
 
