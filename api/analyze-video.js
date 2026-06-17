@@ -9,9 +9,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
-  const DRIVE_KEY  = process.env.GOOGLE_API_KEY  || '';
-  if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY 환경변수가 없습니다.' });
+  const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  // Drive 다운로드 키: 전용 키 없으면 Gemini 키 재사용 (같은 GCP 키면 Drive API만 켜면 됨)
+  const DRIVE_KEY  = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
+  if (!GEMINI_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY(또는 GOOGLE_API_KEY) 환경변수가 없습니다.' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
