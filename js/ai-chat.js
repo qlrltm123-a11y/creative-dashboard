@@ -476,11 +476,37 @@ function _vidCollectVideos() {
         const url = (c.media_url || '').trim();
         if (c.media_type !== 'video' || !url || seen.has(url)) return;
         seen.add(url);
-        out.push({ url, name: c.creative_name || c.ad_name || '(이름없음)', roas: c.roas || 0, spend: c.spend || 0 });
+        out.push({
+            url, name: c.creative_name || c.ad_name || '(이름없음)',
+            roas: c.roas || 0, spend: c.spend || 0,
+            brand: c.brand || '', product: c.product || '',
+        });
     });
     // 광고비 큰 순 (의미있는 소재 우선) → 상한 적용
     out.sort((a, b) => (b.spend || 0) - (a.spend || 0));
     return out;
+}
+
+// 누적 캐시 전체를 배열로 (종합 인사이트용) — 최신 메타로 ROAS 갱신
+function _vidGetAllAnalyzed() {
+    const cache = _vidLoadCache();
+    // 현재 데이터에서 url→최신 메타 매핑 (ROAS/광고비는 시간이 지나며 바뀌므로 최신값 우선)
+    const live = {};
+    _vidCollectVideos().forEach(v => { live[v.url] = v; });
+    return Object.entries(cache)
+        .filter(([, e]) => e && e.text)
+        .map(([url, e]) => {
+            const m = live[url] || {};
+            return {
+                url, text: e.text,
+                name: m.name || e.name || '(이름없음)',
+                roas: (m.roas != null ? m.roas : e.roas) || 0,
+                spend: (m.spend != null ? m.spend : e.spend) || 0,
+                brand: m.brand || e.brand || '',
+                product: m.product || e.product || '',
+                analyzedAt: e.analyzedAt || 0,
+            };
+        });
 }
 
 // 영상 1건 분석 (캐시 우선)
@@ -494,7 +520,12 @@ async function _vidAnalyzeOne(v) {
         });
         const data = await res.json();
         if (res.ok && data.text) {
-            const entry = { text: data.text, name: v.name, analyzedAt: Date.now() };
+            // 메타(ROAS/광고비/브랜드/제품) 함께 저장 → 누적 종합 시 활용
+            const entry = {
+                text: data.text, name: v.name, analyzedAt: Date.now(),
+                roas: v.roas || 0, spend: v.spend || 0,
+                brand: v.brand || '', product: v.product || '',
+            };
             const c2 = _vidLoadCache(); c2[v.url] = entry; _vidSaveCache(c2);
             return entry;
         }
@@ -566,21 +597,30 @@ window.acBatchAnalyzeVideos = async function() {
         return;
     }
 
-    _vidSetProgress(`<div class="vid-prog-txt"><i class="fas fa-wand-magic-sparkles mr-1"></i>${ok}개 영상 분석 완료 — 흐름 패턴 종합 중...</div>`);
-    const synth = await _vidSynthesize(analyzed);
-    _vidSetProgress(`<div class="vid-prog-txt" style="color:#059669">✅ 영상 ${ok}개 흐름 종합 완료${fail ? ` (실패 ${fail}개)` : ''}</div>`);
+    // ★ 누적 종합: 이번 배치만이 아니라 그동안 분석한 전체 캐시를 기반으로
+    const allAnalyzed = _vidGetAllAnalyzed();
+    _vidSetProgress(`<div class="vid-prog-txt"><i class="fas fa-wand-magic-sparkles mr-1"></i>이번 ${ok}개 포함 누적 ${allAnalyzed.length}개 영상으로 흐름 종합 중...</div>`);
+    const synth = await _vidSynthesize(allAnalyzed);
+    _vidSetProgress(`<div class="vid-prog-txt" style="color:#059669">✅ 누적 ${allAnalyzed.length}개 영상 흐름 종합 완료 (이번 신규 ${ok}개${fail ? `, 실패 ${fail}개` : ''})</div>`);
     _vidSetResult(synth);
+    if (typeof window.acRenderCachedVideoSynth === 'function') window.acRenderCachedVideoSynth();
     if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || '🎬 영상 전체 자동분석'; }
 };
 
-// 영상 분석 결과 종합 → AI 인사이트
+// 누적 영상 분석 결과 종합 → AI 인사이트 (전체 캐시 기반)
 async function _vidSynthesize(analyzed) {
     const sorted = analyzed.slice().sort((a, b) => (b.roas || 0) - (a.roas || 0));
-    const cap = sorted.slice(0, 12); // 토큰 보호
-    const corpus = cap.map((a, i) =>
-        `### 영상 ${i + 1}: ${a.name} (ROAS ${Math.round((a.roas || 0) * 100)}%)\n${a.text}`).join('\n\n');
+    // 토큰 보호: 고효율 상위 18개 + 저효율 하위 4개(대조군) 샘플링
+    let cap;
+    if (sorted.length <= 22) cap = sorted;
+    else cap = [...sorted.slice(0, 18), ...sorted.slice(-4)];
+    const total = analyzed.length;
+    const corpus = cap.map((a, i) => {
+        const tag = [a.brand, a.product].filter(Boolean).join('/');
+        return `### 영상 ${i + 1}: ${a.name}${tag ? ` [${tag}]` : ''} (ROAS ${Math.round((a.roas || 0) * 100)}%, 광고비 ${Math.round(a.spend || 0).toLocaleString()}원)\n${a.text}`;
+    }).join('\n\n');
     const prompt = `당신은 일본 라쿠텐 메가와리 퍼포먼스 마케팅 전문가입니다.
-아래는 광고 영상 ${cap.length}개 각각의 "전체 흐름 분석" 결과입니다 (ROAS 높은 순).
+지금까지 누적 분석한 광고 영상 총 ${total}개 중 대표 ${cap.length}개(고효율 상위 + 저효율 대조군)의 "전체 흐름 분석" 결과입니다.
 이를 종합해 다음을 한국어로 작성해주세요:
 
 ### 1. 고효율 영상 공통 후킹 패턴
@@ -598,7 +638,7 @@ async function _vidSynthesize(analyzed) {
 ### 5. 다음 영상 제작 흐름 템플릿 3개
 - 바로 쓸 수 있는 초반/중반/후반 구성안
 
-반드시 실제 영상 분석 내용을 인용하고 소재명을 언급하세요.
+데이터가 누적될수록 패턴 신뢰도가 높아집니다. 반드시 실제 영상 분석 내용을 인용하고 소재명을 언급하세요.
 
 [영상별 분석]
 ${corpus}`;
@@ -610,7 +650,7 @@ ${corpus}`;
         });
         const data = await res.json();
         if (res.ok && data.text) {
-            try { localStorage.setItem(_VIDEO_SYNTH_KEY, JSON.stringify({ text: data.text, at: Date.now(), n: cap.length })); } catch (e) {}
+            try { localStorage.setItem(_VIDEO_SYNTH_KEY, JSON.stringify({ text: data.text, at: Date.now(), n: total })); } catch (e) {}
             return _acFormat(data.text);
         }
         return `<span style="color:#e11d48">종합 분석 실패: ${data.error || res.status}</span>`;
@@ -627,18 +667,65 @@ window.acRenderCachedVideoSynth = function() {
     const allVideos = _vidCollectVideos();
     const targets = allVideos.slice(0, _VIDEO_BATCH_MAX);
     const cache = _vidLoadCache();
+    const totalAccum = Object.values(cache).filter(e => e && e.text).length; // 누적 전체
     const analyzedCount = targets.filter(v => cache[v.url]?.text).length;
     if (hint) {
-        if (!allVideos.length) hint.textContent = '현재 필터에 영상 소재 없음';
+        const parts = [];
+        if (!allVideos.length) parts.push('현재 필터에 영상 없음');
         else if (allVideos.length > _VIDEO_BATCH_MAX)
-            hint.textContent = `영상 ${allVideos.length}개 — 광고비 상위 ${_VIDEO_BATCH_MAX}개 대상 · ${analyzedCount}개 분석됨`;
-        else hint.textContent = `영상 소재 ${allVideos.length}개 중 ${analyzedCount}개 분석됨`;
+            parts.push(`영상 ${allVideos.length}개 (상위 ${_VIDEO_BATCH_MAX}개 대상, ${analyzedCount}개 분석됨)`);
+        else parts.push(`영상 ${allVideos.length}개 중 ${analyzedCount}개 분석됨`);
+        if (totalAccum) parts.push(`💾 누적 ${totalAccum}개 저장`);
+        hint.textContent = parts.join(' · ');
     }
     let synth = null;
     try { synth = JSON.parse(localStorage.getItem(_VIDEO_SYNTH_KEY) || 'null'); } catch (e) {}
     if (synth?.text) {
-        result.innerHTML = _acFormat(synth.text);
+        const when = synth.at ? new Date(synth.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const meta = `<div style="font-size:11px;color:#94a3b8;margin-bottom:8px">📊 누적 ${synth.n || '?'}개 영상 기반 · ${when} 종합</div>`;
+        result.innerHTML = meta + _acFormat(synth.text);
     } else {
-        result.innerHTML = '<span style="color:#94a3b8">영상 소재의 전체 흐름(시작→중간→마무리)을 AI가 자동 분석해 공통 패턴과 제작 템플릿을 뽑아드립니다. 우측 버튼을 눌러 시작하세요.</span>';
+        result.innerHTML = '<span style="color:#94a3b8">영상 소재의 전체 흐름(시작→중간→마무리)을 AI가 자동 분석해 공통 패턴과 제작 템플릿을 뽑아드립니다. 우측 버튼을 눌러 시작하세요. 분석 결과는 자동 저장되어 계속 누적됩니다.</span>';
     }
+};
+
+// 분석 데이터 내보내기 (백업 — 기기 이동/캐시 삭제 대비)
+window.acExportVideoData = function() {
+    const cache = _vidLoadCache();
+    const n = Object.keys(cache).length;
+    if (!n) { alert('내보낼 분석 데이터가 없습니다.'); return; }
+    const blob = new Blob([JSON.stringify(cache, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `video-analysis-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+// 분석 데이터 가져오기 (누적 병합)
+window.acImportVideoData = function(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if (!imported || typeof imported !== 'object') throw new Error('형식 오류');
+            const cache = _vidLoadCache();
+            let added = 0, updated = 0;
+            Object.entries(imported).forEach(([url, entry]) => {
+                if (!entry || !entry.text) return;
+                if (cache[url]) updated++; else added++;
+                cache[url] = entry;
+            });
+            _vidSaveCache(cache);
+            alert(`가져오기 완료 — 신규 ${added}개, 갱신 ${updated}개. 총 누적 ${Object.keys(cache).length}개.`);
+            window.acRenderCachedVideoSynth();
+        } catch (err) {
+            alert('가져오기 실패: ' + err.message);
+        }
+        input.value = '';
+    };
+    reader.readAsText(file);
 };

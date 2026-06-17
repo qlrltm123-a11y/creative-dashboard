@@ -597,7 +597,14 @@
                         <span class="info-tip" tabindex="0" data-tip="영상 소재의 전체 내용(썸네일이 아닌 영상 전체)을 AI가 보고 시작→중간→마무리 흐름, 후킹, 소구포인트를 분석합니다. 버튼을 누르면 현재 필터의 영상 소재를 모두 자동 분석하고 결과는 저장됩니다 (영상 1건당 30초 내외).">ⓘ</span>
                         <span id="video-flow-hint" class="text-xs font-normal text-slate-400 ml-2"></span>
                     </h3>
-                    <button id="video-batch-btn" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white hover:opacity-90 transition shadow-sm" onclick="window.acBatchAnalyzeVideos && window.acBatchAnalyzeVideos()">🎬 영상 전체 자동분석</button>
+                    <div class="flex items-center gap-1.5">
+                        <button class="text-xs text-slate-500 hover:text-fuchsia-600 transition px-2 py-1.5 rounded-lg hover:bg-slate-100" title="누적 분석 데이터 백업 (JSON 내보내기)" onclick="window.acExportVideoData && window.acExportVideoData()"><i class="fas fa-download"></i></button>
+                        <label class="text-xs text-slate-500 hover:text-fuchsia-600 transition px-2 py-1.5 rounded-lg hover:bg-slate-100 cursor-pointer" title="백업 데이터 불러오기 (누적 병합)">
+                            <i class="fas fa-upload"></i>
+                            <input type="file" accept="application/json,.json" class="hidden" onchange="window.acImportVideoData && window.acImportVideoData(this)">
+                        </label>
+                        <button id="video-batch-btn" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white hover:opacity-90 transition shadow-sm" onclick="window.acBatchAnalyzeVideos && window.acBatchAnalyzeVideos()">🎬 영상 전체 자동분석</button>
+                    </div>
                 </div>
                 <div id="video-flow-progress" class="hidden mb-3"></div>
                 <div id="video-flow-result" class="text-sm text-slate-600 leading-relaxed"></div>
