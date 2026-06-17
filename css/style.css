@@ -2,6 +2,46 @@
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
+/* 영상 일괄 분석 진행률 바 */
+.vid-prog-bar {
+    width: 100%;
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.vid-prog-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #d946ef, #a855f7);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.vid-prog-txt {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+}
+/* 영상 흐름 종합 결과 — ai-chat 포맷 재사용 */
+#video-flow-result .ac-h {
+    font-weight: 700;
+    color: #7c3aed;
+    margin: 12px 0 6px;
+    font-size: 13px;
+}
+#video-flow-result .ac-li {
+    padding-left: 14px;
+    position: relative;
+    margin: 3px 0;
+}
+#video-flow-result .ac-li::before {
+    content: '•';
+    position: absolute;
+    left: 2px;
+    color: #a855f7;
+}
+#video-flow-result .ac-num { color: #a855f7; font-weight: 700; }
+
 /* ============================
    ⚡ CLS 방지: 동적 콘텐츠 영역 최소 높이 예약
    레이아웃 이동(CLS 0.81)을 줄이기 위해 주요 섹션에 공간 확보

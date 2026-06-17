@@ -590,6 +590,19 @@
                 <div id="keyword-search-empty" class="text-center text-slate-400 text-sm py-10">검색어를 입력하면 일치하는 강조 포인트·소재명·메시지의 소재를 효율(ROAS) 순으로 보여줘요</div>
             </div>
 
+            <!-- 영상 소재 흐름 종합 인사이트 (전체 영상 자동 분석) -->
+            <div class="chart-card mb-4" id="videoFlowCard">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 class="chart-title"><i class="fas fa-film mr-2 text-fuchsia-500"></i>영상 소재 흐름 종합 인사이트
+                        <span class="info-tip" tabindex="0" data-tip="영상 소재의 전체 내용(썸네일이 아닌 영상 전체)을 AI가 보고 시작→중간→마무리 흐름, 후킹, 소구포인트를 분석합니다. 버튼을 누르면 현재 필터의 영상 소재를 모두 자동 분석하고 결과는 저장됩니다 (영상 1건당 30초 내외).">ⓘ</span>
+                        <span id="video-flow-hint" class="text-xs font-normal text-slate-400 ml-2"></span>
+                    </h3>
+                    <button id="video-batch-btn" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gradient-to-r from-fuchsia-500 to-purple-500 text-white hover:opacity-90 transition shadow-sm" onclick="window.acBatchAnalyzeVideos && window.acBatchAnalyzeVideos()">🎬 영상 전체 자동분석</button>
+                </div>
+                <div id="video-flow-progress" class="hidden mb-3"></div>
+                <div id="video-flow-result" class="text-sm text-slate-600 leading-relaxed"></div>
+            </div>
+
             <!-- 시장조사 연계 인사이트 (성과 연계 카드) -->
             <div class="chart-card mb-4" id="mr-links-section" style="display:none;"></div>
 

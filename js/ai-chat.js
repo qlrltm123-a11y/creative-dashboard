@@ -423,19 +423,222 @@ window.acAnalyzeVideo = async function(videoUrl, creativeName, extraQ) {
     box.insertAdjacentHTML('beforeend', `<div class="ac-msg ac-model" id="${loadId}"><div class="ac-bubble ac-loading"><span></span><span></span><span></span></div><div style="font-size:11px;color:#94a3b8;margin-top:4px;padding-left:8px">영상 업로드 &amp; 분석 중... (30초 내외 소요)</div></div>`);
     box.scrollTop = box.scrollHeight;
     try {
-        const res = await fetch('/api/analyze-video', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoUrl, creativeName, question: extraQ || '' }),
-        });
-        const data = await res.json();
+        // 캐시 우선 — 이미 일괄 분석한 영상이면 즉시
+        const cache = _vidLoadCache();
+        let data;
+        if (cache[videoUrl]?.text && !extraQ) {
+            data = { text: cache[videoUrl].text };
+        } else {
+            const res = await fetch('/api/analyze-video', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videoUrl, creativeName, question: extraQ || '' }),
+            });
+            data = await res.json();
+            if (res.ok && data.text && !extraQ) {
+                cache[videoUrl] = { text: data.text, name: creativeName, analyzedAt: Date.now() };
+                _vidSaveCache(cache);
+            }
+            if (!res.ok) data.error = data.error || `서버 오류 (${res.status})`;
+        }
         document.getElementById(loadId)?.remove();
-        _acHistory.push({ role: 'model', text: !res.ok || data.error
-            ? '⚠️ 영상 분석 실패: ' + (data.error || '알 수 없는 오류')
+        _acHistory.push({ role: 'model', text: data.error
+            ? '⚠️ 영상 분석 실패: ' + data.error
             : `🎬 **${creativeName} 영상 분석 결과**\n\n${data.text}` });
     } catch (e) {
         document.getElementById(loadId)?.remove();
         _acHistory.push({ role: 'model', text: '⚠️ 네트워크 오류: ' + e.message });
     }
     _acRenderMessages();
+};
+
+// ============================================================
+//  영상 소재 일괄 자동 분석 + 흐름 종합 인사이트
+//  - 영상 URL만으로 Gemini Files API가 전체 영상을 분석 (썸네일 X)
+//  - 결과 localStorage 캐싱 → 재방문 시 즉시 표시
+//  - 분석 결과들을 종합 → 흐름 패턴/제작 템플릿 도출
+// ============================================================
+const _VIDEO_CACHE_KEY = 'video_analysis_cache_v1';
+const _VIDEO_SYNTH_KEY = 'video_synth_cache_v1';
+
+function _vidLoadCache() { try { return JSON.parse(localStorage.getItem(_VIDEO_CACHE_KEY) || '{}'); } catch { return {}; } }
+function _vidSaveCache(c) { try { localStorage.setItem(_VIDEO_CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+
+// 영상 일괄 분석 상한 (비용/시간 보호) — 광고비 상위 N개만
+const _VIDEO_BATCH_MAX = 40;
+
+// 현재 AI 인사이트 대상 영상 소재 추출 (중복 URL 제거, 광고비 상위순)
+function _vidCollectVideos() {
+    const list = (typeof getAIInsightsList === 'function') ? getAIInsightsList()
+               : (window.allCreatives || []);
+    const out = []; const seen = new Set();
+    (list || []).forEach(c => {
+        const url = (c.media_url || '').trim();
+        if (c.media_type !== 'video' || !url || seen.has(url)) return;
+        seen.add(url);
+        out.push({ url, name: c.creative_name || c.ad_name || '(이름없음)', roas: c.roas || 0, spend: c.spend || 0 });
+    });
+    // 광고비 큰 순 (의미있는 소재 우선) → 상한 적용
+    out.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+    return out;
+}
+
+// 영상 1건 분석 (캐시 우선)
+async function _vidAnalyzeOne(v) {
+    const cache = _vidLoadCache();
+    if (cache[v.url]?.text) return { text: cache[v.url].text, name: v.name, cached: true };
+    try {
+        const res = await fetch('/api/analyze-video', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl: v.url, creativeName: v.name, question: '' }),
+        });
+        const data = await res.json();
+        if (res.ok && data.text) {
+            const entry = { text: data.text, name: v.name, analyzedAt: Date.now() };
+            const c2 = _vidLoadCache(); c2[v.url] = entry; _vidSaveCache(c2);
+            return entry;
+        }
+        return { error: data.error || `HTTP ${res.status}`, name: v.name };
+    } catch (e) {
+        return { error: e.message, name: v.name };
+    }
+}
+
+function _vidSetProgress(html) {
+    const el = document.getElementById('video-flow-progress');
+    if (el) { el.classList.remove('hidden'); el.innerHTML = html; }
+}
+function _vidSetResult(html) {
+    const el = document.getElementById('video-flow-result');
+    if (el) el.innerHTML = html;
+}
+
+// 일괄 분석 (window 노출) — 버튼에서 호출
+window.acBatchAnalyzeVideos = async function() {
+    const btn = document.getElementById('video-batch-btn');
+    const allVideos = _vidCollectVideos();
+    if (!allVideos.length) {
+        _vidSetResult('<span style="color:#94a3b8">현재 필터 조건에 영상 소재가 없습니다.</span>');
+        return;
+    }
+    // 상한 적용 (광고비 상위 N개) + 미분석분만 카운트
+    const cache = _vidLoadCache();
+    const videos = allVideos.slice(0, _VIDEO_BATCH_MAX);
+    const fresh = videos.filter(v => !cache[v.url]?.text).length;
+    const capped = allVideos.length > _VIDEO_BATCH_MAX;
+    const estMin = Math.ceil(fresh * 30 / 2 / 60); // 동시성 2, 영상당 30초
+
+    const msg = fresh === 0
+        ? `이미 분석된 영상 ${videos.length}개로 흐름 종합만 다시 실행합니다. 계속할까요?`
+        : `영상 ${videos.length}개를 분석합니다` +
+          (capped ? ` (전체 ${allVideos.length}개 중 광고비 상위 ${_VIDEO_BATCH_MAX}개)` : '') +
+          `.\n신규 분석 ${fresh}개 · 예상 ${estMin}분 내외 소요 · Gemini API 비용 발생.\n\n계속할까요?`;
+    if (!window.confirm(msg)) return;
+
+    if (btn) { btn.disabled = true; btn.dataset.orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>분석 중...'; }
+
+    const total = videos.length;
+    let done = 0, ok = 0, fail = 0;
+    const analyzed = [];
+    const update = () => _vidSetProgress(
+        `<div class="vid-prog-bar"><div class="vid-prog-fill" style="width:${Math.round(done / total * 100)}%"></div></div>
+         <div class="vid-prog-txt">${done}/${total} 처리 · 성공 ${ok}${fail ? ` · 실패 ${fail}` : ''}</div>`);
+    update();
+
+    // 동시성 2 (서버 부하/rate limit 보호)
+    const queue = videos.slice();
+    async function worker() {
+        while (queue.length) {
+            const v = queue.shift();
+            const r = await _vidAnalyzeOne(v);
+            done++;
+            if (r.error) fail++;
+            else { ok++; analyzed.push({ name: v.name, text: r.text, roas: v.roas, spend: v.spend }); }
+            update();
+        }
+    }
+    await Promise.all([worker(), worker()]);
+
+    if (!analyzed.length) {
+        _vidSetProgress('');
+        _vidSetResult('<span style="color:#e11d48">영상 분석에 모두 실패했습니다. Drive 파일이 "링크 있는 모든 사용자 — 뷰어"로 공유됐는지 확인해주세요.</span>');
+        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || '🎬 영상 전체 자동분석'; }
+        return;
+    }
+
+    _vidSetProgress(`<div class="vid-prog-txt"><i class="fas fa-wand-magic-sparkles mr-1"></i>${ok}개 영상 분석 완료 — 흐름 패턴 종합 중...</div>`);
+    const synth = await _vidSynthesize(analyzed);
+    _vidSetProgress(`<div class="vid-prog-txt" style="color:#059669">✅ 영상 ${ok}개 흐름 종합 완료${fail ? ` (실패 ${fail}개)` : ''}</div>`);
+    _vidSetResult(synth);
+    if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.orig || '🎬 영상 전체 자동분석'; }
+};
+
+// 영상 분석 결과 종합 → AI 인사이트
+async function _vidSynthesize(analyzed) {
+    const sorted = analyzed.slice().sort((a, b) => (b.roas || 0) - (a.roas || 0));
+    const cap = sorted.slice(0, 12); // 토큰 보호
+    const corpus = cap.map((a, i) =>
+        `### 영상 ${i + 1}: ${a.name} (ROAS ${Math.round((a.roas || 0) * 100)}%)\n${a.text}`).join('\n\n');
+    const prompt = `당신은 일본 라쿠텐 메가와리 퍼포먼스 마케팅 전문가입니다.
+아래는 광고 영상 ${cap.length}개 각각의 "전체 흐름 분석" 결과입니다 (ROAS 높은 순).
+이를 종합해 다음을 한국어로 작성해주세요:
+
+### 1. 고효율 영상 공통 후킹 패턴
+- ROAS 높은 영상들의 첫 3초 공통점
+
+### 2. 잘 먹힌 흐름 구조
+- 시작→중간→마무리 전개의 공통 성공 패턴
+
+### 3. 공통 소구포인트·감정
+- 반복 등장하는 강조점/감정 코드
+
+### 4. 저효율 영상과의 차이
+- ROAS 낮은 영상이 놓친 요소
+
+### 5. 다음 영상 제작 흐름 템플릿 3개
+- 바로 쓸 수 있는 초반/중반/후반 구성안
+
+반드시 실제 영상 분석 내용을 인용하고 소재명을 언급하세요.
+
+[영상별 분석]
+${corpus}`;
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    try {
+        const res = await fetch('/api/ai-chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents, generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }),
+        });
+        const data = await res.json();
+        if (res.ok && data.text) {
+            try { localStorage.setItem(_VIDEO_SYNTH_KEY, JSON.stringify({ text: data.text, at: Date.now(), n: cap.length })); } catch (e) {}
+            return _acFormat(data.text);
+        }
+        return `<span style="color:#e11d48">종합 분석 실패: ${data.error || res.status}</span>`;
+    } catch (e) {
+        return `<span style="color:#e11d48">종합 분석 오류: ${e.message}</span>`;
+    }
+}
+
+// AI 인사이트 진입 시 — 캐시된 종합 결과/진행 현황 표시
+window.acRenderCachedVideoSynth = function() {
+    const result = document.getElementById('video-flow-result');
+    const hint = document.getElementById('video-flow-hint');
+    if (!result) return;
+    const allVideos = _vidCollectVideos();
+    const targets = allVideos.slice(0, _VIDEO_BATCH_MAX);
+    const cache = _vidLoadCache();
+    const analyzedCount = targets.filter(v => cache[v.url]?.text).length;
+    if (hint) {
+        if (!allVideos.length) hint.textContent = '현재 필터에 영상 소재 없음';
+        else if (allVideos.length > _VIDEO_BATCH_MAX)
+            hint.textContent = `영상 ${allVideos.length}개 — 광고비 상위 ${_VIDEO_BATCH_MAX}개 대상 · ${analyzedCount}개 분석됨`;
+        else hint.textContent = `영상 소재 ${allVideos.length}개 중 ${analyzedCount}개 분석됨`;
+    }
+    let synth = null;
+    try { synth = JSON.parse(localStorage.getItem(_VIDEO_SYNTH_KEY) || 'null'); } catch (e) {}
+    if (synth?.text) {
+        result.innerHTML = _acFormat(synth.text);
+    } else {
+        result.innerHTML = '<span style="color:#94a3b8">영상 소재의 전체 흐름(시작→중간→마무리)을 AI가 자동 분석해 공통 패턴과 제작 템플릿을 뽑아드립니다. 우측 버튼을 눌러 시작하세요.</span>';
+    }
 };

@@ -857,6 +857,8 @@ function renderAIInsights() {
     renderInsightThresholdBadge();
     renderKeywordSearch(list);
     bindKeywordSearch();
+    // 영상 흐름 종합 — 캐시된 결과/진행 현황 표시
+    if (typeof window.acRenderCachedVideoSynth === 'function') window.acRenderCachedVideoSynth();
 
     // 2차 배치: 첫 paint 직후 — 주요 차트 + hover맵
     setTimeout(() => {
