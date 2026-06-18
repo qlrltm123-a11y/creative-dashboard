@@ -23,10 +23,10 @@ const COLS = {
   key_message_kr: 28
 };
 
-// 속도 설정 (유료 등급은 RPM 1000+ 이므로 빠르게 가능)
-const SLEEP_BETWEEN_REQUESTS = 1000;     // 1초 간격 (유료 등급)
-const MAX_RETRY_ON_429 = 2;              // 429 발생 시 재시도 횟수
-const RETRY_WAIT_MS = 5000;              // 재시도 대기 (유료는 짧게)
+// 속도 설정
+const SLEEP_BETWEEN_REQUESTS = 3000;     // 3초 간격 (gemini-2.5-flash thinking 토큰 소모 감안)
+const MAX_RETRY_ON_429 = 5;              // 429 발생 시 재시도 횟수
+const RETRY_BASE_WAIT_MS = 15000;        // 첫 재시도 대기 (지수 백오프: 15s → 30s → 60s…)
 
 // ============================================
 // ⚠️ 사전 준비:
@@ -577,7 +577,7 @@ function analyzeGeminiVideoFile(fileUri, mimeType, adName) {
         { file_data: { mime_type: mimeType, file_uri: fileUri } }
       ]
     }],
-    generationConfig: { temperature: 0.4, responseMimeType: 'application/json' }
+    generationConfig: { temperature: 0.4, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
   };
   const responseText = callGeminiAPI(payload);
   const json = JSON.parse(responseText);
@@ -647,7 +647,7 @@ function analyzeVideoByName(fileName, adName) {
 }`;
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+    generationConfig: { temperature: 0.3, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
   };
   const responseText = callGeminiAPI(payload);
   const json = JSON.parse(responseText);
@@ -702,13 +702,14 @@ function callGeminiAPI(payload, retryCount) {
   const responseText = response.getContentText();
   const responseCode = response.getResponseCode();
 
-  // 429: 유료 등급에서도 가끔 발생 - 짧게 대기 후 재시도
+  // 429: 지수 백오프 재시도 (15s → 30s → 60s → 120s → 240s)
   if (responseCode === 429) {
     if (retryCount >= MAX_RETRY_ON_429) {
       throw new Error(`429 한도 초과 (${MAX_RETRY_ON_429}회 재시도 실패)`);
     }
-    Logger.log(`⚠️ 429 - ${RETRY_WAIT_MS / 1000}초 대기 후 재시도 (${retryCount + 1}/${MAX_RETRY_ON_429})`);
-    Utilities.sleep(RETRY_WAIT_MS);
+    const waitMs = RETRY_BASE_WAIT_MS * Math.pow(2, retryCount);
+    Logger.log(`⚠️ 429 - ${waitMs / 1000}초 대기 후 재시도 (${retryCount + 1}/${MAX_RETRY_ON_429})`);
+    Utilities.sleep(waitMs);
     return callGeminiAPI(payload, retryCount + 1);
   }
 
