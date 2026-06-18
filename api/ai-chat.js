@@ -6,6 +6,25 @@
 //
 // 클라이언트는 키 없이 { contents, generationConfig } 만 보내면 됨.
 
+// Vercel KV에 대화 로그 저장 (fire-and-forget, 실패해도 무시)
+function _saveLog(question, model, answerLen) {
+  const url  = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  const entry = JSON.stringify({
+    t:  new Date().toISOString(),
+    q:  (question || '').slice(0, 600),
+    m:  model || '',
+    rl: answerLen || 0,
+  });
+  // fire-and-forget — await 없이 전송
+  fetch(`${url}/lpush/chat_logs`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([entry]),
+  }).catch(() => {});
+}
+
 module.exports = async function handler(req, res) {
   // CORS (동일 origin이지만 안전하게)
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,6 +43,14 @@ module.exports = async function handler(req, res) {
   if (!body || !Array.isArray(body.contents)) {
     return res.status(400).json({ error: 'contents 배열이 필요합니다.' });
   }
+
+  // 첫 번째 사용자 메시지 추출 (로깅용)
+  const _question = (() => {
+    const first = body.contents.find(c => c.role === 'user');
+    if (!first) return '';
+    const parts = first.parts || [];
+    return parts.map(p => p.text || '').join(' ').trim();
+  })();
 
   // generationConfig 정규화 — 클라이언트가 뭘 보내든 thinking 끄고 토큰 한도 보장
   // (gemini-2.5-flash는 thinking 모델이라 thinkingBudget을 안 끄면 사고 토큰이 본문을 잡아먹어 답변이 잘림)
@@ -56,12 +83,15 @@ module.exports = async function handler(req, res) {
         const finish = cand?.finishReason || '';
         // 사고 토큰으로 본문이 잘린 경우 안내
         if (!text && finish === 'MAX_TOKENS') {
+          _saveLog(_question, m, 0);
           return res.status(200).json({ text: '⚠️ 답변 생성 중 토큰 한도에 도달했습니다. 질문을 더 구체적으로(예: 특정 브랜드·기간) 좁혀주세요.', model: m, finishReason: finish });
         }
         // 본문은 있으나 한도로 끊긴 경우 — 끝에 안내 덧붙임
         if (text && finish === 'MAX_TOKENS') {
+          _saveLog(_question, m, text.length);
           return res.status(200).json({ text: text + '\n\n---\n⚠️ *답변이 길어 일부에서 끊겼습니다. 더 필요한 부분을 콕 집어 물어보세요.*', model: m, finishReason: finish });
         }
+        _saveLog(_question, m, text.length);
         return res.status(200).json({ text, model: m, finishReason: finish });
       }
       last = r;
@@ -82,6 +112,7 @@ module.exports = async function handler(req, res) {
         const r = await callModel(pick);
         if (r.ok) {
           const text = r.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          _saveLog(_question, pick, text.length);
           return res.status(200).json({ text, model: pick });
         }
         last = r;
