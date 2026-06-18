@@ -367,7 +367,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
                     <i class="fas fa-sort-amount-down text-slate-400"></i>
-                    <span class="text-sm font-semibold text-slate-700">BEST TOP 5 정렬 기준</span>
+                    <span class="text-sm font-semibold text-slate-700">BEST TOP 20 정렬 기준</span>
                 </div>
                 <select id="product-sort-metric" class="filter-select">
                     <option value="ctr" selected>클릭률(CTR)</option>
@@ -388,19 +388,33 @@
             </div>
         </section>
 
-        <!-- 제품별 BEST 5 -->
+        <!-- BEST TOP 20: 썸네일 그리드 + 우측 인사이트 패널 -->
         <section class="mb-6">
-            <!-- BEST TOP 5 -->
-            <div class="bg-white rounded-xl border-2 border-emerald-200 p-4">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 text-white text-xs">
-                            <i class="fas fa-arrow-trend-up"></i>
-                        </span>
-                        BEST TOP 5
-                    </h3>
+            <div class="flex gap-4 items-start">
+                <!-- 좌측: 썸네일 그리드 -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 text-white text-xs">
+                                <i class="fas fa-arrow-trend-up"></i>
+                            </span>
+                            BEST TOP 20
+                        </h3>
+                    </div>
+                    <div id="best-creatives-list" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
                 </div>
-                <div id="best-creatives-list" class="space-y-2"></div>
+                <!-- 우측: 인사이트 패널 -->
+                <div class="w-64 shrink-0">
+                    <div class="sticky top-16 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                            <h4 class="text-sm font-bold text-slate-800">인사이트</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">상위 20 소재 공통 패턴</p>
+                        </div>
+                        <div class="p-4" id="best-insights-content">
+                            <div class="text-center text-slate-300 text-xs py-8">소재 로딩 중...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 

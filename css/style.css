@@ -2,6 +2,90 @@
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
+/* ── BEST TOP 20 썸네일 카드 ── */
+.best-thumb-card {
+    cursor: pointer;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #ececf0;
+    background: #fff;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.best-thumb-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.10);
+}
+.btc-img-wrap {
+    position: relative;
+    aspect-ratio: 3/4;
+    background: #f1f3f5;
+    overflow: hidden;
+}
+.btc-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.btc-thumb-fallback {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    color: #d1d5db; font-size: 28px;
+}
+.btc-rank {
+    position: absolute; top: 7px; left: 7px;
+    min-width: 22px; height: 22px;
+    background: rgba(0,0,0,.65);
+    color: #fff; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; z-index: 1;
+    padding: 0 5px;
+}
+.btc-metric {
+    position: absolute; bottom: 7px; right: 7px;
+    background: rgba(16,185,129,.92);
+    color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 5px; z-index: 1;
+}
+.btc-info { padding: 7px 8px 8px; }
+.btc-brand {
+    display: block; font-size: 9px; color: #94a3b8;
+    font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+}
+.btc-name {
+    font-size: 11px; font-weight: 600; color: #1e293b;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin: 2px 0 4px;
+}
+.btc-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.btc-chip {
+    font-size: 9px; padding: 1px 6px;
+    background: #eef2ff; color: #4f46e5; border-radius: 999px;
+}
+
+/* ── BEST 인사이트 패널 ── */
+.bi-section { margin-bottom: 14px; }
+.bi-section:last-child { margin-bottom: 0; }
+.bi-title {
+    font-size: 10px; font-weight: 700; color: #64748b;
+    margin-bottom: 7px; letter-spacing: .3px;
+    display: flex; align-items: center; gap: 5px;
+}
+.bi-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.bi-chip {
+    font-size: 10px; padding: 3px 8px;
+    background: #eef2ff; color: #4338ca; border-radius: 999px;
+    display: flex; align-items: center; gap: 4px;
+}
+.bi-chip-hook { background: #fdf4ff; color: #a21caf; }
+.bi-chip-emo  { background: #fff1f2; color: #be123c; }
+.bi-cnt {
+    font-size: 9px; background: rgba(99,102,241,.15);
+    padding: 0 4px; border-radius: 999px;
+}
+.bi-avg {
+    border-top: 1px solid #f1f3f5; padding-top: 12px; margin-top: 2px;
+}
+.bi-avg-val {
+    font-size: 20px; font-weight: 800; color: #10b981; margin-top: 2px;
+}
+.bi-empty { font-size: 10px; color: #cbd5e1; }
+
 /* 영상 일괄 분석 진행률 바 */
 .vid-prog-bar {
     width: 100%;

@@ -4279,7 +4279,7 @@ function renderProductPerformance() {
     const trackingNote = isAllPlatform
         ? `<span class="text-[10px] text-indigo-400 ml-1">· 전환 추적 매체 종합 합산</span>`
         : `<span class="text-[10px] text-slate-400 ml-1">· ${currentPlatform} 단독</span>`;
-    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 5 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${trackingNote}</span>`;
+    if (summaryEl) summaryEl.innerHTML = `<span class="text-xs text-slate-400">BEST TOP 20 · ${pool.length}개 후보 · ${cartLabel}${cfg.label || metric} 기준${trackingNote}</span>`;
 
     // 정렬: cost_per_atc는 낮을수록 좋음 → 오름차순
     const sortAsc = metric === 'cost_per_atc';
@@ -4287,7 +4287,7 @@ function renderProductPerformance() {
         .sort((a, b) => sortAsc
             ? (a[metric] || Infinity) - (b[metric] || Infinity)
             : (b[metric] || 0) - (a[metric] || 0))
-        .slice(0, 5);
+        .slice(0, 20);
 
     // benchmark
     const totalSpend  = pool.reduce((s, x) => s + (x.spend || 0), 0);
@@ -4307,26 +4307,13 @@ function renderProductPerformance() {
         cost_per_atc: totalAtc   > 0 ? totalSpend  / totalAtc    : 0,
     };
 
-    bestEl.innerHTML = best.map((c, i) => createRankRow(c, i + 1, metric, 'best', benchmark)).join('');
+    bestEl.innerHTML = best.map((c, i) => createBestThumbCard(c, i + 1, metric)).join('');
 
-    // ★ 집계 creative 직접 전달 (allCreatives 단일 행 대신 합산 데이터 사용)
-    bestEl.querySelectorAll('.rank-row').forEach((row, idx) => {
-        row.addEventListener('click', (e) => {
-            if (e.target.closest('.rank-comment-toggle')) return;
-            openModal(row.dataset.id, best[idx]);
-        });
+    bestEl.querySelectorAll('.best-thumb-card').forEach((card, idx) => {
+        card.addEventListener('click', () => openModal(card.dataset.id, best[idx]));
     });
-    bestEl.querySelectorAll('.rank-comment-toggle').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const row = btn.closest('.rank-row');
-            const comment = row?.querySelector('.rank-comment');
-            if (comment) {
-                comment.classList.toggle('expanded');
-                btn.classList.toggle('expanded');
-            }
-        });
-    });
+
+    renderBestInsights(best, metric);
 
     // ──────────────────────────────────────────
     // WORST TOP 5 렌더링
@@ -4485,6 +4472,83 @@ function buildPerformanceComment(c, type, benchmark) {
     }
 
     return { reasons, tips };
+}
+
+// BEST TOP 20 썸네일 카드
+function createBestThumbCard(c, rank, metric) {
+    const cfg = METRIC_CONFIG[metric] || { label: metric };
+    const value = cfg.format(c[metric]);
+    const isVideo = c.media_type === 'video';
+    const rawThumb = c.thumbnail_url || c.media_url || '';
+    const fallback = `<div class="btc-thumb-fallback"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
+
+    let thumbHtml;
+    if (!rawThumb) {
+        thumbHtml = fallback;
+    } else if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(rawThumb) && typeof window.buildDriveImgHtml === 'function') {
+        thumbHtml = window.buildDriveImgHtml(rawThumb, { className: 'btc-thumb', alt: '', finalFallbackHtml: fallback });
+    } else {
+        thumbHtml = `<img src="${rawThumb}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="btc-thumb" onerror="this.outerHTML='${fallback.replace(/'/g, "\\'")}'">`;
+    }
+
+    const appeals = normalizeArrayField(c.appeal_points).slice(0, 2);
+    const appealsHtml = appeals.map(a => `<span class="btc-chip">${a}</span>`).join('');
+    const adName = (c.ad_name || c.creative_name || '(무제)').slice(0, 30);
+    const brand = c.brand || '';
+
+    return `<div class="best-thumb-card" data-id="${c.id}">
+        <div class="btc-img-wrap">
+            <span class="btc-rank">${rank}</span>
+            ${thumbHtml}
+            <span class="btc-metric">${value}</span>
+        </div>
+        <div class="btc-info">
+            ${brand ? `<span class="btc-brand">${brand}</span>` : ''}
+            <p class="btc-name" title="${adName}">${adName}</p>
+            ${appealsHtml ? `<div class="btc-chips">${appealsHtml}</div>` : ''}
+        </div>
+    </div>`;
+}
+
+// BEST 인사이트 패널 렌더링
+function renderBestInsights(best, metric) {
+    const panel = document.getElementById('best-insights-content');
+    if (!panel) return;
+    if (!best.length) {
+        panel.innerHTML = '<div class="text-center text-slate-300 text-xs py-8">데이터 없음</div>';
+        return;
+    }
+    function topKw(items, field, n) {
+        const cnt = new Map();
+        items.forEach(c => normalizeArrayField(c[field]).forEach(k => { if (k) cnt.set(k, (cnt.get(k) || 0) + 1); }));
+        return [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    }
+    const appeals  = topKw(best, 'appeal_points', 8);
+    const hooks    = topKw(best, 'hook_type', 4);
+    const emotions = topKw(best, 'target_emotion', 4);
+    const cfg = METRIC_CONFIG[metric] || { label: metric, format: v => v };
+    const avg = best.reduce((s, c) => s + (c[metric] || 0), 0) / best.length;
+
+    const chipsOf = (pairs, cls = '') => pairs.map(([k, v]) =>
+        `<span class="bi-chip ${cls}">${k}<span class="bi-cnt">${v}</span></span>`).join('');
+
+    panel.innerHTML = `
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-tags"></i> 강조 포인트</div>
+            <div class="bi-chips">${chipsOf(appeals) || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-eye"></i> 시선 끄는 방식</div>
+            <div class="bi-chips">${chipsOf(hooks, 'bi-chip-hook') || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-heart"></i> 감정 · 분위기</div>
+            <div class="bi-chips">${chipsOf(emotions, 'bi-chip-emo') || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-avg">
+            <div class="bi-title"><i class="fas fa-chart-bar"></i> 평균 ${cfg.label}</div>
+            <div class="bi-avg-val">${cfg.format(avg)}</div>
+        </div>`;
 }
 
 // 순위 행 (썸네일 즉시 렌더링 + Drive URL 자동 변환 + AI 추론 코멘트)
