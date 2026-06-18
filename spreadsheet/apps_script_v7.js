@@ -24,9 +24,9 @@ const COLS = {
 };
 
 // 속도 설정
-const SLEEP_BETWEEN_REQUESTS = 3000;     // 3초 간격 (gemini-2.5-flash thinking 토큰 소모 감안)
-const MAX_RETRY_ON_429 = 5;              // 429 발생 시 재시도 횟수
-const RETRY_BASE_WAIT_MS = 15000;        // 첫 재시도 대기 (지수 백오프: 15s → 30s → 60s…)
+const SLEEP_BETWEEN_REQUESTS = 1000;     // 1초 간격 (gemini-2.0-flash는 RPM 한도 높음)
+const MAX_RETRY_ON_429 = 4;              // 429 발생 시 재시도 횟수
+const RETRY_BASE_WAIT_MS = 8000;         // 첫 재시도 대기 (지수 백오프: 8s → 16s → 32s → 64s)
 
 // ============================================
 // ⚠️ 사전 준비:
@@ -491,23 +491,31 @@ function uploadVideoToGeminiFiles(videoBlob, displayName) {
   const mimeType = videoBlob.getContentType() || 'video/mp4';
   const bytes = videoBlob.getBytes();
 
-  // Step 1: 업로드 세션 시작
-  const initResp = UrlFetchApp.fetch(
-    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`,
-    {
-      method: 'post',
-      headers: {
-        'X-Goog-Upload-Protocol': 'resumable',
-        'X-Goog-Upload-Command': 'start',
-        'X-Goog-Upload-Header-Content-Length': String(bytes.length),
-        'X-Goog-Upload-Header-Content-Type': mimeType,
-        'Content-Type': 'application/json'
-      },
-      payload: JSON.stringify({ file: { display_name: displayName || 'ad_video' } }),
-      muteHttpExceptions: true
+  // Step 1: 업로드 세션 시작 (429 시 최대 3회 재시도)
+  let initResp;
+  for (let attempt = 0; attempt <= 3; attempt++) {
+    initResp = UrlFetchApp.fetch(
+      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`,
+      {
+        method: 'post',
+        headers: {
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+          'X-Goog-Upload-Header-Content-Type': mimeType,
+          'Content-Type': 'application/json'
+        },
+        payload: JSON.stringify({ file: { display_name: displayName || 'ad_video' } }),
+        muteHttpExceptions: true
+      }
+    );
+    if (initResp.getResponseCode() === 200) break;
+    if (initResp.getResponseCode() === 429 && attempt < 3) {
+      const wait = 10000 * Math.pow(2, attempt); // 10s → 20s → 40s
+      Logger.log(`⚠️ Files API 429 — ${wait/1000}초 대기 후 재시도 (${attempt+1}/3)`);
+      Utilities.sleep(wait);
+      continue;
     }
-  );
-  if (initResp.getResponseCode() !== 200) {
     throw new Error(`Files API 초기화 실패 (${initResp.getResponseCode()})`);
   }
   const uploadUrl = initResp.getHeaders()['X-Goog-Upload-URL'] ||
@@ -691,7 +699,7 @@ function callGeminiAPI(payload, retryCount) {
     throw new Error('⚠️ GEMINI_API_KEY를 코드 상단에 입력하세요.');
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
