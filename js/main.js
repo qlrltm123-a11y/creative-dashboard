@@ -5092,84 +5092,55 @@ function renderKRSection() {
     grid.classList.remove('hidden');
     empty?.classList.add('hidden');
 
-    // 소재 카드 렌더
-    grid.innerHTML = sorted.map(c => {
-        const fx2     = typeof getFxRate === 'function' ? getFxRate() : 9.5;
-        const name    = c.ad_name || c.creative_name || c.id || '';
-        const roas    = Math.round((c.roas || 0) * 100);
-        const ctr     = ((c.ctr || 0) * 100).toFixed(2);
-        const cvr     = ((c.cvr || 0) * 100).toFixed(2);
-        const cv      = Math.round(c.conversions || 0).toLocaleString();
-        const spendKrw = Math.round((c.spend || 0) * fx2);
-        const spend   = spendKrw >= 10000
-            ? '₩' + (spendKrw / 10000).toFixed(0) + '만'
-            : '₩' + spendKrw.toLocaleString();
-        const isVideo = c.media_type === 'video';
+    // 소재 카드 렌더 (compact 썸네일 — createBestThumbCard 재사용, metric=roas)
+    grid.innerHTML = sorted.map((c, i) => createBestThumbCard(c, i + 1, 'roas')).join('');
 
-        // 썸네일
-        const rawThumb = c.thumbnail_url || c.media_url || '';
-        const fallback = `<div style="width:100%;height:160px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#94a3b8;font-size:2rem"><i class="fas fa-${isVideo ? 'video' : 'image'}"></i></div>`;
-        let thumbHtml;
-        if (!rawThumb) {
-            thumbHtml = fallback;
-        } else if (typeof window.isDriveUrl === 'function' && window.isDriveUrl(rawThumb) && typeof window.buildDriveImgHtml === 'function') {
-            thumbHtml = window.buildDriveImgHtml(rawThumb, {
-                className: 'kr-thumb',
-                alt: name,
-                finalFallbackHtml: fallback,
-            });
-        } else {
-            thumbHtml = `<img src="${rawThumb}" alt="${name}" loading="lazy"
-                class="kr-thumb" style="width:100%;height:160px;object-fit:cover;border-radius:8px;"
-                onerror="this.outerHTML='${fallback.replace(/'/g,"\\'")}'" >`;
-        }
+    grid.querySelectorAll('.best-thumb-card').forEach((card, idx) => {
+        card.addEventListener('click', () => openModal(card.dataset.id, sorted[idx]));
+    });
 
-        // 소구포인트 칩
-        const appeals = typeof normalizeArrayField === 'function' ? normalizeArrayField(c.appeal_points).slice(0, 3) : [];
-        const appealHtml = appeals.length
-            ? appeals.map(a => `<span class="rank-appeal-chip">${a}</span>`).join('')
-            : '<span class="text-xs text-slate-400">분석 전</span>';
+    renderKRInsights(sorted);
+}
 
-        // ROAS 색상
-        const roasColor = roas >= 300 ? 'text-emerald-600' : roas >= 150 ? 'text-amber-600' : 'text-rose-500';
+function renderKRInsights(items) {
+    const panel = document.getElementById('kr-insights-content');
+    if (!panel) return;
+    if (!items.length) {
+        panel.innerHTML = '<div class="text-center text-slate-300 text-xs py-8">데이터 없음</div>';
+        return;
+    }
+    function topKw(arr, field, n) {
+        const cnt = new Map();
+        arr.forEach(c => normalizeArrayField(c[field]).forEach(k => { if (k) cnt.set(k, (cnt.get(k) || 0) + 1); }));
+        return [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    }
+    const appeals  = topKw(items, 'appeal_points', 8);
+    const hooks    = topKw(items, 'hook_type', 4);
+    const emotions = topKw(items, 'target_emotion', 4);
+    const avgRoas  = items.reduce((s, c) => s + (c.roas || 0), 0) / items.length;
+    const avgCtr   = items.reduce((s, c) => s + (c.ctr  || 0), 0) / items.length;
 
-        // 플랫폼 배지
-        const platforms = c._platforms ? [...c._platforms].join(' · ') : (c.platform || '');
+    const chipsOf = (pairs, cls = '') => pairs.map(([k, v]) =>
+        `<span class="bi-chip ${cls}">${k}<span class="bi-cnt">${v}</span></span>`).join('');
 
-        // 드라이브 링크 (media_url 우선, 없으면 thumbnail_url)
-        const driveUrl = c.media_url || c.thumbnail_url || '';
-
-        return `
-        <a ${driveUrl ? `href="${driveUrl}" target="_blank" rel="noopener"` : ''}
-           class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow block ${driveUrl ? 'cursor-pointer hover:border-violet-400' : ''}"
-           style="text-decoration:none;color:inherit">
-            <div class="mb-3 relative">
-                ${thumbHtml}
-                ${driveUrl ? `<div class="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1"><i class="fas fa-external-link-alt"></i>Drive</div>` : ''}
-            </div>
-            <div class="text-xs font-bold text-slate-800 mb-1 leading-snug break-all">${name}</div>
-            ${platforms ? `<div class="text-xs text-slate-400 mb-2"><i class="fas fa-broadcast-tower mr-1"></i>${platforms}</div>` : ''}
-            <div class="flex flex-wrap gap-1 mb-3">${appealHtml}</div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div class="bg-slate-50 rounded-lg p-2">
-                    <div class="text-slate-400 mb-0.5">ROAS</div>
-                    <div class="font-bold ${roasColor}">${roas}%</div>
-                </div>
-                <div class="bg-slate-50 rounded-lg p-2">
-                    <div class="text-slate-400 mb-0.5">CTR</div>
-                    <div class="font-bold text-blue-600">${ctr}%</div>
-                </div>
-                <div class="bg-slate-50 rounded-lg p-2">
-                    <div class="text-slate-400 mb-0.5">전환수</div>
-                    <div class="font-bold text-slate-700">${cv}</div>
-                </div>
-                <div class="bg-slate-50 rounded-lg p-2">
-                    <div class="text-slate-400 mb-0.5">광고비</div>
-                    <div class="font-bold text-slate-700">${spend}</div>
-                </div>
-            </div>
-        </a>`;
-    }).join('');
+    panel.innerHTML = `
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-tags"></i> 강조 포인트</div>
+            <div class="bi-chips">${chipsOf(appeals) || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-eye"></i> 시선 끄는 방식</div>
+            <div class="bi-chips">${chipsOf(hooks, 'bi-chip-hook') || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-section">
+            <div class="bi-title"><i class="fas fa-heart"></i> 감정 · 분위기</div>
+            <div class="bi-chips">${chipsOf(emotions, 'bi-chip-emo') || '<span class="bi-empty">없음</span>'}</div>
+        </div>
+        <div class="bi-avg">
+            <div class="bi-title"><i class="fas fa-chart-bar"></i> 평균 ROAS</div>
+            <div class="bi-avg-val">${Math.round(avgRoas * 100)}%</div>
+            <div class="text-xs text-slate-400 mt-1">평균 CTR ${(avgCtr * 100).toFixed(2)}%</div>
+        </div>`;
 }
 window.renderKRSection = renderKRSection;
 
