@@ -763,9 +763,6 @@
                     <select id="cep-brand-filter" class="filter-select text-sm">
                         <option value="">전체 브랜드</option>
                     </select>
-                    <select id="cep-product-filter" class="filter-select text-sm">
-                        <option value="">전체 제품</option>
-                    </select>
                     <select id="cep-status-filter" class="filter-select text-sm">
                         <option value="">전체 상태</option>
                         <option value="done">검증 완료</option>
@@ -780,9 +777,24 @@
             <!-- 요약 통계 -->
             <div id="cep-summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
 
-            <!-- 제품별 CEP 카드 -->
-            <div id="cep-groups">
-                <div class="text-center text-slate-300 text-sm py-16">검증 로그 불러오는 중...</div>
+            <!-- 2패널: 좌측 제품 목록 + 우측 선택 제품 상세 -->
+            <div class="flex gap-4 items-start">
+                <div class="w-72 shrink-0">
+                    <div class="sticky top-16 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                            <h4 class="text-sm font-bold text-slate-800">제품 목록</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">클릭하면 우측에 상세가 표시됩니다</p>
+                        </div>
+                        <div id="cep-product-list" class="cep-product-list">
+                            <div class="text-center text-slate-300 text-xs py-10">검증 로그 불러오는 중...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div id="cep-detail">
+                        <div class="text-center text-slate-300 text-sm py-16">제품을 선택하세요.</div>
+                    </div>
+                </div>
             </div>
         </div>
         <!-- ============ /SECTION: CEP 검증 로그 ============ -->
