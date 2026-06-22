@@ -3,15 +3,18 @@
 // v7: 유료 등급 최적화 + 자체 일일 한도 + 카운터 + 메일 알림
 // ============================================
 
-// 🔑 유료 결제 활성화된 API 키 1개 (충분합니다)
-// https://aistudio.google.com/app/apikey 에서 발급
-const GEMINI_API_KEY = 'AIza_여기에_유료_키_입력';
+// 🔑 API 키
+const GEMINI_API_KEY = 'AIza_여기에_입력';  // aistudio.google.com/apikey
 
-// 🛡️ 자체 안전장치 (Cloud Console 권한 없어도 코드 레벨에서 차단)
-const DAILY_CALL_LIMIT = 3000;          // 일일 최대 호출 수 (이거 넘으면 자동 차단)
-const COST_PER_CALL = 0.0003;            // 1회당 평균 비용 (USD)
-const ALERT_EMAIL = '';                  // 한도 80% 도달 시 알림 받을 이메일 (빈칸이면 알림 X)
-const ALERT_THRESHOLD = 0.8;             // 80% 도달 시 메일 알림
+// 429 재시도 설정
+const MAX_RETRY_ON_429 = 4;
+const RETRY_BASE_WAIT_MS = 8000;  // 8s → 16s → 32s → 64s
+
+// 🛡️ 자체 안전장치
+const DAILY_CALL_LIMIT = 3000;
+const COST_PER_CALL = 0.0003;
+const ALERT_EMAIL = '';
+const ALERT_THRESHOLD = 0.8;
 
 // 시트 컬럼 인덱스 (1부터 시작)
 const COLS = {
@@ -24,9 +27,7 @@ const COLS = {
 };
 
 // 속도 설정
-const SLEEP_BETWEEN_REQUESTS = 1000;     // 1초 간격 (gemini-2.0-flash는 RPM 한도 높음)
-const MAX_RETRY_ON_429 = 4;              // 429 발생 시 재시도 횟수
-const RETRY_BASE_WAIT_MS = 8000;         // 첫 재시도 대기 (지수 백오프: 8s → 16s → 32s → 64s)
+const SLEEP_BETWEEN_REQUESTS = 1000;  // 1초 간격
 
 // ============================================
 // ⚠️ 사전 준비:
@@ -39,6 +40,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🤖 AI 분석')
     .addItem('▶ 선택한 행 분석', 'analyzeSelectedRow')
+    .addItem('▶ 선택한 행 분석 (다중)', 'analyzeSelectedRows')
     .addItem('▶▶ 빈 칸 모두 분석 (6분 제한)', 'analyzeAllEmpty')
     .addItem('🌙 끝까지 자동 처리 (이어달리기)', 'startAutoRunUntilDone')
     .addItem('⏹️ 자동 처리 중단', 'stopAutoRun')
@@ -370,6 +372,35 @@ function analyzeSelectedRow() {
   }
 }
 
+function analyzeSelectedRows() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const ranges = sheet.getActiveRangeList().getRanges();
+  const rows = new Set();
+  ranges.forEach(r => {
+    for (let row = r.getRow(); row <= r.getLastRow(); row++) {
+      if (row >= 2) rows.add(row);
+    }
+  });
+  if (!rows.size) {
+    SpreadsheetApp.getUi().alert('2행 이상의 데이터 행을 선택해주세요.');
+    return;
+  }
+  let count = 0, failCount = 0;
+  rows.forEach(row => {
+    try {
+      checkDailyLimit();
+    } catch (e) {
+      SpreadsheetApp.getUi().alert('🛑 일일 한도 도달: ' + e.message);
+      return;
+    }
+    const success = analyzeRow(sheet, row);
+    if (success) count++;
+    else failCount++;
+    Utilities.sleep(SLEEP_BETWEEN_REQUESTS);
+  });
+  SpreadsheetApp.getUi().alert(`✅ 완료: ${count}개 성공 / ${failCount}개 실패\n오늘 누적: ${getDailyCount()}회`);
+}
+
 function analyzeAllEmpty() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const lastRow = sheet.getLastRow();
@@ -699,7 +730,7 @@ function callGeminiAPI(payload, retryCount) {
     throw new Error('⚠️ GEMINI_API_KEY를 코드 상단에 입력하세요.');
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
     contentType: 'application/json',
@@ -710,7 +741,7 @@ function callGeminiAPI(payload, retryCount) {
   const responseText = response.getContentText();
   const responseCode = response.getResponseCode();
 
-  // 429: 지수 백오프 재시도 (15s → 30s → 60s → 120s → 240s)
+  // 429: 지수 백오프 재시도
   if (responseCode === 429) {
     if (retryCount >= MAX_RETRY_ON_429) {
       throw new Error(`429 한도 초과 (${MAX_RETRY_ON_429}회 재시도 실패)`);

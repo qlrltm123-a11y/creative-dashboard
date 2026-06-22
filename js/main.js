@@ -556,7 +556,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false, kr: false };
+let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false, kr: false, cep: false };
 let _currentSection = 'performance';   // 개요 탭 제거됨 → 기본 성과 분석
 
 function switchSection(sectionName) {
@@ -601,6 +601,8 @@ function switchSection(sectionName) {
                 if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
             } else if (sectionName === 'kr') {
                 renderKRSection();
+            } else if (sectionName === 'cep') {
+                if (typeof window.renderCepVerification === 'function') window.renderCepVerification();
             } else if (sectionName === 'funnel' || sectionName === 'gmv') {
                 // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드) + 전역 브랜드 전달
                 const frame = document.getElementById(sectionName + '-frame');
