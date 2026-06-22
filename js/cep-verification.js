@@ -18,6 +18,86 @@ const CEP_VERDICT_META = {
     weak:    { emoji: '🟠', label: '반응 약함' },
 };
 
+// 시트에 같은 제품이 옵션/구성 단위로 쪼개져 입력된 경우를 하나로 통합
+const CEP_PRODUCT_ALIASES = {
+    '콜라겐 세럼미스트 X 2': '콜라겐 세럼미스트',
+    '3D크림 리필기획 옵션①': '3D크림 리필기획',
+    '3D크림 리필기획 옵션②': '3D크림 리필기획',
+};
+function _cepNormalizeProduct(raw) {
+    const s = (raw || '').trim();
+    return CEP_PRODUCT_ALIASES[s] || s;
+}
+
+// 제품별 CEP 시장 컨텍스트 (boh-tankcream-dashboard.vercel.app 시장조사 대시보드 기반)
+// 시트의 CEP 번호는 입력 오타가 섞여있어(같은 번호가 다른 CEP에 중복 사용된 경우 발견) 신뢰할 수 없다.
+// 대신 CEP 제목에 포함된 키워드로 매칭한다.
+const _CTX_EYECREAM = [
+    { kw: ['눈가 처짐', '탄력 저하'], text: '거울에서 눈가 처짐·탄력 저하를 발견하는, 연중 발생하는 노화 인식 시점' },
+    { kw: ['수면 부족', '다크서클'], text: '늦게 잔 다음날 아침 수면 부족으로 다크서클이 심해지는 시점' },
+    { kw: ['에어컨'], text: '에어컨 켜진 사무실에서 종일 있으며 눈가 건조가 누적되는 여름 집중 시점' },
+];
+const _CTX_COLLAGEN_MIST = [
+    { kw: ['메이크업 전', '수분 부스팅'], text: '메이크업 전 빠르게 수분을 채워 파운데이션 밀착력을 높이려는 프리페어 단계' },
+    { kw: ['세안 직후'], text: '세안 직후 피부가 가장 건조한 순간, 시간 없이 빠르게 보습하려는 니즈' },
+    { kw: ['취침 전', '원스텝'], text: '취침 전 복잡한 루틴 없이 원스텝으로 보습을 마무리하려는 저녁 니즈' },
+    { kw: ['메이크업 위', '들뜸'], text: '외출 중 파운데이션이 들뜰 때 메이크업을 무너뜨리지 않고 보습하려는 니즈' },
+    { kw: ['마스크'], text: '마스크 착용으로 인한 피부 건조에 빠르게 대응하려는 상황' },
+    { kw: ['겨울철', '외부 건조'], text: '겨울철 외부 환경 건조에 대응하려는 계절적 니즈' },
+    { kw: ['육아'], text: '육아로 바쁜 와중에 짧게 끝낼 수 있는 틈새 보습 니즈' },
+    { kw: ['여행', '출장'], text: '여행·출장 이동 중 휴대성 좋은 보습 솔루션을 찾는 상황' },
+    { kw: ['오피스', '에어컨 건조'], text: '에어컨이 나오는 오피스 환경에서 응급 보습·리프레시가 필요한 상황' },
+    { kw: ['일정 전', '컨디션 개선'], text: '중요한 일정 전 피부 컨디션을 빠르게 개선하려는 니즈' },
+];
+const _CTX_TANCREAM = [
+    { kw: ['시술 전'], text: '시술 비용·부담을 피해 화장품으로 먼저 리프팅 관리를 시도하려는 시술 대체 심리' },
+    { kw: ['환절기'], text: '환절기 피부 탄력 저하를 느끼며 집중 케어가 필요해지는 시점' },
+    { kw: ['육아', '하안부'], text: '출산·육아 스트레스로 하안부(턱선·입가) 처짐을 느낀 30-40대 여성의 고민' },
+    { kw: ['사진', '노안'], text: '사진·영상 속 본인 얼굴이 실제보다 늙어 보인다고 느끼는 순간' },
+    { kw: ['마스크'], text: '마스크 착용이 일상화되며 눈가 인상 관리 필요성이 높아진 상황' },
+    { kw: ['40대'], text: '40대에 진입하며 눈가 탄력 저하를 예방적으로 관리하려는 심리' },
+    { kw: ['마리오네트'], text: '입가~턱으로 이어지는 마리오네트 라인이 두드러질 때의 하안부 집중 관리 니즈' },
+    { kw: ['모닝 리프팅'], text: '내일 아침 탄력을 위해 오늘 밤부터 투자하려는 모닝 리프팅 준비 심리' },
+    { kw: ['나이트 리프팅'], text: '자기 전 마무리 단계로 자리잡은 나이트 리프팅 루틴' },
+    { kw: ['화상회의', '화상 회의'], text: '화상회의 화면 속 자신의 얼굴에 놀라 생긴 긴급한 안티에이징 욕구' },
+];
+const _CTX_NADCREAM = [
+    { kw: ['노화 체감'], text: '피부 노화를 처음 체감하며 안티에이징에 입문하는 단계, 신성분에 대한 심리적 저항감 존재' },
+    { kw: ['피부 피로'], text: '나이보다 피곤해 보이는 컨디션 악화가 먼저 체감되는 시점' },
+    { kw: ['성분'], text: '"이 성분이 뭔가요?" 하는 궁금증이 생기는, 신성분 정보 탐색 단계' },
+    { kw: ['아침 피부컨디션', '아침 피부 컨디션'], text: '나이트 케어 후 다음날 아침 피부 변화를 기대하는 루틴 시점' },
+    { kw: ['퇴근 후'], text: '퇴근 후 하루의 피로를 피부에 남기지 않으려는 저녁 집중 관리' },
+    { kw: ['수면 부족'], text: '잠이 부족한 날일수록 피부 회복이 필요한, 컨디션 회복과 나이트케어가 겹치는 지점' },
+    { kw: ['시술 전'], text: '시술 전 프리미엄 홈케어로 피부를 직접 준비하려는 고급 소비자층의 니즈' },
+];
+const CEP_CONTEXT = {
+    '아이크림': _CTX_EYECREAM,
+    '콜라겐 겔 미스트': _CTX_COLLAGEN_MIST,
+    '콜라겐 세럼미스트': _CTX_COLLAGEN_MIST,
+    '3D크림 리필기획': _CTX_TANCREAM,
+    'PDRN크림': _CTX_TANCREAM,
+    'NAD크림 단품': _CTX_NADCREAM,
+    'NAD크림 단품-옵션2': _CTX_NADCREAM,
+    'NAD+콜라겐크림 (NAD크림 단품)': _CTX_NADCREAM,
+    'NAD+콜라겐크림 (NAD크림 단품-옵션2)': _CTX_NADCREAM,
+};
+function _cepContextFor(product, title) {
+    const list = CEP_CONTEXT[product];
+    if (!list || !title) return null;
+    const found = list.find(entry => entry.kw.some(k => title.includes(k)));
+    return found ? found.text : null;
+}
+
+// "CEP-9 오피스 건조 리프레시" -> { num: 9, no: 'CEP-9', title: '오피스 건조 리프레시' }
+function _cepSplitLabel(label) {
+    const m = label.match(/CEP-?\s*(\d+)/i);
+    const num = m ? parseInt(m[1], 10) : null;
+    const spaceIdx = label.indexOf(' ');
+    const no = spaceIdx > 0 ? label.slice(0, spaceIdx) : label;
+    const title = spaceIdx > 0 ? label.slice(spaceIdx + 1).trim() : '';
+    return { num, no, title };
+}
+
 let _cepProducts = null;   // Map(brand__product -> {brand, product, ceps: Map(cepLabel -> {cepLabel, hypotheses:Set, creatives:[]})})
 let _cepLoading = false;
 let _cepSelectedKey = null;
@@ -84,7 +164,7 @@ function _cepBuildModel(rows) {
     dataRows.forEach(r => {
         if (!r || r.length < 3) return;
         const brand = (r[CEP_COL.brand] || '').trim();
-        const product = (r[CEP_COL.product] || '').trim();
+        const product = _cepNormalizeProduct(r[CEP_COL.product]);
         if (!brand && !product) return;
 
         const cepLines = (r[CEP_COL.cep] || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
@@ -152,13 +232,18 @@ function _cepVerdictTag(agg, hasResult) {
     return 'weak';
 }
 
-// 원인 분석: CTR/CVR 진단 + 소재간 편차(앵글 비교)
-function _cepAnalyze(cepObj, agg, tag) {
+// 원인 분석: 시장 컨텍스트 + CTR/CVR 진단 + 소재간 편차(앵글 비교)
+function _cepAnalyze(cepObj, agg, tag, ctx) {
     const causes = [];
     let best = null, worst = null;
     if (tag === 'pending') {
         causes.push('검증 소재가 아직 집행되지 않아 결과를 분석할 수 없습니다.');
         return { causes, best, worst };
+    }
+
+    if (ctx) {
+        if (tag === 'win' || tag === 'mid') causes.push(`이 CEP는 "${ctx}" 같이 구체적이고 시급한 상황이라, 소재가 그 순간을 짚어주자 소비자가 빠르게 반응한 것으로 보입니다.`);
+        else causes.push(`이 CEP는 "${ctx}" 상황을 겨냥했지만, 이번 소재가 그 구체적인 순간·감정을 충분히 포착하지 못했을 가능성이 있습니다.`);
     }
 
     if (agg.ctr < 1.5) causes.push(`CTR ${agg.ctr.toFixed(2)}%로 평균 대비 낮아 소재의 1차 주목도(썸네일·카피)가 약했을 가능성이 있습니다.`);
@@ -200,16 +285,16 @@ function _cepFmtKRW(v) { return '₩' + Math.round(v).toLocaleString(); }
 function _cepFmtPct(v) { return v.toFixed(1) + '%'; }
 function _cepFmtInt(v) { return Math.round(v).toLocaleString(); }
 
-function _cepRenderCepBlock(cepObj) {
+function _cepRenderCepBlock(cepObj, productName) {
     const hasResult = cepObj.creatives.length > 0;
     const agg = hasResult ? _cepAggregate(cepObj) : null;
     const tag = _cepVerdictTag(agg, hasResult);
     const meta = CEP_VERDICT_META[tag];
     const hypotheses = [...cepObj.hypotheses];
-    const spaceIdx = cepObj.cepLabel.indexOf(' ');
-    const cepNo = spaceIdx > 0 ? cepObj.cepLabel.slice(0, spaceIdx) : cepObj.cepLabel;
-    const cepTitle = spaceIdx > 0 ? cepObj.cepLabel.slice(spaceIdx + 1) : '';
+    const { no: cepNo, title: cepTitle } = _cepSplitLabel(cepObj.cepLabel);
+    const ctx = _cepContextFor(productName, cepTitle);
 
+    const ctxHtml = ctx ? `<div class="cep-ctx-note"><i class="fas fa-chart-pie"></i> ${_cepEsc(ctx)}</div>` : '';
     const hypoHtml = hypotheses.length
         ? `<div class="cep-hypo"><div class="cep-hypo-label">가설</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`
         : '';
@@ -224,6 +309,7 @@ function _cepRenderCepBlock(cepObj) {
         return `
         <div class="cep-block cep-block--pending">
             ${headHtml}
+            ${ctxHtml}
             ${hypoHtml}
             <div class="cep-pending-note"><i class="fas fa-circle-notch"></i> 검증 소재 제작 대기 중 — 결과·원인 분석은 집행 후 표시됩니다.</div>
             <div class="cep-nextstep">
@@ -233,7 +319,7 @@ function _cepRenderCepBlock(cepObj) {
         </div>`;
     }
 
-    const { causes, best } = _cepAnalyze(cepObj, agg, tag);
+    const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx);
     const nextText = _cepNextStepText(tag, agg, best);
     const multi = cepObj.creatives.filter(c => c.cost > 0).length > 1;
 
@@ -271,6 +357,7 @@ function _cepRenderCepBlock(cepObj) {
     return `
     <div class="cep-block cep-block--${tag}">
         ${headHtml}
+        ${ctxHtml}
         ${hypoHtml}
         <div class="cep-section-label">CEP 종합 결과</div>
         ${resultHtml}
@@ -362,6 +449,28 @@ function _cepRenderProductList(productsMap) {
     });
 }
 
+// 같은 제품 안에서 CEP끼리 비교 — 어떤 CEP가 왜 잘됐고, 왜 안됐는지
+function _cepProductInsight(pObj) {
+    const items = [...pObj.ceps.values()]
+        .map(c => ({ cep: c, agg: _cepAggregate(c) }))
+        .filter(x => x.cep.creatives.length > 0 && x.agg.cost > 0);
+    if (items.length < 2) return '';
+
+    const sorted = [...items].sort((a, b) => b.agg.roas - a.agg.roas);
+    const top = sorted[0], bottom = sorted[sorted.length - 1];
+    if (top === bottom || top.agg.roas - bottom.agg.roas < 20) return '';
+
+    const topInfo = _cepSplitLabel(top.cep.cepLabel);
+    const bottomInfo = _cepSplitLabel(bottom.cep.cepLabel);
+    const topCtx = _cepContextFor(pObj.product, topInfo.title);
+    const bottomCtx = _cepContextFor(pObj.product, bottomInfo.title);
+
+    const topLine = `"${topInfo.title}"(ROAS ${top.agg.roas.toFixed(0)}%)가 가장 효율이 높았습니다${topCtx ? ` — "${topCtx}" 같이 구체적이고 시급한 상황일수록 소비자 반응이 빠르게 일어나는 것으로 보입니다.` : '.'}`;
+    const bottomLine = `반대로 "${bottomInfo.title}"(ROAS ${bottom.agg.roas.toFixed(0)}%)는 효율이 낮았는데${bottomCtx ? `, "${bottomCtx}" 상황은 니즈가 막연하거나 시급성이 낮아 소구가 약하게 작동했을 가능성이 있습니다.` : ', 소구포인트가 막연했거나 시급성이 낮았을 가능성이 있습니다.'}`;
+
+    return `${topLine} ${bottomLine} 다음 예산은 "${topInfo.title}" 류의 CEP에 더 비중을 두고, "${bottomInfo.title}"은 소구를 더 구체화하거나 우선순위를 낮추는 것을 검토하세요.`;
+}
+
 function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
@@ -376,6 +485,7 @@ function _cepRenderDetailForSelected() {
     const allCeps = [...pObj.ceps.values()];
     const done = allCeps.filter(c => c.creatives.length > 0).length;
     const avgRoas = _cepProductAvgRoas(pObj);
+    const productInsight = _cepProductInsight(pObj);
 
     detailEl.innerHTML = `
         <div class="cep-detail-header">
@@ -383,8 +493,13 @@ function _cepRenderDetailForSelected() {
             <span class="cep-detail-title">${_cepEsc(pObj.product)}</span>
             <span class="cep-product-stat">CEP ${allCeps.length}개 · 완료 ${done} · 대기 ${allCeps.length - done}${avgRoas != null ? ` · 평균 ROAS ${avgRoas.toFixed(0)}%` : ''}</span>
         </div>
+        ${productInsight ? `
+        <div class="cep-product-insight">
+            <div class="cep-section-label">제품 전체 CEP 비교 인사이트</div>
+            <p>${_cepEsc(productInsight)}</p>
+        </div>` : ''}
         <div class="cep-blocks">
-            ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c)).join('') : '<div class="text-center text-slate-300 text-sm py-10">조건에 맞는 CEP가 없습니다.</div>'}
+            ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product)).join('') : '<div class="text-center text-slate-300 text-sm py-10">조건에 맞는 CEP가 없습니다.</div>'}
         </div>`;
 }
 
