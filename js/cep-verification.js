@@ -112,17 +112,31 @@ function _cepNum(v) {
     return isNaN(n) ? 0 : n;
 }
 
-// 핵심 카피/앵글 추출 ("카피문구 / 인플루언서 / 활용방식 ..." -> "카피문구 · 인플루언서")
-// 소재 간 차이가 보통 두 번째 구절(인물·소구 변형)에 있으므로, 코어 문구를 줄여서라도 항상 포함시킨다.
-function _cepShortDetail(detail) {
+// 같은 CEP의 소재들은 보통 카피·적용 방법 구절을 동일하게 공유하고, 실제로 달라지는 건
+// 모델(인플루언서)과 영상 구성(시연 방식, 클로즈업 등)이다. 모든 소재가 공통으로 가진 구절을
+// 찾아내 제외하면, 진짜 차이를 만든 부분만 비교/원인 분석에 쓸 수 있다.
+function _cepCommonDetailSegments(creatives) {
+    const lists = creatives.filter(c => c.detail).map(c => c.detail.split('/').map(s => s.trim()).filter(Boolean));
+    if (lists.length < 2) return new Set();
+    const common = new Set(lists[0]);
+    for (let i = 1; i < lists.length; i++) {
+        const setI = new Set(lists[i]);
+        [...common].forEach(seg => { if (!setI.has(seg)) common.delete(seg); });
+    }
+    return common;
+}
+
+// "카피(공통) / 인플루언서 / 공통 적용방법 / 영상 구성요소..." -> "인플루언서(영상 구성요소)"
+function _cepUniqueDetail(detail, commonSegs) {
     if (!detail) return '';
     const parts = detail.split('/').map(s => s.trim()).filter(Boolean);
     if (!parts.length) return '';
-    const core = parts[0];
-    const tag = parts[1] || '';
-    const coreMax = tag ? 20 : 30;
-    const shortCore = core.length > coreMax ? core.slice(0, coreMax) + '…' : core;
-    return tag ? `${shortCore} · ${tag}` : shortCore;
+    const name = parts[1] || parts[0];
+    const rest = parts.filter((p, idx) => idx !== 1 && !(commonSegs && commonSegs.has(p)));
+    const restText = rest.join(', ');
+    const max = 60;
+    const shortRest = restText.length > max ? restText.slice(0, max) + '…' : restText;
+    return shortRest ? `${name}(${shortRest})` : name;
 }
 
 // 쿼트/임베드 줄바꿈을 지원하는 CSV 파서 (sheets.js parseCSV와 동일한 로직)
@@ -233,7 +247,7 @@ function _cepVerdictTag(agg, hasResult) {
 }
 
 // 원인 분석: 시장 컨텍스트 + CTR/CVR 진단 + 소재간 편차(앵글 비교)
-function _cepAnalyze(cepObj, agg, tag, ctx) {
+function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs) {
     const causes = [];
     let best = null, worst = null;
     if (tag === 'pending') {
@@ -259,7 +273,13 @@ function _cepAnalyze(cepObj, agg, tag, ctx) {
         const sorted = [...spent].sort((a, b) => b.roasSheet - a.roasSheet);
         best = sorted[0]; worst = sorted[sorted.length - 1];
         if (best.roasSheet - worst.roasSheet > 50) {
-            causes.push(`같은 CEP를 겨냥했지만 소재별 성과 편차가 큽니다 — "${_cepShortDetail(best.detail)}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${_cepShortDetail(worst.detail)}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. 같은 상황을 겨냥해도 모델·구성·카피 등 표현 방식 차이가 성과를 가른 것으로 보입니다.`);
+            const bestUniq = _cepUniqueDetail(best.detail, commonSegs);
+            const worstUniq = _cepUniqueDetail(worst.detail, commonSegs);
+            const copies = spent.map(c => (c.detail || '').split('/')[0]?.trim()).filter(Boolean);
+            const sameCopy = copies.length > 1 && copies.every(c => c === copies[0]);
+            const intro = sameCopy ? '동일한 카피·소구를 사용했음에도' : '같은 CEP를 겨냥했지만';
+            const outro = sameCopy ? '카피보다 모델과 영상 구성(시연 방식·클로즈업 등)의 차이가 성과를 가른 것으로 보입니다.' : '모델·구성·카피 등 표현 방식 차이가 성과를 가른 것으로 보입니다.';
+            causes.push(`${intro} 소재별 성과 편차가 큽니다 — "${bestUniq}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${worstUniq}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. ${outro}`);
         }
     } else if (spent.length === 1) {
         best = spent[0];
@@ -271,12 +291,13 @@ function _cepAnalyze(cepObj, agg, tag, ctx) {
     return { causes, best, worst };
 }
 
-function _cepNextStepText(tag, agg, best) {
+function _cepNextStepText(tag, agg, best, commonSegs) {
+    const bestUniq = best ? _cepUniqueDetail(best.detail, commonSegs) : '';
     switch (tag) {
         case 'pending': return '가설에 맞는 검증 소재를 제작해 테스트를 시작하세요.';
         case 'fail': return '전환 0건으로 가설이 입증되지 않았습니다. 동일 CEP를 다른 앵글로 1회 더 검증하거나 다른 CEP로 예산을 재배분하세요.';
-        case 'win': return `검증된 CEP입니다.${best ? ` "${_cepShortDetail(best.detail)}" 앵글을 중심으로` : ''} 소재를 추가 제작하고 예산 확대를 검토하세요.`;
-        case 'mid': return `손익 경계선입니다.${best ? ` "${_cepShortDetail(best.detail)}" 소재 앵글을 변형해` : ''} 2-3개 추가 소재로 재검증하세요.`;
+        case 'win': return `검증된 CEP입니다.${bestUniq ? ` "${bestUniq}" 같은 영상 구성을 중심으로` : ''} 소재를 추가 제작하고 예산 확대를 검토하세요.`;
+        case 'mid': return `손익 경계선입니다.${bestUniq ? ` "${bestUniq}" 소재의 영상 구성을 변형해` : ''} 2-3개 추가 소재로 재검증하세요.`;
         default: return '전환은 있으나 효율이 낮습니다. 타겟 또는 랜딩 오퍼를 조정해 재검증하세요.';
     }
 }
@@ -328,8 +349,9 @@ function _cepRenderCepBlock(cepObj, productName) {
         </div>`;
     }
 
-    const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx);
-    const nextText = _cepNextStepText(tag, agg, best);
+    const commonSegs = _cepCommonDetailSegments(cepObj.creatives);
+    const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx, commonSegs);
+    const nextText = _cepNextStepText(tag, agg, best, commonSegs);
     const multi = cepObj.creatives.filter(c => c.cost > 0).length > 1;
 
     const resultHtml = `
@@ -352,7 +374,7 @@ function _cepRenderCepBlock(cepObj, productName) {
                         return `
                         <tr class="${isBest ? 'cep-row-best' : ''}">
                             <td>${c.url ? `<a href="${_cepEsc(c.url)}" target="_blank" rel="noopener">${_cepEsc(c.name)} <i class="fas fa-arrow-up-right-from-square"></i></a>` : _cepEsc(c.name)}${isBest ? ' <span class="cep-best-tag">★최고</span>' : ''}</td>
-                            <td class="cep-angle-cell">${_cepEsc(_cepShortDetail(c.detail))}</td>
+                            <td class="cep-angle-cell">${_cepEsc(_cepUniqueDetail(c.detail, commonSegs))}</td>
                             <td>${_cepFmtInt(c.imp)}</td>
                             <td>${c.imp > 0 ? _cepFmtPct(c.ctrSheet) : '-'}</td>
                             <td>${_cepFmtInt(c.cv)}</td>
