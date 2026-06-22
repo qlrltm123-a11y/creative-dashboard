@@ -90,6 +90,21 @@
 }
 .cep-product-insight .cep-section-label { margin-top: 0; color: #4f46e5; }
 .cep-product-insight p { font-size: 12.5px; color: #312e81; line-height: 1.7; margin: 0; }
+.cep-product-insight .cep-section-label:not(:first-of-type) { margin-top: 14px; }
+
+.cep-compare-wrap { overflow-x: auto; background: #fff; border-radius: 8px; }
+.cep-compare-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.cep-compare-table th {
+    text-align: left; color: #94a3b8; font-weight: 600; padding: 5px 8px;
+    border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+}
+.cep-compare-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; white-space: nowrap; }
+.cep-compare-title { color: #1e293b; font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.cep-compare-roas b { color: #4f46e5; }
+.cep-compare-row--win .cep-compare-roas b { color: #047857; }
+.cep-compare-row--mid .cep-compare-roas b { color: #b45309; }
+.cep-compare-row--weak .cep-compare-roas b { color: #c2410c; }
+.cep-compare-row--fail .cep-compare-roas b { color: #be123c; }
 
 .cep-ctx-note {
     font-size: 11.5px; color: #6366f1; background: #eef2ff;

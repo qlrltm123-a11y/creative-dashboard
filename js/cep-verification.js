@@ -502,6 +502,45 @@ function _cepProductInsight(pObj) {
     return `${topLine} ${bottomLine} 다음 예산은 "${topInfo.title}" 류의 CEP에 더 비중을 두고, "${bottomInfo.title}"은 소구를 더 구체화하거나 우선순위를 낮추는 것을 검토하세요.`;
 }
 
+// 제품 내 CEP 전체를 한눈에 비교하는 표 — 완료된 CEP는 ROAS 높은 순으로, 대기 중인 CEP는 뒤에 모아 보여준다.
+function _cepCompareTableHtml(pObj) {
+    const rows = [...pObj.ceps.values()].map(c => {
+        const { title } = _cepSplitLabel(c.cepLabel);
+        const hasResult = c.creatives.length > 0;
+        const agg = hasResult ? _cepAggregate(c) : null;
+        const tag = _cepVerdictTag(agg, hasResult);
+        return { title, hasResult, agg, tag };
+    });
+    if (rows.length < 2) return '';
+
+    rows.sort((a, b) => {
+        if (a.hasResult !== b.hasResult) return a.hasResult ? -1 : 1;
+        if (a.hasResult && b.hasResult) return b.agg.roas - a.agg.roas;
+        return 0;
+    });
+
+    return `
+    <div class="cep-section-label">CEP별 수치 비교</div>
+    <div class="cep-compare-wrap">
+        <table class="cep-compare-table">
+            <thead><tr><th>CEP</th><th>상태</th><th>IMP</th><th>CTR</th><th>CVR</th><th>COST</th><th>CV</th><th>ROAS</th></tr></thead>
+            <tbody>
+                ${rows.map(r => `
+                <tr class="cep-compare-row--${r.tag}">
+                    <td class="cep-compare-title">${_cepEsc(r.title)}</td>
+                    <td><span class="cep-status-badge ${r.hasResult ? 'done' : 'pending'}">${r.hasResult ? '완료' : '대기'}</span></td>
+                    <td>${r.hasResult ? _cepFmtInt(r.agg.imp) : '-'}</td>
+                    <td>${r.hasResult ? _cepFmtPct(r.agg.ctr) : '-'}</td>
+                    <td>${r.hasResult ? _cepFmtPct(r.agg.cvr) : '-'}</td>
+                    <td>${r.hasResult ? _cepFmtKRW(r.agg.cost) : '-'}</td>
+                    <td>${r.hasResult ? _cepFmtInt(r.agg.cv) : '-'}</td>
+                    <td class="cep-compare-roas">${r.hasResult ? `<b>${r.agg.roas.toFixed(0)}%</b>` : '-'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
+}
+
 function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
@@ -517,6 +556,7 @@ function _cepRenderDetailForSelected() {
     const done = allCeps.filter(c => c.creatives.length > 0).length;
     const avgRoas = _cepProductAvgRoas(pObj);
     const productInsight = _cepProductInsight(pObj);
+    const compareTable = _cepCompareTableHtml(pObj);
 
     detailEl.innerHTML = `
         <div class="cep-detail-header">
@@ -528,7 +568,8 @@ function _cepRenderDetailForSelected() {
         <div class="cep-product-insight">
             <div class="cep-section-label">제품 전체 CEP 비교 인사이트</div>
             <p>${_cepEsc(productInsight)}</p>
-        </div>` : ''}
+            ${compareTable}
+        </div>` : compareTable}
         <div class="cep-blocks">
             ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product)).join('') : '<div class="text-center text-slate-300 text-sm py-10">조건에 맞는 CEP가 없습니다.</div>'}
         </div>`;
