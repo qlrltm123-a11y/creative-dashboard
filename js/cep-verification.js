@@ -259,7 +259,7 @@ function _cepAnalyze(cepObj, agg, tag, ctx) {
         const sorted = [...spent].sort((a, b) => b.roasSheet - a.roasSheet);
         best = sorted[0]; worst = sorted[sorted.length - 1];
         if (best.roasSheet - worst.roasSheet > 50) {
-            causes.push(`같은 CEP 안에서도 소재별 성과 편차가 큽니다 — "${_cepShortDetail(best.detail)}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${_cepShortDetail(worst.detail)}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. 가설 자체보다 표현 방식(앵글) 차이가 성과를 가른 것으로 보입니다.`);
+            causes.push(`같은 CEP를 겨냥했지만 소재별 성과 편차가 큽니다 — "${_cepShortDetail(best.detail)}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${_cepShortDetail(worst.detail)}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. 같은 상황을 겨냥해도 모델·구성·카피 등 표현 방식 차이가 성과를 가른 것으로 보입니다.`);
         }
     } else if (spent.length === 1) {
         best = spent[0];
@@ -295,9 +295,18 @@ function _cepRenderCepBlock(cepObj, productName) {
     const ctx = _cepContextFor(productName, cepTitle);
 
     const ctxHtml = ctx ? `<div class="cep-ctx-note"><i class="fas fa-chart-pie"></i> ${_cepEsc(ctx)}</div>` : '';
-    const hypoHtml = hypotheses.length
-        ? `<div class="cep-hypo"><div class="cep-hypo-label">가설</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`
-        : '';
+    // "검증 상세" 컬럼은 가설이 아니라 소재(영상)가 실제로 어떻게 구성되는지에 대한 설명이다.
+    // 검증 완료 건은 소재명과 묶어 보여주고(어떤 영상이 그렇게 만들어졌는지), 검증 대기 건은
+    // 아직 만들지 않은 기획 내용이므로 별도로 표시한다.
+    let hypoHtml = '';
+    if (hasResult) {
+        const items = cepObj.creatives.filter(c => c.detail);
+        if (items.length) {
+            hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">소재별 영상 구성</div><ul class="cep-hypo-list">${items.map(c => `<li><b>${_cepEsc(c.name)}</b> — ${_cepEsc(c.detail)}</li>`).join('')}</ul></div>`;
+        }
+    } else if (hypotheses.length) {
+        hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">기획 내용 (제작 예정 소재)</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`;
+    }
     const headHtml = `
         <div class="cep-card-head">
             <span class="cep-tag">${_cepEsc(cepNo)}</span>
