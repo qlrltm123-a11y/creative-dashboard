@@ -154,19 +154,33 @@
 .cep-result-chip b { color: #1e293b; font-size: 13px; margin-right: 3px; }
 .cep-result-chip--roas b { color: #4f46e5; }
 
-.cep-creative-table-wrap { overflow-x: auto; }
-.cep-creative-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-.cep-creative-table th {
-    text-align: left; color: #94a3b8; font-weight: 600; padding: 5px 8px;
-    border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+.cep-creative-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
 }
-.cep-creative-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; color: #334155; }
-.cep-creative-table td a { color: #4f46e5; text-decoration: none; }
-.cep-creative-table td a:hover { text-decoration: underline; }
-.cep-creative-table td:first-child { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cep-angle-cell { max-width: 200px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cep-row-best { background: #f0fdf4; }
+.cep-creative-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;
+    transition: box-shadow .2s, border-color .2s;
+}
+.cep-creative-card:hover { box-shadow: 0 6px 16px rgba(0,0,0,.08); border-color: #c7d2fe; }
+.cep-creative-card--best { border-color: #10b981; box-shadow: 0 0 0 1px #10b981; }
+.cep-creative-thumb {
+    position: relative; display: block; aspect-ratio: 1 / 1; background: #f1f5f9; overflow: hidden;
+}
+.cep-creative-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cep-creative-noimg {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    color: #cbd5e1; font-size: 22px; background: #f1f5f9;
+}
 .cep-best-tag { font-size: 9px; font-weight: 700; color: #047857; background: #d1fae5; padding: 1px 5px; border-radius: 999px; white-space: nowrap; }
+.cep-best-tag--thumb { position: absolute; top: 6px; left: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.cep-creative-body { padding: 8px 9px; }
+.cep-creative-angle {
+    font-size: 11px; color: #475569; line-height: 1.4; margin-bottom: 6px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cep-creative-metrics { display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 9.5px; color: #94a3b8; }
+.cep-creative-metrics b { color: #1e293b; font-size: 11px; margin-right: 2px; }
+.cep-creative-roas b { color: #4f46e5; }
 
 .cep-pending-note {
     font-size: 12px; color: #94a3b8; background: #f8fafc; border: 1px dashed #e2e8f0;

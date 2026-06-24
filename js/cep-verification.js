@@ -364,25 +364,33 @@ function _cepRenderCepBlock(cepObj, productName) {
             <span class="cep-result-chip cep-result-chip--roas"><b>${agg.roas.toFixed(0)}%</b>ROAS</span>
         </div>`;
 
-    const tableHtml = `
-        <div class="cep-creative-table-wrap">
-            <table class="cep-creative-table">
-                <thead><tr><th>검증 소재</th><th>앵글</th><th>IMP</th><th>CTR</th><th>CV</th><th>ROAS</th></tr></thead>
-                <tbody>
-                    ${cepObj.creatives.map(c => {
-                        const isBest = multi && best && c === best;
-                        return `
-                        <tr class="${isBest ? 'cep-row-best' : ''}">
-                            <td>${c.url ? `<a href="${_cepEsc(c.url)}" target="_blank" rel="noopener">${_cepEsc(c.name)} <i class="fas fa-arrow-up-right-from-square"></i></a>` : _cepEsc(c.name)}${isBest ? ' <span class="cep-best-tag">★최고</span>' : ''}</td>
-                            <td class="cep-angle-cell">${_cepEsc(_cepUniqueDetail(c.detail, commonSegs))}</td>
-                            <td>${_cepFmtInt(c.imp)}</td>
-                            <td>${c.imp > 0 ? _cepFmtPct(c.ctrSheet) : '-'}</td>
-                            <td>${_cepFmtInt(c.cv)}</td>
-                            <td>${c.cost > 0 ? _cepFmtPct(c.roasSheet) : '-'}</td>
-                        </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>
+    const creativeCardsHtml = `
+        <div class="cep-creative-grid">
+            ${cepObj.creatives.map(c => {
+                const isBest = multi && best && c === best;
+                const thumbHtml = typeof window.buildDriveImgHtml === 'function'
+                    ? window.buildDriveImgHtml(c.url, {
+                        className: 'cep-creative-img', alt: c.name,
+                        finalFallbackHtml: '<div class="cep-creative-noimg"><i class="fas fa-image"></i></div>',
+                    })
+                    : `<img class="cep-creative-img" src="${_cepEsc(c.url)}" alt="${_cepEsc(c.name)}" loading="lazy" referrerpolicy="no-referrer">`;
+                return `
+                <div class="cep-creative-card ${isBest ? 'cep-creative-card--best' : ''}">
+                    <a href="${_cepEsc(c.url)}" target="_blank" rel="noopener" class="cep-creative-thumb">
+                        ${thumbHtml}
+                        ${isBest ? '<span class="cep-best-tag cep-best-tag--thumb">★최고</span>' : ''}
+                    </a>
+                    <div class="cep-creative-body">
+                        <div class="cep-creative-angle">${_cepEsc(_cepUniqueDetail(c.detail, commonSegs))}</div>
+                        <div class="cep-creative-metrics">
+                            <span><b>${_cepFmtInt(c.imp)}</b>IMP</span>
+                            <span><b>${c.imp > 0 ? _cepFmtPct(c.ctrSheet) : '-'}</b>CTR</span>
+                            <span><b>${_cepFmtInt(c.cv)}</b>CV</span>
+                            <span class="cep-creative-roas"><b>${c.cost > 0 ? _cepFmtPct(c.roasSheet) : '-'}</b>ROAS</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
         </div>`;
 
     return `
@@ -393,7 +401,7 @@ function _cepRenderCepBlock(cepObj, productName) {
         <div class="cep-section-label">CEP 종합 결과</div>
         ${resultHtml}
         <div class="cep-section-label">소재별 성과</div>
-        ${tableHtml}
+        ${creativeCardsHtml}
         <div class="cep-section-label">원인 분석</div>
         <ul class="cep-cause-list">${causes.map(c => `<li>${_cepEsc(c)}</li>`).join('')}</ul>
         <div class="cep-nextstep">
