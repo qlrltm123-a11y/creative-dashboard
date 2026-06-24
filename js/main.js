@@ -4971,11 +4971,11 @@ function renderKRSection() {
     const summary = document.getElementById('kr-summary-cards');
     if (!grid) return;
 
-    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴)
+    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴 또는 UGC 표기)
     const allData = window.allCreatives || [];
     let krData = allData.filter(c => {
         const name = (c.ad_name || c.creative_name || c.id || '').toString();
-        return /-EDIT/i.test(name);
+        return /-EDIT/i.test(name) || /UGC/i.test(name);
     });
 
     // 브랜드 필터 적용 (currentBrand 전역 변수 직접 참조 — 탭 전환 시 항상 최신값)
@@ -5002,31 +5002,45 @@ function renderKRSection() {
     // MARIE-3D-EDIT       → MARIE    (첫 토큰)
     // momota-kaho-EDIT    → momota-kaho (두 번째 토큰이 소문자 이름이면 유지)
     // (KR)KangYeJin-EDIT  → KangYeJin  ((KR) 제거)
+    // UGC 표기 소재(-EDIT 없음)는 별도 패턴으로 처리: 같은 인플루언서라도 테마(EyeFirming,
+    // Deep-Moisture 등)가 다르면 서로 다른 소재이므로 이름만으로 합치면 안 된다. 해상도·로케일
+    // 접미사만 제거해, 동일 소재의 사이즈 변형(1080x1080 vs 1080x1920)끼리만 묶는다.
+    // 260501_Collagen_mist_influencer_VID_UGC2_Megapo_1080x1080_JP
+    // 260501_Collagen_mist_influencer_VID_UGC2_Megapo_1080x1920_JP  → 동일 키로 병합
     const _influKey = name => {
-        // 1) -EDIT 바로 앞까지만 남김 (EDIT-2, EDIT_VID 등 이후 전부 제거)
-        const beforeEdit = name.replace(/-EDIT.*/i, '');
-        // 2) 마지막 _ 세그먼트 = 인플루언서 세그먼트
-        const parts  = beforeEdit.split('_');
-        const product = parts.slice(1, -1).join('_').toLowerCase(); // 제품군 (date 제외)
-        const seg    = parts[parts.length - 1] || '';
-        // 3) (KR), (JP) 등 국가 태그 제거
-        const clean  = seg.replace(/^\([^)]*\)/, '');
-        // 4) 하이픈 분리 후 인플루언서명 결정
-        const tokens = clean.split('-').filter(Boolean);
-        let influName;
-        if (tokens.length <= 1) {
-            influName = tokens[0] || clean;
-        } else {
-            const second = tokens[1];
-            // 두 번째 토큰이 숫자 포함, 대문자 시작 상품명, 2자 이하 약어 → 첫 토큰만
-            if (/\d/.test(second) || /^[A-Z]/.test(second) || second.length <= 2) {
-                influName = tokens[0];
+        if (/-EDIT/i.test(name)) {
+            // 1) -EDIT 바로 앞까지만 남김 (EDIT-2, EDIT_VID 등 이후 전부 제거)
+            const beforeEdit = name.replace(/-EDIT.*/i, '');
+            // 2) 마지막 _ 세그먼트 = 인플루언서 세그먼트
+            const parts  = beforeEdit.split('_');
+            const product = parts.slice(1, -1).join('_').toLowerCase(); // 제품군 (date 제외)
+            const seg    = parts[parts.length - 1] || '';
+            // 3) (KR), (JP) 등 국가 태그 제거
+            const clean  = seg.replace(/^\([^)]*\)/, '');
+            // 4) 하이픈 분리 후 인플루언서명 결정
+            const tokens = clean.split('-').filter(Boolean);
+            let influName;
+            if (tokens.length <= 1) {
+                influName = tokens[0] || clean;
             } else {
-                // 소문자 연속 이름 (momota-kaho 등) → 두 토큰 유지
-                influName = tokens[0] + '-' + tokens[1];
+                const second = tokens[1];
+                // 두 번째 토큰이 숫자 포함, 대문자 시작 상품명, 2자 이하 약어 → 첫 토큰만
+                if (/\d/.test(second) || /^[A-Z]/.test(second) || second.length <= 2) {
+                    influName = tokens[0];
+                } else {
+                    // 소문자 연속 이름 (momota-kaho 등) → 두 토큰 유지
+                    influName = tokens[0] + '-' + tokens[1];
+                }
             }
+            return (product + '|' + influName).toLowerCase();
         }
-        return (product + '|' + influName).toLowerCase();
+        if (/UGC/i.test(name)) {
+            return name
+                .replace(/_\d{3,4}x\d{3,4}.*/i, '')
+                .replace(/_(JP|KR|EN)$/i, '')
+                .toLowerCase();
+        }
+        return name.toLowerCase();
     };
 
     const sizeDeduped = [];
