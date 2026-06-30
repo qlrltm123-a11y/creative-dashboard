@@ -21,6 +21,7 @@ const CEP_VERDICT_META = {
 // 원인 분석 항목의 종류별 아이콘 — 글만 나열하지 않고 한눈에 어떤 종류의 원인인지 구분되게 한다
 const CEP_CAUSE_ICON = {
     context: 'fa-bullseye',      // 시장 맥락(타겟 상황) 적중도
+    rank: 'fa-medal',             // 같은 제품 내 다른 CEP 대비 순위
     ctr: 'fa-eye',                // 1차 주목도
     cv: 'fa-cart-shopping',       // 전환 단계
     compare: 'fa-shuffle',        // 소재간 비교
@@ -280,6 +281,31 @@ function _cepProductAvgRoas(pObj) {
     return cost > 0 ? revenue / cost * 100 : null;
 }
 
+// 제품 내 검증 완료 CEP들의 집계값 모음 — 개별 CEP 원인 분석에서 "이 제품의 다른 CEP와 비교하면"
+// 같은 상대적 코멘트를 만들 때 쓴다. CEP가 1개뿐이면 비교 대상이 없으므로 빈 배열을 반환한다.
+function _cepProductBenchmark(pObj) {
+    return [...pObj.ceps.values()]
+        .filter(c => c.creatives.length > 0)
+        .map(c => ({ label: c.cepLabel, agg: _cepAggregate(c) }))
+        .filter(x => x.agg.imp > 0 || x.agg.cost > 0);
+}
+
+// 자기 자신을 제외한 나머지 CEP들의 평균값(절대 기준이 아니라 "이 제품 안에서의 상대 위치")
+function _cepPeerAvg(benchmark, selfLabel, field) {
+    const peers = benchmark.filter(x => x.label !== selfLabel);
+    if (!peers.length) return null;
+    return peers.reduce((s, x) => s + x.agg[field], 0) / peers.length;
+}
+
+// ROAS 기준 이 CEP의 제품 내 순위
+function _cepRankInfo(benchmark, selfLabel) {
+    if (benchmark.length < 2) return null;
+    const sorted = [...benchmark].sort((a, b) => b.agg.roas - a.agg.roas);
+    const idx = sorted.findIndex(x => x.label === selfLabel);
+    if (idx < 0) return null;
+    return { rank: idx + 1, total: sorted.length, top: sorted[0] };
+}
+
 function _cepVerdictTag(agg, hasResult) {
     if (!hasResult || !agg || agg.cost === 0) return 'pending';
     if (agg.cv === 0) return 'fail';
@@ -288,9 +314,11 @@ function _cepVerdictTag(agg, hasResult) {
     return 'weak';
 }
 
-// 원인 분석: 시장 컨텍스트 + CTR/CVR 진단 + 소재간 편차(앵글 비교)
+// 원인 분석: 시장 컨텍스트 + 제품 내 순위/상대 비교 + CTR/CVR 진단 + 소재간 편차(앵글 비교)
 // 각 원인에 type을 붙여 렌더링 시 아이콘·색으로 구분되게 한다(가독성 개선).
-function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs) {
+// CTR/CVR은 가능하면 고정 임계값이 아니라 "같은 제품의 다른 CEP 평균"과 비교해서 말한다 —
+// 그래야 CEP마다 다른, 실제로 차이를 만든 지점이 드러난다.
+function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs, benchmark) {
     const causes = [];
     let best = null, worst = null;
     if (tag === 'pending') {
@@ -303,11 +331,39 @@ function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs) {
         else causes.push({ type: 'context', text: `이 CEP는 "${ctx}" 상황을 겨냥했지만, 이번 소재가 그 구체적인 순간·감정을 충분히 포착하지 못했을 가능성이 있습니다.` });
     }
 
-    if (agg.ctr < 1.5) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 평균 대비 낮아 소재의 1차 주목도(썸네일·카피)가 약했을 가능성이 있습니다.` });
-    else if (agg.ctr >= 3) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 양호해 소구포인트에 대한 1차 반응(클릭 유도)은 잘 작동했습니다.` });
+    const bm = benchmark || [];
+    const rank = _cepRankInfo(bm, cepObj.cepLabel);
+    if (rank) {
+        if (rank.rank === 1) {
+            causes.push({ type: 'rank', text: `이 제품의 검증 완료 CEP ${rank.total}개 중 ROAS가 가장 높습니다(1위).` });
+        } else {
+            const topTitle = _cepSplitLabel(rank.top.label).title;
+            causes.push({ type: 'rank', text: `이 제품의 검증 완료 CEP ${rank.total}개 중 ROAS 기준 ${rank.rank}위입니다 — 1위 "${topTitle}"(ROAS ${rank.top.agg.roas.toFixed(0)}%)와는 격차가 있습니다.` });
+        }
+    }
 
-    if (agg.click > 0 && agg.cv === 0) causes.push({ type: 'cv', text: `클릭 ${Math.round(agg.click).toLocaleString()}건 대비 전환이 0건으로, 클릭 이후 구매 결정 단계(가격·상세페이지·오퍼)에서 이탈했을 가능성이 큽니다.` });
-    else if (agg.cv > 0 && agg.cvr < 1) causes.push({ type: 'cv', text: `CVR ${agg.cvr.toFixed(2)}%로 낮아 클릭 이후 전환 단계에서 이탈이 큽니다.` });
+    const peerCtr = _cepPeerAvg(bm, cepObj.cepLabel, 'ctr');
+    if (peerCtr != null && Math.abs(agg.ctr - peerCtr) >= 0.3) {
+        causes.push(agg.ctr < peerCtr
+            ? { type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 이 제품의 다른 CEP 평균(${peerCtr.toFixed(2)}%)보다 낮습니다 — 소재의 1차 주목도(썸네일·카피)가 상대적으로 약했을 가능성이 있습니다.` }
+            : { type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 이 제품의 다른 CEP 평균(${peerCtr.toFixed(2)}%)보다 높습니다 — 소구포인트에 대한 1차 반응(클릭 유도)이 다른 CEP보다 잘 작동했습니다.` });
+    } else if (peerCtr == null) {
+        if (agg.ctr < 1.5) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 낮은 편이라 소재의 1차 주목도(썸네일·카피)가 약했을 가능성이 있습니다.` });
+        else if (agg.ctr >= 3) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 양호해 소구포인트에 대한 1차 반응(클릭 유도)은 잘 작동했습니다.` });
+    }
+
+    if (agg.click > 0 && agg.cv === 0) {
+        causes.push({ type: 'cv', text: `클릭 ${Math.round(agg.click).toLocaleString()}건 대비 전환이 0건으로, 클릭 이후 구매 결정 단계(가격·상세페이지·오퍼)에서 이탈했을 가능성이 큽니다.` });
+    } else if (agg.cv > 0) {
+        const peerCvr = _cepPeerAvg(bm, cepObj.cepLabel, 'cvr');
+        if (peerCvr != null && Math.abs(agg.cvr - peerCvr) >= 0.3) {
+            causes.push(agg.cvr < peerCvr
+                ? { type: 'cv', text: `CVR ${agg.cvr.toFixed(2)}%로 이 제품의 다른 CEP 평균(${peerCvr.toFixed(2)}%)보다 낮습니다 — 클릭 이후 전환 단계에서 상대적으로 더 이탈합니다.` }
+                : { type: 'cv', text: `CVR ${agg.cvr.toFixed(2)}%로 이 제품의 다른 CEP 평균(${peerCvr.toFixed(2)}%)보다 높습니다 — 클릭 이후 전환이 다른 CEP보다 잘 일어났습니다.` });
+        } else if (peerCvr == null && agg.cvr < 1) {
+            causes.push({ type: 'cv', text: `CVR ${agg.cvr.toFixed(2)}%로 낮아 클릭 이후 전환 단계에서 이탈이 큽니다.` });
+        }
+    }
 
     // 소재별 비교는 시트가 직접 계산한 ROAS(roasSheet)를 기준으로 한다 — COST/CV/Revenue가
     // 플랫폼 리포트 특성상 단순 나눗셈과 다를 수 있어, 재계산값이 아닌 원본 값을 신뢰한다.
@@ -349,7 +405,7 @@ function _cepFmtKRW(v) { return '₩' + Math.round(v).toLocaleString(); }
 function _cepFmtPct(v) { return v.toFixed(1) + '%'; }
 function _cepFmtInt(v) { return Math.round(v).toLocaleString(); }
 
-function _cepRenderCepBlock(cepObj, productName, isOpen) {
+function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
     const hasResult = cepObj.creatives.length > 0;
     const agg = hasResult ? _cepAggregate(cepObj) : null;
     const tag = _cepVerdictTag(agg, hasResult);
@@ -409,7 +465,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen) {
         </div>`;
     }
 
-    const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx, commonSegs);
+    const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx, commonSegs, benchmark);
     const nextText = _cepNextStepText(tag, agg, best, commonSegs);
     const multi = cepObj.creatives.filter(c => c.cost > 0).length > 1;
 
@@ -624,6 +680,7 @@ function _cepRenderDetailForSelected() {
     const avgRoas = _cepProductAvgRoas(pObj);
     const productInsight = _cepProductInsight(pObj);
     const compareTable = _cepCompareTableHtml(pObj);
+    const benchmark = _cepProductBenchmark(pObj);
 
     detailEl.innerHTML = `
         <div class="cep-detail-header">
@@ -638,7 +695,7 @@ function _cepRenderDetailForSelected() {
             ${compareTable}
         </div>` : compareTable}
         <div class="cep-blocks">
-            ${ceps.length ? ceps.map((c, i) => _cepRenderCepBlock(c, pObj.product, i === 0)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
+            ${ceps.length ? ceps.map((c, i) => _cepRenderCepBlock(c, pObj.product, i === 0, benchmark)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
         </div>`;
 }
 

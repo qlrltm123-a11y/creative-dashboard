@@ -211,6 +211,8 @@
 .cep-cause i { font-size: 11px; margin-top: 3px; width: 14px; text-align: center; flex-shrink: 0; }
 .cep-cause--context { background: #eef2ff; }
 .cep-cause--context i { color: #4f46e5; }
+.cep-cause--rank { background: #fdf2f8; }
+.cep-cause--rank i { color: #db2777; }
 .cep-cause--ctr { background: #eff6ff; }
 .cep-cause--ctr i { color: #2563eb; }
 .cep-cause--cv { background: #fffbeb; }
