@@ -45,6 +45,29 @@ let performanceEvents = [];
 function _pfHas(arr, val) { return !arr.length || arr.includes((val || '').trim()); }
 // 캐시키/표시용 직렬화
 function _pfKey() { return `${performanceEvents.join('+')}|${performanceProducts.join('+')}|${performanceCampaigns.join('+')}`; }
+
+// ★ MEGAPO는 매달 반복되는데 raw event 값이 전부 "Megapo"로 동일해 월별 구분이 안 된다.
+//   캠페인명 끝의 YYMMDD 날짜를 보고, 월말 3일(28~31일) 이내면 "다음 달 메가포"로,
+//   그 외에는 "해당 월 메가포"로 분류해 성과 분석 필터에서 월별로 선택할 수 있게 한다.
+//   (Megapo가 아닌 다른 이벤트는 원래 값 그대로 반환 — 영향 없음)
+function _megapoEventLabel(c) {
+    const ev = (c.event || '').toString().trim();
+    if (ev.toLowerCase() !== 'megapo') return ev;
+    const m = (c.campaign_name || '').toString().match(/_(\d{6})$/);
+    if (!m) return ev;
+    let year = 2000 + parseInt(m[1].slice(0, 2), 10);
+    let month = parseInt(m[1].slice(2, 4), 10);
+    const day = parseInt(m[1].slice(4, 6), 10);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return ev;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    if (day >= daysInMonth - 2) {
+        month += 1;
+        if (month > 12) { month = 1; year += 1; }
+    }
+    return `${month}월 메가포`;
+}
+// 성과 분석 섹션 전용 이벤트 매처 — Megapo는 위 월별 라벨 기준으로 매칭
+function _pfHasEvent(arr, c) { return !arr.length || arr.includes(_megapoEventLabel(c)); }
 // AI 인사이트 섹션 — 복수 선택 배열 (단일 legacy 변수도 유지)
 let aiProducts = [];  let aiProduct = '';
 let aiCampaigns = []; let aiCampaign = '';
@@ -692,7 +715,7 @@ function getBrandCreatives(scope, opts) {
     }
     // ★ 섹션 단위 필터 (scope = 'performance' | 'ai')
     if (scope === 'performance') {
-        if (performanceEvents.length) list = list.filter(c => _pfHas(performanceEvents, c.event));
+        if (performanceEvents.length) list = list.filter(c => _pfHasEvent(performanceEvents, c));
         if (performanceProducts.length) list = list.filter(c => _pfHas(performanceProducts, c.product));
         if (performanceCampaigns.length) list = list.filter(c => performanceCampaigns.some(cp => matchCampaign(c, cp)));
     } else if (scope === 'ai') {
@@ -905,7 +928,7 @@ function getSectionProductList() {
     let base = getBrandCreatives(undefined, { ignoreDate: true });
     // 성과 분석 이벤트 복수 선택 시 해당 이벤트들의 제품만
     if (performanceEvents.length) {
-        base = base.filter(c => _pfHas(performanceEvents, c.event));
+        base = base.filter(c => _pfHasEvent(performanceEvents, c));
     }
     return Array.from(new Set(
         base.map(c => (c.product || '').trim()).filter(Boolean)
@@ -913,9 +936,25 @@ function getSectionProductList() {
 }
 
 // 섹션별 캠페인 옵션 목록 (현재 브랜드 기준 — 섹션 제품 선택 영향 X)
+// ★ 이벤트(예: Megapo)를 선택하면 그 이벤트에 해당하는 캠페인만 보이도록 좁힌다
+//   (getSectionProductList와 동일하게 performanceEvents로 cascading)
 function getSectionCampaignList() {
-    // 전역 캠페인 필터는 무시하고 브랜드 기준 전체 캠페인 풀
-    return getAvailableCampaigns();
+    let base = getBrandCreatives(undefined, { ignoreDate: true });
+    if (performanceEvents.length) {
+        base = base.filter(c => _pfHasEvent(performanceEvents, c));
+    }
+    const set = new Set();
+    base.forEach(c => {
+        const cn = (c.campaign_name || '').toString().trim();
+        if (!cn) return;
+        // "A 외 N건" 형태는 분해해서 원본 캠페인만 등록
+        if (Array.isArray(c._campaigns) && c._campaigns.length) {
+            c._campaigns.forEach(x => x && set.add(x));
+        } else {
+            set.add(cn);
+        }
+    });
+    return Array.from(set).sort();
 }
 
 // 성과 분석 섹션 필터 옵션 채우기
@@ -923,7 +962,8 @@ function populatePerformanceFilterOptions() {
     const products = getSectionProductList();
     const campaigns = getSectionCampaignList();
     const base = (currentBrand === 'ALL') ? allCreatives : allCreatives.filter(c => c.brand === currentBrand);
-    const events = [...new Set(base.map(c => (c.event||'').trim()).filter(Boolean))].sort();
+    // ★ Megapo는 _megapoEventLabel로 월별 라벨("5월 메가포" 등)로 분할해서 옵션을 만든다
+    const events = [...new Set(base.map(c => _megapoEventLabel(c)).filter(Boolean))].sort();
 
     // 선택값을 새 옵션 목록 내로 정리
     performanceEvents = performanceEvents.filter(e => events.includes(e));
@@ -4126,10 +4166,19 @@ function aggregateByAdName(rows) {
         const dates = items.map(x => x.start_date).filter(Boolean).sort();
         const endDates = items.map(x => x.end_date).filter(Boolean).sort();
 
-        // ★ 키워드 배열 필드: 빈도 기반 통합 (자주 반복되는 포인트 우선)
-        const mergedAppeals  = mergeKeywordField(items, 'appeal_points');
-        const mergedHooks    = mergeKeywordField(items, 'hook_type');
-        const mergedEmotions = mergeKeywordField(items, 'target_emotion');
+        // ★ 같은 ad_name이라도 운영 중 캠페인이 바뀌면서 카피·소재가 통째로 교체되는 경우가 있다
+        //   (썸네일은 그대로인데 캐치카피·소구포인트만 다른 날짜에 완전히 다른 값으로 찍힌 행들이 섞임).
+        //   이걸 구분 없이 합치면 "이미지 A의 카드인데 소구포인트는 카피 B 기준" 같은 불일치가 생긴다.
+        //   가장 많이 반복된 캐치카피(key_message_kr)를 이 ad_name의 "대표 버전"으로 삼고,
+        //   소구포인트·후킹·감정·썸네일도 전부 그 버전에 속한 행에서만 뽑아 내용이 서로 어긋나지 않게 한다.
+        const repMsgKr = pickMostFrequent(items, 'key_message_kr');
+        const repItems = repMsgKr ? items.filter(it => (it.key_message_kr || '').trim() === repMsgKr) : items;
+
+        // ★ 키워드 배열 필드: 대표 버전 행들 안에서만 빈도 기반 통합 (자주 반복되는 포인트 우선)
+        const mergedAppeals  = mergeKeywordField(repItems, 'appeal_points');
+        const mergedHooks    = mergeKeywordField(repItems, 'hook_type');
+        const mergedEmotions = mergeKeywordField(repItems, 'target_emotion');
+        const repMsgJp = pickMostFrequent(repItems, 'key_message_jp') || pickMostFrequent(items, 'key_message_jp');
 
         // ★ 평문 텍스트 필드: 가장 자주 나오는 값 선택
         const mergedPlatform = pickMostFrequent(items, 'platform') || first.platform || '';
@@ -4163,17 +4212,19 @@ function aggregateByAdName(rows) {
             // 날짜 범위
             start_date: dates[0] || first.start_date,
             end_date: endDates[endDates.length - 1] || first.end_date,
-            // ★ 통합된 키워드/카테고리 필드
+            // ★ 통합된 키워드/카테고리 필드 (모두 대표 버전 행 기준 — 카피와 어긋나지 않게)
             appeal_points: mergedAppeals || first.appeal_points || '',
             hook_type: mergedHooks || first.hook_type || '',
             target_emotion: mergedEmotions || first.target_emotion || '',
+            key_message_kr: repMsgKr || first.key_message_kr || '',
+            key_message_jp: repMsgJp || first.key_message_jp || '',
             platform: mergedPlatform,
             product: mergedProduct,
             brand: mergedBrand,
             campaign_name: mergedCampaign,
-            // 썸네일/미디어 URL: 그룹 내 첫 번째 비어있지 않은 값 사용 (첫 행이 빈 경우 대비)
-            thumbnail_url: items.map(x => x.thumbnail_url).find(v => v) || first.thumbnail_url || '',
-            media_url:     items.map(x => x.media_url).find(v => v)     || first.media_url     || '',
+            // 썸네일/미디어 URL: 대표 버전 행 안에서 첫 번째 비어있지 않은 값 사용
+            thumbnail_url: repItems.map(x => x.thumbnail_url).find(v => v) || items.map(x => x.thumbnail_url).find(v => v) || first.thumbnail_url || '',
+            media_url:     repItems.map(x => x.media_url).find(v => v)     || items.map(x => x.media_url).find(v => v)     || first.media_url     || '',
             // 집계 메타
             _aggregated: true,
             _row_count: items.length,
@@ -4215,7 +4266,7 @@ function _getPerfData() {
     if (currentBrand && currentBrand !== 'ALL') data = data.filter(c => c.brand === currentBrand);
     if (currentPlatform) data = data.filter(c => (c.platform || '').toString().trim() === currentPlatform);
     if (currentEvent)   data = data.filter(c => (c.event    || '').toString().trim() === currentEvent);
-    if (performanceEvents.length) data = data.filter(c => _pfHas(performanceEvents, c.event));
+    if (performanceEvents.length) data = data.filter(c => _pfHasEvent(performanceEvents, c));
     if (performanceProducts.length) data = data.filter(c => _pfHas(performanceProducts, c.product));
 
     const isAllPlatform = !currentPlatform;
