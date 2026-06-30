@@ -18,6 +18,15 @@ const CEP_VERDICT_META = {
     weak:    { emoji: '🟠', label: '반응 약함' },
 };
 
+// 원인 분석 항목의 종류별 아이콘 — 글만 나열하지 않고 한눈에 어떤 종류의 원인인지 구분되게 한다
+const CEP_CAUSE_ICON = {
+    context: 'fa-bullseye',      // 시장 맥락(타겟 상황) 적중도
+    ctr: 'fa-eye',                // 1차 주목도
+    cv: 'fa-cart-shopping',       // 전환 단계
+    compare: 'fa-shuffle',        // 소재간 비교
+    neutral: 'fa-circle-info',
+};
+
 // 시트에 같은 제품이 옵션/구성 단위로 쪼개져 입력된 경우를 하나로 통합
 const CEP_PRODUCT_ALIASES = {
     '콜라겐 세럼미스트 X 2': '콜라겐 세럼미스트',
@@ -138,17 +147,38 @@ function _cepCommonDetailSegments(creatives) {
     return common;
 }
 
-// "카피(공통) / 인플루언서 / 공통 적용방법 / 영상 구성요소..." -> "인플루언서(영상 구성요소)"
-function _cepUniqueDetail(detail, commonSegs) {
+// "카피(공통) / 인플루언서 / 공통 적용방법 / 영상 구성요소..." 중 인플루언서 이름만 추출
+function _cepDetailName(detail, fallbackName) {
+    const parts = (detail || '').split('/').map(s => s.trim()).filter(Boolean);
+    return parts[1] || fallbackName || '';
+}
+
+// 영상 구성요소를 그대로 나열하지 않고, "강조" 표현이 있는 구절의 핵심만 뽑아낸다.
+// "강조" 표현이 없으면 가장 구체적인(마지막) 구성요소 하나만 남긴다.
+function _cepEmphasisText(detail, commonSegs) {
     if (!detail) return '';
     const parts = detail.split('/').map(s => s.trim()).filter(Boolean);
     if (!parts.length) return '';
-    const name = parts[1] || parts[0];
     const rest = parts.filter((p, idx) => idx !== 1 && !(commonSegs && commonSegs.has(p)));
-    const restText = rest.join(', ');
-    const max = 60;
-    const shortRest = restText.length > max ? restText.slice(0, max) + '…' : restText;
-    return shortRest ? `${name}(${shortRest})` : name;
+    const emphasized = rest
+        .filter(p => p.includes('강조'))
+        .map(p => p
+            .replace(/\s*강조.*$/u, '')
+            .replace(/(이라는 점|라는 점|는 점)$/u, '')
+            .replace(/[을를]$/u, '')
+            .trim())
+        .filter(Boolean);
+    if (emphasized.length) return emphasized.join(', ');
+    const last = rest[rest.length - 1] || '';
+    return last.length > 40 ? last.slice(0, 40) + '…' : last;
+}
+
+function _cepUniqueDetail(detail, commonSegs) {
+    if (!detail) return '';
+    const name = _cepDetailName(detail);
+    if (!name) return '';
+    const emphasis = _cepEmphasisText(detail, commonSegs);
+    return emphasis ? `${name}(${emphasis})` : name;
 }
 
 // 쿼트/임베드 줄바꿈을 지원하는 CSV 파서 (sheets.js parseCSV와 동일한 로직)
@@ -259,24 +289,25 @@ function _cepVerdictTag(agg, hasResult) {
 }
 
 // 원인 분석: 시장 컨텍스트 + CTR/CVR 진단 + 소재간 편차(앵글 비교)
+// 각 원인에 type을 붙여 렌더링 시 아이콘·색으로 구분되게 한다(가독성 개선).
 function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs) {
     const causes = [];
     let best = null, worst = null;
     if (tag === 'pending') {
-        causes.push('검증 소재가 아직 집행되지 않아 결과를 분석할 수 없습니다.');
+        causes.push({ type: 'neutral', text: '검증 소재가 아직 집행되지 않아 결과를 분석할 수 없습니다.' });
         return { causes, best, worst };
     }
 
     if (ctx) {
-        if (tag === 'win' || tag === 'mid') causes.push(`이 CEP는 "${ctx}" 같이 구체적이고 시급한 상황이라, 소재가 그 순간을 짚어주자 소비자가 빠르게 반응한 것으로 보입니다.`);
-        else causes.push(`이 CEP는 "${ctx}" 상황을 겨냥했지만, 이번 소재가 그 구체적인 순간·감정을 충분히 포착하지 못했을 가능성이 있습니다.`);
+        if (tag === 'win' || tag === 'mid') causes.push({ type: 'context', text: `이 CEP는 "${ctx}" 같이 구체적이고 시급한 상황이라, 소재가 그 순간을 짚어주자 소비자가 빠르게 반응한 것으로 보입니다.` });
+        else causes.push({ type: 'context', text: `이 CEP는 "${ctx}" 상황을 겨냥했지만, 이번 소재가 그 구체적인 순간·감정을 충분히 포착하지 못했을 가능성이 있습니다.` });
     }
 
-    if (agg.ctr < 1.5) causes.push(`CTR ${agg.ctr.toFixed(2)}%로 평균 대비 낮아 소재의 1차 주목도(썸네일·카피)가 약했을 가능성이 있습니다.`);
-    else if (agg.ctr >= 3) causes.push(`CTR ${agg.ctr.toFixed(2)}%로 양호해 소구포인트에 대한 1차 반응(클릭 유도)은 잘 작동했습니다.`);
+    if (agg.ctr < 1.5) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 평균 대비 낮아 소재의 1차 주목도(썸네일·카피)가 약했을 가능성이 있습니다.` });
+    else if (agg.ctr >= 3) causes.push({ type: 'ctr', text: `CTR ${agg.ctr.toFixed(2)}%로 양호해 소구포인트에 대한 1차 반응(클릭 유도)은 잘 작동했습니다.` });
 
-    if (agg.click > 0 && agg.cv === 0) causes.push(`클릭 ${Math.round(agg.click).toLocaleString()}건 대비 전환이 0건으로, 클릭 이후 구매 결정 단계(가격·상세페이지·오퍼)에서 이탈했을 가능성이 큽니다.`);
-    else if (agg.cv > 0 && agg.cvr < 1) causes.push(`CVR ${agg.cvr.toFixed(2)}%로 낮아 클릭 이후 전환 단계에서 이탈이 큽니다.`);
+    if (agg.click > 0 && agg.cv === 0) causes.push({ type: 'cv', text: `클릭 ${Math.round(agg.click).toLocaleString()}건 대비 전환이 0건으로, 클릭 이후 구매 결정 단계(가격·상세페이지·오퍼)에서 이탈했을 가능성이 큽니다.` });
+    else if (agg.cv > 0 && agg.cvr < 1) causes.push({ type: 'cv', text: `CVR ${agg.cvr.toFixed(2)}%로 낮아 클릭 이후 전환 단계에서 이탈이 큽니다.` });
 
     // 소재별 비교는 시트가 직접 계산한 ROAS(roasSheet)를 기준으로 한다 — COST/CV/Revenue가
     // 플랫폼 리포트 특성상 단순 나눗셈과 다를 수 있어, 재계산값이 아닌 원본 값을 신뢰한다.
@@ -291,14 +322,14 @@ function _cepAnalyze(cepObj, agg, tag, ctx, commonSegs) {
             const sameCopy = copies.length > 1 && copies.every(c => c === copies[0]);
             const intro = sameCopy ? '동일한 카피·소구를 사용했음에도' : '같은 CEP를 겨냥했지만';
             const outro = sameCopy ? '카피보다 모델과 영상 구성(시연 방식·클로즈업 등)의 차이가 성과를 가른 것으로 보입니다.' : '모델·구성·카피 등 표현 방식 차이가 성과를 가른 것으로 보입니다.';
-            causes.push(`${intro} 소재별 성과 편차가 큽니다 — "${bestUniq}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${worstUniq}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. ${outro}`);
+            causes.push({ type: 'compare', text: `${intro} 소재별 성과 편차가 큽니다 — "${bestUniq}" 소재는 ROAS ${best.roasSheet.toFixed(0)}%로 가장 높았고, "${worstUniq}" 소재는 ROAS ${worst.roasSheet.toFixed(0)}%로 낮았습니다. ${outro}` });
         }
     } else if (spent.length === 1) {
         best = spent[0];
     }
 
     if (!causes.length) {
-        causes.push((tag === 'win' || tag === 'mid') ? '전반적으로 안정적인 성과를 보이고 있습니다.' : '뚜렷한 원인 신호 없이 전반적으로 반응이 약합니다. 노출/클릭 표본이 적어 판단이 어려울 수 있습니다.');
+        causes.push({ type: 'neutral', text: (tag === 'win' || tag === 'mid') ? '전반적으로 안정적인 성과를 보이고 있습니다.' : '뚜렷한 원인 신호 없이 전반적으로 반응이 약합니다. 노출/클릭 표본이 적어 판단이 어려울 수 있습니다.' });
     }
     return { causes, best, worst };
 }
@@ -328,14 +359,21 @@ function _cepRenderCepBlock(cepObj, productName, isOpen) {
     const ctx = _cepContextFor(productName, cepTitle);
 
     const ctxHtml = ctx ? `<div class="cep-ctx-note"><i class="fas fa-chart-pie"></i> ${_cepEsc(ctx)}</div>` : '';
+    // 소재별 비교에 쓰는 공통 구절 집합 — hypoHtml(이름+강조 포인트만 표시)에도 같이 쓴다.
+    const commonSegs = hasResult ? _cepCommonDetailSegments(cepObj.creatives) : null;
     // "검증 상세" 컬럼은 가설이 아니라 소재(영상)가 실제로 어떻게 구성되는지에 대한 설명이다.
-    // 검증 완료 건은 소재명과 묶어 보여주고(어떤 영상이 그렇게 만들어졌는지), 검증 대기 건은
-    // 아직 만들지 않은 기획 내용이므로 별도로 표시한다.
+    // 전체를 나열하면 읽기 어려우므로, 검증 완료 건은 이름 + "강조하는 부분"만 짧게 보여주고
+    // (전체 흐름은 아래 소재 카드의 링크로 확인), 검증 대기 건은 아직 만들지 않은 기획 내용이므로
+    // 별도로 표시한다.
     let hypoHtml = '';
     if (hasResult) {
         const items = cepObj.creatives.filter(c => c.detail);
         if (items.length) {
-            hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">소재별 영상 구성</div><ul class="cep-hypo-list">${items.map(c => `<li><b>${_cepEsc(c.name)}</b> — ${_cepEsc(c.detail)}</li>`).join('')}</ul></div>`;
+            hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">소재별 강조 포인트</div><ul class="cep-hypo-list">${items.map(c => {
+                const name = _cepDetailName(c.detail, c.name);
+                const emphasis = _cepEmphasisText(c.detail, commonSegs);
+                return `<li><b>${_cepEsc(name)}</b>${emphasis ? ` — ${_cepEsc(emphasis)} 강조` : ''}</li>`;
+            }).join('')}</ul></div>`;
         }
     } else if (hypotheses.length) {
         hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">기획 내용 (제작 예정 소재)</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`;
@@ -371,7 +409,6 @@ function _cepRenderCepBlock(cepObj, productName, isOpen) {
         </div>`;
     }
 
-    const commonSegs = _cepCommonDetailSegments(cepObj.creatives);
     const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx, commonSegs);
     const nextText = _cepNextStepText(tag, agg, best, commonSegs);
     const multi = cepObj.creatives.filter(c => c.cost > 0).length > 1;
@@ -414,7 +451,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen) {
             <div class="cep-section-label">소재별 성과</div>
             ${creativeCardsHtml}
             <div class="cep-section-label">원인 분석</div>
-            <ul class="cep-cause-list">${causes.map(c => `<li>${_cepEsc(c)}</li>`).join('')}</ul>
+            <ul class="cep-cause-list">${causes.map(c => `<li class="cep-cause cep-cause--${c.type}"><i class="fas ${CEP_CAUSE_ICON[c.type] || CEP_CAUSE_ICON.neutral}"></i><span>${_cepEsc(c.text)}</span></li>`).join('')}</ul>
             <div class="cep-nextstep">
                 <span class="cep-action-badge cep-action--${tag}">${meta.emoji} Next Step</span>
                 <p class="cep-action-text">${_cepEsc(nextText)}</p>
