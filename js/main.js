@@ -2997,7 +2997,9 @@ function renderAppealInsight() {
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
         raw = raw.filter(c => !isNoConvPlatform((c.platform || '').toString().trim()));
         if (currentEvent)       raw = raw.filter(c => (c.event || '').toString().trim() === currentEvent);
+        if (performanceEvents.length) raw = raw.filter(c => _pfHasEvent(performanceEvents, c));
         if (performanceProducts.length) raw = raw.filter(c => _pfHas(performanceProducts, c.product));
+        if (performanceCampaigns.length) raw = raw.filter(c => performanceCampaigns.some(cp => matchCampaign(c, cp)));
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
         roasPool = raw.filter(c => (c.roas || 0) > 0);
     }
@@ -3008,7 +3010,9 @@ function renderAppealInsight() {
                 : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
         if (currentEvent)       raw = raw.filter(c => (c.event || '').toString().trim() === currentEvent);
+        if (performanceEvents.length) raw = raw.filter(c => _pfHasEvent(performanceEvents, c));
         if (performanceProducts.length) raw = raw.filter(c => _pfHas(performanceProducts, c.product));
+        if (performanceCampaigns.length) raw = raw.filter(c => performanceCampaigns.some(cp => matchCampaign(c, cp)));
         if (typeof aggregateByAdName === 'function') raw = aggregateByAdName(raw);
         // 선택 지표에 따라 풀 필터링
         if (appealRightMetric === 'atc_rate') {
@@ -3343,7 +3347,9 @@ function renderAppealInsight() {
         let raw = Array.isArray(window.allCreatives) ? window.allCreatives : Array.isArray(allCreatives) ? allCreatives : [];
         if (currentBrand && currentBrand !== 'ALL') raw = raw.filter(c => c.brand === currentBrand);
         if (currentEvent)       raw = raw.filter(c => (c.event||'').toString().trim() === currentEvent);
+        if (performanceEvents.length) raw = raw.filter(c => _pfHasEvent(performanceEvents, c));
         if (performanceProducts.length) raw = raw.filter(c => _pfHas(performanceProducts, c.product));
+        if (performanceCampaigns.length) raw = raw.filter(c => performanceCampaigns.some(cp => matchCampaign(c, cp)));
         return raw.some(c => (c.add_to_cart || 0) > 0);
     })();
     const rightMetricBtns = `
