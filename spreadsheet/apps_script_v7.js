@@ -41,6 +41,7 @@ function onOpen() {
     .createMenu('🤖 AI 분석')
     .addItem('▶ 선택한 행 분석', 'analyzeSelectedRow')
     .addItem('▶ 선택한 행 분석 (다중)', 'analyzeSelectedRows')
+    .addItem('▶ 선택한 행부터 끝까지 분석', 'analyzeFromSelectedRowToEnd')
     .addItem('▶▶ 빈 칸 모두 분석 (6분 제한)', 'analyzeAllEmpty')
     .addItem('🌙 끝까지 자동 처리 (이어달리기)', 'startAutoRunUntilDone')
     .addItem('⏹️ 자동 처리 중단', 'stopAutoRun')
@@ -399,6 +400,59 @@ function analyzeSelectedRows() {
     Utilities.sleep(SLEEP_BETWEEN_REQUESTS);
   });
   SpreadsheetApp.getUi().alert(`✅ 완료: ${count}개 성공 / ${failCount}개 실패\n오늘 누적: ${getDailyCount()}회`);
+}
+
+// 선택한 행부터 아래로 내려가며, 소재명·URL이 모두 빈 행(데이터 끝)을 만나면 멈추고
+// 그 구간 안에서 분석이 필요한 행만 처리한다.
+function analyzeFromSelectedRowToEnd() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const startRow = sheet.getActiveCell().getRow();
+  if (startRow < 2) {
+    ui.alert('데이터 행을 선택해주세요 (2행 이상)');
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  let endRow = startRow;
+  for (let row = startRow; row <= lastRow; row++) {
+    const adName = sheet.getRange(row, 1).getValue();
+    const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
+    if (!adName && !mediaUrl) break;  // 소재명·URL 둘 다 비어있으면 데이터 끝
+    endRow = row;
+  }
+
+  const resp = ui.alert(
+    '▶ 선택한 행부터 끝까지 분석',
+    `${startRow}행부터 ${endRow}행까지 (${endRow - startRow + 1}개 행) 중 분석이 필요한 행을 처리합니다.\n계속하시겠습니까?`,
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
+  let count = 0, failCount = 0, blockedByLimit = false;
+  for (let row = startRow; row <= endRow; row++) {
+    const mediaUrl = sheet.getRange(row, COLS.media_url).getValue();
+    const appealPoints = sheet.getRange(row, COLS.appeal_points).getValue();
+
+    if (mediaUrl && (!appealPoints || String(appealPoints).startsWith('❌') || String(appealPoints).startsWith('⏳'))) {
+      try {
+        checkDailyLimit();
+      } catch (e) {
+        blockedByLimit = true;
+        break;
+      }
+      const success = analyzeRow(sheet, row);
+      if (success) count++;
+      else failCount++;
+      Utilities.sleep(SLEEP_BETWEEN_REQUESTS);
+    }
+  }
+
+  let msg = `✅ 완료: ${count}개 성공 / ${failCount}개 실패\n`;
+  msg += `📊 오늘 누적: ${getDailyCount()} / ${DAILY_CALL_LIMIT}\n`;
+  msg += `💰 오늘 누적 비용: $${(getDailyCount() * COST_PER_CALL).toFixed(4)}`;
+  if (blockedByLimit) msg += '\n\n🛑 일일 한도 도달로 중단됨';
+  ui.alert(msg);
 }
 
 function analyzeAllEmpty() {

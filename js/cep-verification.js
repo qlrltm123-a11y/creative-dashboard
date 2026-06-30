@@ -112,6 +112,18 @@ function _cepNum(v) {
     return isNaN(n) ? 0 : n;
 }
 
+// 로딩/에러/빈 상태 공통 마크업 (대시보드 다른 탭의 빈 상태와 동일한 톤: 큰 아이콘 + 설명)
+function _cepEmptyHtml(icon, text, opts) {
+    const o = opts || {};
+    const color = o.color || 'text-slate-300';
+    const py = o.py || 'py-16';
+    const spin = o.spin ? ' fa-spin' : '';
+    return `<div class="text-center ${color} ${py}">
+        <i class="fas ${icon}${spin} text-4xl mb-3 opacity-30"></i>
+        <p class="text-sm">${_cepEsc(text)}</p>
+    </div>`;
+}
+
 // 같은 CEP의 소재들은 보통 카피·적용 방법 구절을 동일하게 공유하고, 실제로 달라지는 건
 // 모델(인플루언서)과 영상 구성(시연 방식, 클로즈업 등)이다. 모든 소재가 공통으로 가진 구절을
 // 찾아내 제외하면, 진짜 차이를 만든 부분만 비교/원인 분석에 쓸 수 있다.
@@ -306,7 +318,7 @@ function _cepFmtKRW(v) { return '₩' + Math.round(v).toLocaleString(); }
 function _cepFmtPct(v) { return v.toFixed(1) + '%'; }
 function _cepFmtInt(v) { return Math.round(v).toLocaleString(); }
 
-function _cepRenderCepBlock(cepObj, productName) {
+function _cepRenderCepBlock(cepObj, productName, isOpen) {
     const hasResult = cepObj.creatives.length > 0;
     const agg = hasResult ? _cepAggregate(cepObj) : null;
     const tag = _cepVerdictTag(agg, hasResult);
@@ -328,23 +340,33 @@ function _cepRenderCepBlock(cepObj, productName) {
     } else if (hypotheses.length) {
         hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">기획 내용 (제작 예정 소재)</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`;
     }
+    // 헤더에 ROAS 미리보기 칩을 붙여, 접힌 상태에서도 핵심 수치가 보이게 한다
+    // (CEP별 수치 비교 표·소재 카드와 똑같은 숫자를 본문에서 또 보여주지 않기 위해
+    // CEP 종합 결과 strip은 제거하고 이 칩 하나로 대체했다).
+    const headMetricHtml = hasResult
+        ? `<span class="cep-head-metric">ROAS <b>${agg.roas.toFixed(0)}%</b></span>`
+        : '';
     const headHtml = `
         <div class="cep-card-head">
             <span class="cep-tag">${_cepEsc(cepNo)}</span>
             <span class="cep-name">${_cepEsc(cepTitle)}</span>
+            ${headMetricHtml}
             <span class="cep-status-badge ${hasResult ? 'done' : 'pending'}">${hasResult ? '검증 완료' : '검증 대기'}</span>
+            <i class="fas fa-chevron-down cep-collapse-icon"></i>
         </div>`;
 
     if (!hasResult) {
         return `
-        <div class="cep-block cep-block--pending">
+        <div class="cep-block cep-block--pending ${isOpen ? '' : 'cep-block--collapsed'}">
             ${headHtml}
-            ${ctxHtml}
-            ${hypoHtml}
-            <div class="cep-pending-note"><i class="fas fa-circle-notch"></i> 검증 소재 제작 대기 중 — 결과·원인 분석은 집행 후 표시됩니다.</div>
-            <div class="cep-nextstep">
-                <span class="cep-action-badge cep-action--pending">${meta.emoji} Next Step</span>
-                <p class="cep-action-text">${_cepEsc(_cepNextStepText('pending'))}</p>
+            <div class="cep-block-body">
+                ${ctxHtml}
+                ${hypoHtml}
+                <div class="cep-pending-note"><i class="fas fa-circle-notch"></i> 검증 소재 제작 대기 중 — 결과·원인 분석은 집행 후 표시됩니다.</div>
+                <div class="cep-nextstep">
+                    <span class="cep-action-badge cep-action--pending">${meta.emoji} Next Step</span>
+                    <p class="cep-action-text">${_cepEsc(_cepNextStepText('pending'))}</p>
+                </div>
             </div>
         </div>`;
     }
@@ -353,16 +375,6 @@ function _cepRenderCepBlock(cepObj, productName) {
     const { causes, best } = _cepAnalyze(cepObj, agg, tag, ctx, commonSegs);
     const nextText = _cepNextStepText(tag, agg, best, commonSegs);
     const multi = cepObj.creatives.filter(c => c.cost > 0).length > 1;
-
-    const resultHtml = `
-        <div class="cep-result-strip">
-            <span class="cep-result-chip"><b>${_cepFmtInt(agg.imp)}</b>IMP</span>
-            <span class="cep-result-chip"><b>${_cepFmtPct(agg.ctr)}</b>CTR</span>
-            <span class="cep-result-chip"><b>${_cepFmtPct(agg.cvr)}</b>CVR</span>
-            <span class="cep-result-chip"><b>${_cepFmtKRW(agg.cost)}</b>COST</span>
-            <span class="cep-result-chip"><b>${_cepFmtInt(agg.cv)}</b>CV</span>
-            <span class="cep-result-chip cep-result-chip--roas"><b>${agg.roas.toFixed(0)}%</b>ROAS</span>
-        </div>`;
 
     const creativeCardsHtml = `
         <div class="cep-creative-grid">
@@ -394,19 +406,19 @@ function _cepRenderCepBlock(cepObj, productName) {
         </div>`;
 
     return `
-    <div class="cep-block cep-block--${tag}">
+    <div class="cep-block cep-block--${tag} ${isOpen ? '' : 'cep-block--collapsed'}">
         ${headHtml}
-        ${ctxHtml}
-        ${hypoHtml}
-        <div class="cep-section-label">CEP 종합 결과</div>
-        ${resultHtml}
-        <div class="cep-section-label">소재별 성과</div>
-        ${creativeCardsHtml}
-        <div class="cep-section-label">원인 분석</div>
-        <ul class="cep-cause-list">${causes.map(c => `<li>${_cepEsc(c)}</li>`).join('')}</ul>
-        <div class="cep-nextstep">
-            <span class="cep-action-badge cep-action--${tag}">${meta.emoji} Next Step</span>
-            <p class="cep-action-text">${_cepEsc(nextText)}</p>
+        <div class="cep-block-body">
+            ${ctxHtml}
+            ${hypoHtml}
+            <div class="cep-section-label">소재별 성과</div>
+            ${creativeCardsHtml}
+            <div class="cep-section-label">원인 분석</div>
+            <ul class="cep-cause-list">${causes.map(c => `<li>${_cepEsc(c)}</li>`).join('')}</ul>
+            <div class="cep-nextstep">
+                <span class="cep-action-badge cep-action--${tag}">${meta.emoji} Next Step</span>
+                <p class="cep-action-text">${_cepEsc(nextText)}</p>
+            </div>
         </div>
     </div>`;
 }
@@ -455,12 +467,21 @@ function _cepPopulateBrandFilter(productsMap) {
     if ([...brands].includes(cur)) brandSel.value = cur;
 }
 
+// 제품 목록에서 클릭 없이도 성과를 가늠할 수 있도록, CEP 블록과 같은 등급(win/mid/weak/pending)을
+// 좌측 색상 바로 표시한다.
+function _cepRoasTier(avgRoas) {
+    if (avgRoas == null) return 'pending';
+    if (avgRoas >= 200) return 'win';
+    if (avgRoas >= 100) return 'mid';
+    return 'weak';
+}
+
 function _cepRenderProductList(productsMap) {
     const listEl = document.getElementById('cep-product-list');
     if (!listEl) return;
     const arr = [...productsMap.entries()];
     if (!arr.length) {
-        listEl.innerHTML = '<div class="text-center text-slate-300 text-xs py-10">조건에 맞는 제품이 없습니다.</div>';
+        listEl.innerHTML = _cepEmptyHtml('fa-flask', '조건에 맞는 제품이 없습니다.', { py: 'py-10' });
         return;
     }
     if (!_cepSelectedKey || !productsMap.has(_cepSelectedKey)) _cepSelectedKey = arr[0][0];
@@ -469,13 +490,14 @@ function _cepRenderProductList(productsMap) {
         const ceps = [...p.ceps.values()];
         const done = ceps.filter(c => c.creatives.length > 0).length;
         const avgRoas = _cepProductAvgRoas(p);
+        const tier = _cepRoasTier(avgRoas);
         return `
-        <button class="cep-prod-item ${key === _cepSelectedKey ? 'active' : ''}" data-key="${_cepEsc(key)}">
+        <button class="cep-prod-item cep-prod-item--${tier} ${key === _cepSelectedKey ? 'active' : ''}" data-key="${_cepEsc(key)}">
             <div class="cep-prod-item-top">
                 <span class="cep-brand-tag">${_cepEsc(p.brand)}</span>
                 <span class="cep-prod-item-name">${_cepEsc(p.product)}</span>
             </div>
-            <div class="cep-prod-item-stat">CEP ${ceps.length}개 · 완료 ${done}${avgRoas != null ? ` · ROAS ${avgRoas.toFixed(0)}%` : ''}</div>
+            <div class="cep-prod-item-stat">CEP ${ceps.length}개 · 완료 ${done}${avgRoas != null ? ` · <span class="cep-prod-item-roas">ROAS ${avgRoas.toFixed(0)}%</span>` : ''}</div>
         </button>`;
     }).join('');
 
@@ -553,7 +575,7 @@ function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
     const pObj = _cepProducts.get(_cepSelectedKey);
-    if (!pObj) { detailEl.innerHTML = '<div class="text-center text-slate-300 text-sm py-16">좌측에서 제품을 선택하세요.</div>'; return; }
+    if (!pObj) { detailEl.innerHTML = _cepEmptyHtml('fa-hand-pointer', '좌측에서 제품을 선택하세요.'); return; }
 
     const statusSel = document.getElementById('cep-status-filter')?.value || '';
     let ceps = [...pObj.ceps.values()];
@@ -579,7 +601,7 @@ function _cepRenderDetailForSelected() {
             ${compareTable}
         </div>` : compareTable}
         <div class="cep-blocks">
-            ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product)).join('') : '<div class="text-center text-slate-300 text-sm py-10">조건에 맞는 CEP가 없습니다.</div>'}
+            ${ceps.length ? ceps.map((c, i) => _cepRenderCepBlock(c, pObj.product, i === 0)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
         </div>`;
 }
 
@@ -601,7 +623,7 @@ async function renderCepVerification(forceReload) {
     if (_cepProducts && !forceReload) { _cepApplyFilters(); return; }
 
     _cepLoading = true;
-    listEl.innerHTML = '<div class="text-center text-slate-300 text-xs py-10"><i class="fas fa-spinner fa-spin mr-2"></i>로딩 중...</div>';
+    listEl.innerHTML = _cepEmptyHtml('fa-spinner', '검증 로그 불러오는 중...', { py: 'py-10', spin: true });
     const detailEl = document.getElementById('cep-detail');
     if (detailEl) detailEl.innerHTML = '';
     try {
@@ -617,7 +639,7 @@ async function renderCepVerification(forceReload) {
         _cepPopulateBrandFilter(_cepProducts);
         _cepApplyFilters();
     } catch (e) {
-        listEl.innerHTML = `<div class="text-center text-rose-400 text-xs py-10"><i class="fas fa-triangle-exclamation mr-2"></i>로드 실패: ${_cepEsc(e.message)}</div>`;
+        listEl.innerHTML = _cepEmptyHtml('fa-triangle-exclamation', '로드 실패: ' + e.message, { py: 'py-10', color: 'text-rose-400' });
     } finally {
         _cepLoading = false;
     }
@@ -628,4 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('cep-brand-filter')?.addEventListener('change', _cepApplyFilters);
     document.getElementById('cep-status-filter')?.addEventListener('change', _cepRenderDetailForSelected);
     document.getElementById('cep-refresh-btn')?.addEventListener('click', () => renderCepVerification(true));
+    // CEP 블록 헤더 클릭 시 접기/펼치기 (이벤트 위임 — innerHTML이 새로 그려져도 유지됨)
+    document.getElementById('cep-detail')?.addEventListener('click', (e) => {
+        const head = e.target.closest('.cep-card-head');
+        if (head) head.closest('.cep-block')?.classList.toggle('cep-block--collapsed');
+    });
 });

@@ -70,6 +70,20 @@
 .cep-prod-item-name { font-size: 12.5px; font-weight: 700; color: #1e293b; }
 .cep-prod-item-stat { font-size: 10.5px; color: #94a3b8; }
 
+/* 클릭 없이도 제품별 성과를 가늠할 수 있도록 좌측 색상 바 + ROAS 글자색으로 등급 표시 */
+.cep-prod-item--win   { box-shadow: inset 3px 0 0 #10b981; }
+.cep-prod-item--mid   { box-shadow: inset 3px 0 0 #f59e0b; }
+.cep-prod-item--weak  { box-shadow: inset 3px 0 0 #fb923c; }
+.cep-prod-item--pending { box-shadow: inset 3px 0 0 #cbd5e1; }
+.cep-prod-item.active.cep-prod-item--win,
+.cep-prod-item.active.cep-prod-item--mid,
+.cep-prod-item.active.cep-prod-item--weak,
+.cep-prod-item.active.cep-prod-item--pending { box-shadow: none; }
+.cep-prod-item-roas { font-weight: 700; }
+.cep-prod-item--win .cep-prod-item-roas { color: #047857; }
+.cep-prod-item--mid .cep-prod-item-roas { color: #b45309; }
+.cep-prod-item--weak .cep-prod-item-roas { color: #c2410c; }
+
 .cep-brand-tag {
     font-size: 10px; font-weight: 700; color: #fff;
     background: #475569; padding: 2px 8px; border-radius: 999px; letter-spacing: .3px;
@@ -123,17 +137,26 @@
 .cep-block--fail  { border-left-color: #f43f5e; }
 .cep-block--pending { border-left-color: #94a3b8; }
 
-.cep-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.cep-card-head {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    cursor: pointer; user-select: none;
+}
+.cep-block-body { margin-top: 10px; }
+.cep-block--collapsed .cep-block-body { display: none; }
 .cep-tag {
     font-size: 10px; font-weight: 800; color: #4f46e5; background: #eef2ff;
     padding: 2px 7px; border-radius: 6px;
 }
-.cep-name { font-size: 14px; font-weight: 700; color: #1e293b; }
+.cep-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-right: auto; }
+.cep-head-metric { font-size: 11px; color: #64748b; white-space: nowrap; }
+.cep-head-metric b { color: #4f46e5; font-size: 13px; margin-left: 2px; }
 .cep-status-badge {
-    font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; margin-left: auto;
+    font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
 }
 .cep-status-badge.done { background: #d1fae5; color: #047857; }
 .cep-status-badge.pending { background: #f1f5f9; color: #64748b; }
+.cep-collapse-icon { color: #94a3b8; font-size: 11px; transition: transform .2s; }
+.cep-block--collapsed .cep-collapse-icon { transform: rotate(-90deg); }
 
 .cep-hypo { margin-bottom: 12px; }
 .cep-hypo-label { font-size: 10px; font-weight: 700; color: #94a3b8; margin-bottom: 4px; letter-spacing: .3px; }
@@ -145,14 +168,6 @@
     margin: 14px 0 7px; text-transform: uppercase;
 }
 .cep-section-label:first-of-type { margin-top: 4px; }
-
-.cep-result-strip {
-    display: flex; flex-wrap: wrap; gap: 14px;
-    background: #f8fafc; border-radius: 8px; padding: 10px 14px;
-}
-.cep-result-chip { font-size: 11px; color: #64748b; }
-.cep-result-chip b { color: #1e293b; font-size: 13px; margin-right: 3px; }
-.cep-result-chip--roas b { color: #4f46e5; }
 
 .cep-creative-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
