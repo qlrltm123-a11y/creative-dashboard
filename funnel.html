@@ -236,7 +236,7 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 
 <script>
 const BRANDS = ['BOH','WM','CG'];
-const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
+const COL_262 = {event:0,date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
 const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
 const C262 = {cart:'#6366f1',buy:'#a78bfa'};
 const C261 = {cart:'#f97316',buy:'#fb923c'};
@@ -247,6 +247,38 @@ let charts = {};
 
 // 전환 지표 필터: 'both' | 'cart' | 'buy' (유입 막대는 항상 표시)
 let _funnelMetric = 'both';
+// 이벤트 필터: 'all' | '상시' | 'megapo' 등
+let _funnelEvent = 'all';
+
+function _getEventList(rawData) {
+  const evs = new Set();
+  let hasBlank = false;
+  Object.values(rawData['262Q']).forEach(rows =>
+    rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })
+  );
+  const result = [];
+  if (hasBlank && evs.size > 0) result.push('상시');
+  result.push(...[...evs].sort());
+  return result;
+}
+
+function _filterDataByEvent(rawData, event) {
+  if (event === 'all') return rawData;
+  const isBlank = event === '상시';
+  const filtered262 = {};
+  Object.entries(rawData['262Q']).forEach(([prod, rows]) => {
+    const f = rows.filter(r => isBlank ? !r.event : r.event === event);
+    if (f.length) filtered262[prod] = f;
+  });
+  return { '262Q': filtered262, '261Q': rawData['261Q'] };
+}
+
+function setFunnelEvent(v) {
+  _funnelEvent = v;
+  if (!brandData[currentBrand]) return;
+  render(currentBrand);
+  _restoreInner(currentBrand);
+}
 function _funnelMetricToggle(brand) {
   const opt = (v, label) => `<button class="fm-btn${_funnelMetric===v?' active':''}" onclick="setFunnelMetric('${v}')">${label}</button>`;
   return `<div class="fm-toggle">${opt('both','전체')}${opt('inflow','유입수')}${opt('cart','장바구니율')}${opt('buy','구매율')}</div>`;
@@ -404,9 +436,10 @@ function parseSheet(rows) {
       if(!prod||!date||prod==='제품'||date==='date'||date==='') continue;
       if(!d[prod]) d[prod]=[];
       const inflow=parseNum(r[cm.inflow]), cart=parseNum(r[cm.cart]), buy=parseNum(r[cm.buy]);
+      const event = (cm.event != null && r[cm.event] != null) ? r[cm.event].trim() : '';
       // 시트의 전환율 컬럼은 오류가 있어 신뢰하지 않고 건수에서 직접 계산
       d[prod].push({
-        date, inflow, cart, buy,
+        date, event, inflow, cart, buy,
         cartRate: (inflow>0 && cart!=null) ? cart/inflow*100 : null,
         buyRate:  (cart>0   && buy!=null)  ? buy/cart*100    : null,
       });
@@ -420,11 +453,15 @@ function parseSheet(rows) {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(brand) {
-  const data = brandData[brand];
-  const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
+  const rawData = brandData[brand];
+  const events = _getEventList(rawData);
+  const data = _filterDataByEvent(rawData, _funnelEvent);
+  const prods = _funnelEvent === 'all'
+    ? [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])]
+    : Object.keys(data['262Q']);
   const panel = document.getElementById(`panel-${brand}`);
 
-  panel.innerHTML = buildPanelHTML(brand);
+  panel.innerHTML = buildPanelHTML(brand, events);
 
   // destroy old charts
   Object.keys(charts).filter(k=>k.startsWith(brand+'_')).forEach(k=>{charts[k].destroy();delete charts[k];});
@@ -435,7 +472,15 @@ function render(brand) {
   renderTrendCharts(brand, data, prods);
 }
 
-function buildPanelHTML(brand) {
+function buildPanelHTML(brand, events=[]) {
+  const evFilterHtml = events.length ? `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e8ecf3;border-radius:10px;padding:10px 14px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.04)">
+      <span style="font-size:11px;font-weight:700;color:#64748b;white-space:nowrap">이벤트</span>
+      <div class="fm-toggle">
+        <button class="fm-btn${_funnelEvent==='all'?' active':''}" onclick="setFunnelEvent('all')">전체</button>
+        ${events.map(ev=>`<button class="fm-btn${_funnelEvent===ev?' active':''}" onclick="setFunnelEvent('${ev.replace(/'/g,"\\'")}')">${ev}</button>`).join('')}
+      </div>
+    </div>` : '';
   const tabsFn = (b) => `
     <div class="inner-tabs" id="itabs-${b}">
       <button class="inner-tab active" onclick="switchInner('${b}','summary',this)">📋 현황 요약</button>
@@ -444,6 +489,7 @@ function buildPanelHTML(brand) {
       <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 일별 추이</button>
     </div>`;
   return `
+    ${evFilterHtml}
     <div id="inner-${brand}-summary">
       <div class="sec-label">${brand} 현황 요약 · 이번 시즌(262Q) vs 직전 시즌(261Q)</div>
       <div class="kpi-row" id="kpi-${brand}"></div>
