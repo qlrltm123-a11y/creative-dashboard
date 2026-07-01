@@ -203,21 +203,39 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 
 <div id="url-BOH" class="url-banner boh">
   <span class="url-label">BOH</span>
-  <input id="url-input-BOH" placeholder="구글 시트 웹 게시 CSV URL">
+  <input id="url-input-BOH" placeholder="구글 시트 웹 게시 CSV URL (기본 탭)">
   <button class="url-btn" onclick="applyUrl('BOH')">적용</button>
   <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
 </div>
+<div id="url-megapo-BOH" class="url-banner boh" style="background:#f5f3ff;border-top:none">
+  <span class="url-label" style="color:#7c3aed">BOH<br><span style="font-size:9px">메가포</span></span>
+  <input id="url-megapo-input-BOH" placeholder="megapo_boh 탭 CSV URL (없으면 비워두세요)">
+  <button class="url-btn" style="background:#7c3aed" onclick="applyMegapoUrl('BOH')">적용</button>
+  <span class="url-hint">메가포 탭 별도 URL</span>
+</div>
 <div id="url-WM" class="url-banner wm" style="display:none">
   <span class="url-label">WM</span>
-  <input id="url-input-WM" placeholder="구글 시트 웹 게시 CSV URL">
+  <input id="url-input-WM" placeholder="구글 시트 웹 게시 CSV URL (기본 탭)">
   <button class="url-btn" onclick="applyUrl('WM')">적용</button>
   <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
 </div>
+<div id="url-megapo-WM" class="url-banner wm" style="display:none;background:#f0fdf4;border-top:none">
+  <span class="url-label" style="color:#065f46">WM<br><span style="font-size:9px">메가포</span></span>
+  <input id="url-megapo-input-WM" placeholder="megapo_wm 탭 CSV URL (없으면 비워두세요)">
+  <button class="url-btn" style="background:#065f46" onclick="applyMegapoUrl('WM')">적용</button>
+  <span class="url-hint">메가포 탭 별도 URL</span>
+</div>
 <div id="url-CG" class="url-banner cg" style="display:none">
   <span class="url-label">CG</span>
-  <input id="url-input-CG" placeholder="구글 시트 웹 게시 CSV URL">
+  <input id="url-input-CG" placeholder="구글 시트 웹 게시 CSV URL (기본 탭)">
   <button class="url-btn" onclick="applyUrl('CG')">적용</button>
   <span class="url-hint">파일 › 웹에 게시 › CSV 탭 선택 › 게시</span>
+</div>
+<div id="url-megapo-CG" class="url-banner cg" style="display:none;background:#fffbeb;border-top:none">
+  <span class="url-label" style="color:#92400e">CG<br><span style="font-size:9px">메가포</span></span>
+  <input id="url-megapo-input-CG" placeholder="megapo_cg 탭 CSV URL (없으면 비워두세요)">
+  <button class="url-btn" style="background:#92400e" onclick="applyMegapoUrl('CG')">적용</button>
+  <span class="url-hint">메가포 탭 별도 URL</span>
 </div>
 
 <main>
@@ -236,8 +254,12 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 
 <script>
 const BRANDS = ['BOH','WM','CG'];
-const COL_262 = {event:2,date:1,product:3,inflow:4,cart:5,buy:6,cartRate:7,buyRate:8};
-const COL_261 = {event:8,date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+// 기존 탭 (BOH/WM/CG): A열=제품코드 (무시), event 없음
+const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
+const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+// 메가포 탭 (megapo_boh/wm/cg): A열=이벤트262Q, J열=이벤트261Q
+const COL_MEGAPO_262 = {event:0,date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
+const COL_MEGAPO_261 = {event:9,date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
 const C262 = {cart:'#6366f1',buy:'#a78bfa'};
 const C261 = {cart:'#f97316',buy:'#fb923c'};
 
@@ -336,6 +358,32 @@ const DEFAULT_URLS = {
 // ── Storage ───────────────────────────────────────────────────────────────────
 const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
 const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
+const getMegapoUrl = b => localStorage.getItem(`furl_megapo_${b}`) || '';
+const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo_${b}`,u);
+
+// ── CSV fetch helper ──────────────────────────────────────────────────────────
+async function fetchCsv(url) {
+  try {
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{cache:'no-store'});
+    if (r.ok) return await r.text();
+  } catch {}
+  try { const r2 = await fetch(url,{cache:'no-store'}); return await r2.text(); } catch {}
+  return null;
+}
+
+// ── Merge two parsed sheet datasets ──────────────────────────────────────────
+function mergeSheetData(base, extra) {
+  const merged = {'262Q':{},'261Q':{}};
+  ['262Q','261Q'].forEach(q => {
+    const allProds = new Set([...Object.keys(base[q]||{}),...Object.keys(extra[q]||{})]);
+    allProds.forEach(prod => {
+      const a = base[q]?.[prod] || [];
+      const b = extra[q]?.[prod] || [];
+      merged[q][prod] = [...a,...b].sort((x,y)=>dateKey(x.date)-dateKey(y.date));
+    });
+  });
+  return merged;
+}
 
 // ── Brand switch ──────────────────────────────────────────────────────────────
 function switchBrand(brand, btn) {
@@ -343,6 +391,7 @@ function switchBrand(brand, btn) {
   BRANDS.forEach(b => {
     document.getElementById(`panel-${b}`).classList.toggle('active', b===brand);
     document.getElementById(`url-${b}`).style.display = b===brand ? '' : 'none';
+    document.getElementById(`url-megapo-${b}`).style.display = b===brand ? '' : 'none';
   });
   document.querySelectorAll('.brand-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
@@ -353,6 +402,11 @@ function applyUrl(brand) {
   const u = document.getElementById(`url-input-${brand}`).value.trim();
   if (!u) return alert('URL을 입력해주세요');
   saveUrl(brand, u);
+  loadBrand(brand, true);
+}
+function applyMegapoUrl(brand) {
+  const u = document.getElementById(`url-megapo-input-${brand}`).value.trim();
+  saveMegapoUrl(brand, u);
   loadBrand(brand, true);
 }
 
@@ -376,36 +430,35 @@ function _fStampUpdated(ts) {
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadBrand(brand, force=false) {
-  // 강제(시트 갱신)가 아니면: 메모리 → 캐시 순으로만 표시, 네트워크 호출 절대 안 함
   if (!force) {
     if (brandData[brand]) { render(brand); return; }
     const ts = _fLoadCache(brand);
     if (brandData[brand]) { render(brand); _fStampUpdated(ts); return; }
-    // 캐시도 없으면 fetch하지 않고 안내만 (오직 '시트 갱신' 버튼으로만 로드)
     const panel = document.getElementById(`panel-${brand}`);
     if (panel) panel.innerHTML = `<div class="loading-state" style="flex-direction:column;gap:12px">
         <div style="font-size:13px;color:#64748b">아직 불러온 데이터가 없습니다.</div>
         <button class="btn btn-reload" onclick="reloadCurrent()">🔄 시트 갱신으로 데이터 불러오기</button>
       </div>`;
     document.getElementById(`url-input-${brand}`).value = getUrl(brand);
+    document.getElementById(`url-megapo-input-${brand}`).value = getMegapoUrl(brand);
     return;
   }
   const url = getUrl(brand);
+  const megapoUrl = getMegapoUrl(brand);
   document.getElementById(`url-input-${brand}`).value = url;
+  document.getElementById(`url-megapo-input-${brand}`).value = megapoUrl;
   setPanelState(brand,'loading');
-  if (!url) { setPanelState(brand,'error',`${brand} 시트 URL을 위에 입력해주세요.<br><small>파일 › 웹에 게시 › CSV › 게시 › URL 복사</small>`); return; }
+  if (!url) { setPanelState(brand,'error',`${brand} 시트 URL을 위에 입력해주세요.`); return; }
 
-  let text;
-  try {
-    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{cache:'no-store'});
-    if (!r.ok) throw 0;
-    text = await r.text();
-  } catch {
-    try { const r2=await fetch(url,{cache:'no-store'}); text=await r2.text(); }
-    catch(e){ setPanelState(brand,'error',`로드 실패: 시트가 공개 게시되어 있는지 확인하세요.`); return; }
-  }
+  const [text, megapoText] = await Promise.all([
+    fetchCsv(url),
+    megapoUrl ? fetchCsv(megapoUrl) : Promise.resolve(null),
+  ]);
+  if (!text) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
-  brandData[brand] = parseSheet(parseCSV(text));
+  const regularData = parseSheet(parseCSV(text), COL_262, COL_261);
+  const megapoData  = megapoText ? parseSheet(parseCSV(megapoText), COL_MEGAPO_262, COL_MEGAPO_261) : null;
+  brandData[brand]  = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
   _fSaveCache(brand);
   render(brand);
   _fStampUpdated();
@@ -427,7 +480,7 @@ function parseCSV(text) {
 const parsePct = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace('%','').replace(',','')); return isNaN(n)?null:n; };
 const parseNum = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace(/,/g,'')); return isNaN(n)?null:n; };
 
-function parseSheet(rows) {
+function parseSheet(rows, cm262=COL_262, cm261=COL_261) {
   function ext(cm) {
     const d={};
     for(let i=1;i<rows.length;i++){
@@ -438,7 +491,6 @@ function parseSheet(rows) {
       if(!d[prod]) d[prod]=[];
       const inflow=parseNum(r[cm.inflow]), cart=parseNum(r[cm.cart]), buy=parseNum(r[cm.buy]);
       const event = (cm.event != null && r[cm.event] != null) ? r[cm.event].trim() : '';
-      // 시트의 전환율 컬럼은 오류가 있어 신뢰하지 않고 건수에서 직접 계산
       d[prod].push({
         date, event, inflow, cart, buy,
         cartRate: (inflow>0 && cart!=null) ? cart/inflow*100 : null,
@@ -449,7 +501,7 @@ function parseSheet(rows) {
     Object.values(d).forEach(a=>a.sort((a,b)=>sk(a.date)-sk(b.date)));
     return d;
   }
-  return {'262Q':ext(COL_262),'261Q':ext(COL_261)};
+  return {'262Q':ext(cm262),'261Q':ext(cm261)};
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -1043,6 +1095,7 @@ window.addEventListener('message', e => {
 window.addEventListener('DOMContentLoaded',()=>{
   BRANDS.forEach(b=>{
     document.getElementById(`url-input-${b}`).value=getUrl(b);
+    document.getElementById(`url-megapo-input-${b}`).value=getMegapoUrl(b);
     setPanelState(b,'loading');
   });
   const init = _initialBrand();
