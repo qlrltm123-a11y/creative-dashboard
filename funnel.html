@@ -236,8 +236,8 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 
 <script>
 const BRANDS = ['BOH','WM','CG'];
-const COL_262 = {event:0,date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
-const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+const COL_262 = {event:2,date:1,product:3,inflow:4,cart:5,buy:6,cartRate:7,buyRate:8};
+const COL_261 = {event:8,date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
 const C262 = {cart:'#6366f1',buy:'#a78bfa'};
 const C261 = {cart:'#f97316',buy:'#fb923c'};
 
@@ -253,8 +253,10 @@ let _funnelEvent = 'all';
 function _getEventList(rawData) {
   const evs = new Set();
   let hasBlank = false;
-  Object.values(rawData['262Q']).forEach(rows =>
-    rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })
+  ['262Q','261Q'].forEach(q =>
+    Object.values(rawData[q]).forEach(rows =>
+      rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })
+    )
   );
   const result = [];
   if (hasBlank && evs.size > 0) result.push('상시');
@@ -265,12 +267,11 @@ function _getEventList(rawData) {
 function _filterDataByEvent(rawData, event) {
   if (event === 'all') return rawData;
   const isBlank = event === '상시';
-  const filtered262 = {};
-  Object.entries(rawData['262Q']).forEach(([prod, rows]) => {
-    const f = rows.filter(r => isBlank ? !r.event : r.event === event);
-    if (f.length) filtered262[prod] = f;
-  });
-  return { '262Q': filtered262, '261Q': rawData['261Q'] };
+  const filterRows = rows => rows.filter(r => isBlank ? !r.event : r.event === event);
+  const filtered262 = {}, filtered261 = {};
+  Object.entries(rawData['262Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered262[p]=f; });
+  Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered261[p]=f; });
+  return { '262Q': filtered262, '261Q': filtered261 };
 }
 
 function setFunnelEvent(v) {
@@ -456,9 +457,7 @@ function render(brand) {
   const rawData = brandData[brand];
   const events = _getEventList(rawData);
   const data = _filterDataByEvent(rawData, _funnelEvent);
-  const prods = _funnelEvent === 'all'
-    ? [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])]
-    : Object.keys(data['262Q']);
+  const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
   const panel = document.getElementById(`panel-${brand}`);
 
   panel.innerHTML = buildPanelHTML(brand, events);
