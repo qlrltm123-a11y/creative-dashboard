@@ -7,8 +7,8 @@
 
 const CEP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1751932102&single=true&output=csv';
 
-// 컬럼 인덱스: 소재명,브랜드,제품,소구포인트(CEP),검증 상세,검증 소재 media urls,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
-const CEP_COL = { name: 0, brand: 1, product: 2, cep: 3, detail: 4, url: 5, imp: 6, click: 7, ctr: 8, cost: 10, cv: 11, revenue: 14, roas: 15 };
+// 컬럼 인덱스: 브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트(CEP),검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
+const CEP_COL = { brand: 0, name: 1, product: 2, start: 3, end: 4, url: 5, cep: 6, detail: 7, imp: 8, click: 9, ctr: 10, cpc: 11, cost: 12, cv: 13, cvr: 14, cpa: 15, revenue: 16, roas: 17 };
 
 const CEP_VERDICT_META = {
     pending: { emoji: '📝', label: '검증 대기' },
@@ -90,6 +90,13 @@ const CEP_CONTEXT = {
     'NAD크림 단품-옵션2': _CTX_NADCREAM,
     'NAD+콜라겐크림 (NAD크림 단품)': _CTX_NADCREAM,
     'NAD+콜라겐크림 (NAD크림 단품-옵션2)': _CTX_NADCREAM,
+    // 시트 제품명이 영문 토큰으로 변경됨 (2026-07)
+    'EyeCream': _CTX_EYECREAM,
+    'GelMist': _CTX_COLLAGEN_MIST,
+    'GelMistx2': _CTX_COLLAGEN_MIST,
+    '3D-Refill': _CTX_TANCREAM,
+    'NAD-Cream': _CTX_NADCREAM,
+    'NAD-Cream-2': _CTX_NADCREAM,
 };
 function _cepContextFor(product, title) {
     const list = CEP_CONTEXT[product];
@@ -99,9 +106,11 @@ function _cepContextFor(product, title) {
 }
 
 // "CEP-9 오피스 건조 리프레시" -> { num: 9, no: 'CEP-9', title: '오피스 건조 리프레시' }
+// 번호 없이 상황 문장만 있는 라벨("거울 속 눈가가 처지고...")은 전체를 title로 쓴다.
 function _cepSplitLabel(label) {
-    const m = label.match(/CEP-?\s*(\d+)/i);
-    const num = m ? parseInt(m[1], 10) : null;
+    const m = label.match(/^CEP-?\s*(\d+)/i);
+    if (!m) return { num: null, no: '', title: label.trim() };
+    const num = parseInt(m[1], 10);
     const spaceIdx = label.indexOf(' ');
     const no = spaceIdx > 0 ? label.slice(0, spaceIdx) : label;
     const title = spaceIdx > 0 ? label.slice(spaceIdx + 1).trim() : '';
@@ -442,7 +451,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
         : '';
     const headHtml = `
         <div class="cep-card-head">
-            <span class="cep-tag">${_cepEsc(cepNo)}</span>
+            ${cepNo ? `<span class="cep-tag">${_cepEsc(cepNo)}</span>` : ''}
             <span class="cep-name">${_cepEsc(cepTitle)}</span>
             ${headMetricHtml}
             <span class="cep-status-badge ${hasResult ? 'done' : 'pending'}">${hasResult ? '검증 완료' : '검증 대기'}</span>
@@ -664,6 +673,129 @@ function _cepCompareTableHtml(pObj) {
     </div>`;
 }
 
+function _cepRankingSectionHtml(pObj, benchmark) {
+    const medals = ['🥇', '🥈', '🥉'];
+    const allCeps = [...pObj.ceps.values()];
+    const done = allCeps.filter(c => c.creatives.length > 0);
+    const pending = allCeps.filter(c => c.creatives.length === 0);
+
+    const rankedDone = done
+        .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
+        .sort((a, b) => b.agg.roas - a.agg.roas);
+
+    if (!rankedDone.length && !pending.length) return '';
+
+    const modClass = i => i === 0 ? 'first' : i === 1 ? 'second' : i === 2 ? 'third' : '';
+    const cardHtml = (entry, i) => {
+        const { c, agg, info } = entry;
+        const tag = _cepVerdictTag(agg, true);
+        const meta = CEP_VERDICT_META[tag];
+        const ctx = _cepContextFor(pObj.product, info.title);
+        return `
+        <div class="cep-rank-card${modClass(i) ? ` cep-rank-card--${modClass(i)}` : ''}">
+            <span class="cep-verdict-chip cep-verdict-chip--${tag}">${meta.emoji} ${meta.label}</span>
+            <div class="cep-rank-medal">${medals[i] || '📌'}</div>
+            <div class="cep-rank-body">
+                <div class="cep-rank-name">${_cepEsc(info.title || c.cepLabel)}</div>
+                <div class="cep-rank-metrics">
+                    <span class="cep-rank-roas">${agg.roas.toFixed(0)}%</span>
+                    <span class="cep-rank-sep">|</span>
+                    <span class="cep-rank-cv">CV ${_cepFmtInt(agg.cv)}건</span>
+                    <span class="cep-rank-cost">${_cepFmtKRW(agg.cost)}</span>
+                </div>
+                ${ctx ? `<div class="cep-rank-ctx"><i class="fas fa-quote-left"></i><span>${_cepEsc(ctx)}</span></div>` : ''}
+            </div>
+        </div>`;
+    };
+
+    const pendingCardsHtml = pending.map(c => {
+        const info = _cepSplitLabel(c.cepLabel);
+        return `
+        <div class="cep-rank-card cep-rank-card--pending">
+            <div class="cep-rank-medal">⏳</div>
+            <div class="cep-rank-body">
+                <div class="cep-rank-pending-label">검증 대기</div>
+                <div class="cep-rank-name">${_cepEsc(info.title || c.cepLabel)}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `
+    <div class="cep-ranking-section">
+        <div class="cep-ranking-header">
+            <span class="cep-ranking-title">CEP 성과 순위</span>
+            <span class="cep-ranking-sub">ROAS 기준 · 검증 완료 ${rankedDone.length}개</span>
+        </div>
+        <div class="cep-rank-cards">
+            ${rankedDone.map((entry, i) => cardHtml(entry, i)).join('')}
+            ${pendingCardsHtml}
+        </div>
+    </div>`;
+}
+
+function _cepAutoInsightHtml(pObj) {
+    const items = [...pObj.ceps.values()]
+        .map(c => ({ c, agg: _cepAggregate(c) }))
+        .filter(x => x.c.creatives.length > 0 && x.agg.cost > 0);
+    if (items.length < 2) return '';
+
+    const sorted = [...items].sort((a, b) => b.agg.roas - a.agg.roas);
+    const top = sorted[0], bottom = sorted[sorted.length - 1];
+    if (top.agg.roas - bottom.agg.roas < 20) return '';
+
+    const topInfo = _cepSplitLabel(top.c.cepLabel);
+    const bottomInfo = _cepSplitLabel(bottom.c.cepLabel);
+    const topCtx = _cepContextFor(pObj.product, topInfo.title);
+
+    const urgencyLine = topCtx
+        ? `"${_cepEsc(topInfo.title)}"이 잘 된 이유: <b>소비자가 지금 당장 불편한 상황</b>("${_cepEsc(topCtx)}")을 구체적으로 짚어줬기 때문에 반응이 빨랐습니다.`
+        : `"${_cepEsc(topInfo.title)}"이 ROAS ${top.agg.roas.toFixed(0)}%로 가장 효율이 높았습니다.`;
+    const dirLine = `다음 방향: <b>"${_cepEsc(topInfo.title)}" 류의 CEP에 예산 비중을 더 두고</b>, "${_cepEsc(bottomInfo.title)}"(ROAS ${bottom.agg.roas.toFixed(0)}%)는 소구를 더 구체화하거나 우선순위를 낮추세요.`;
+
+    return `
+    <div class="cep-auto-insight">
+        <i class="fas fa-lightbulb"></i>
+        <div>${urgencyLine}<br>${dirLine}</div>
+    </div>`;
+}
+
+function _cepNoteKey(pKey, field) {
+    return `cep_note_${pKey}_${field}`;
+}
+
+function _cepNoteEditorHtml(pKey) {
+    const get = f => _cepEsc(localStorage.getItem(_cepNoteKey(pKey, f)) || '');
+    const safeKey = _cepEsc(pKey);
+    return `
+    <div class="cep-note-section">
+        <div class="cep-note-header">
+            <span class="cep-ranking-title">팀 노트</span>
+            <span class="cep-note-hint"><i class="fas fa-floppy-disk"></i> 자동 저장</span>
+        </div>
+        <div class="cep-note-fields">
+            <div>
+                <div class="cep-note-field-label">워킹 요인 (가설)</div>
+                <textarea class="cep-note-textarea" rows="3" placeholder="왜 이 CEP가 잘 됐거나 안 됐는지 — 소비자 심리, 시즌, 소재 구성 등 팀 의견을 적어주세요" oninput="cepSaveNote('${safeKey}','hypo',this.value)">${get('hypo')}</textarea>
+            </div>
+            <div class="cep-note-grid">
+                <div>
+                    <div class="cep-note-field-label">Next Action</div>
+                    <textarea class="cep-note-textarea" rows="4" placeholder="예) 동일 CEP 앵글 변경 소재 2개 추가 제작&#10;예) 타겟 연령대 확대 테스트" oninput="cepSaveNote('${safeKey}','action',this.value)">${get('action')}</textarea>
+                </div>
+                <div>
+                    <div class="cep-note-field-label">A/B Test 아이디어</div>
+                    <textarea class="cep-note-textarea" rows="4" placeholder="예) 썸네일: 인물 클로즈업 vs 제품 클로즈업&#10;예) 카피: 시급성 강조 vs 성분 강조" oninput="cepSaveNote('${safeKey}','abtest',this.value)">${get('abtest')}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function cepSaveNote(pKey, field, value) {
+    localStorage.setItem(_cepNoteKey(pKey, field), value);
+}
+window.cepSaveNote = cepSaveNote;
+
 function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
@@ -678,9 +810,8 @@ function _cepRenderDetailForSelected() {
     const allCeps = [...pObj.ceps.values()];
     const done = allCeps.filter(c => c.creatives.length > 0).length;
     const avgRoas = _cepProductAvgRoas(pObj);
-    const productInsight = _cepProductInsight(pObj);
-    const compareTable = _cepCompareTableHtml(pObj);
     const benchmark = _cepProductBenchmark(pObj);
+    const compareTable = _cepCompareTableHtml(pObj);
 
     detailEl.innerHTML = `
         <div class="cep-detail-header">
@@ -688,14 +819,13 @@ function _cepRenderDetailForSelected() {
             <span class="cep-detail-title">${_cepEsc(pObj.product)}</span>
             <span class="cep-product-stat">CEP ${allCeps.length}개 · 완료 ${done} · 대기 ${allCeps.length - done}${avgRoas != null ? ` · 평균 ROAS ${avgRoas.toFixed(0)}%` : ''}</span>
         </div>
-        ${productInsight ? `
-        <div class="cep-product-insight">
-            <div class="cep-section-label">제품 전체 CEP 비교 인사이트</div>
-            <p>${_cepEsc(productInsight)}</p>
-            ${compareTable}
-        </div>` : compareTable}
+        ${_cepRankingSectionHtml(pObj, benchmark)}
+        ${_cepAutoInsightHtml(pObj)}
+        ${_cepNoteEditorHtml(_cepSelectedKey)}
+        ${compareTable ? `<div class="cep-section-detail-label"><i class="fas fa-table"></i> 수치 상세</div>${compareTable}` : ''}
+        <div class="cep-section-detail-label"><i class="fas fa-flask"></i> CEP별 소재 상세</div>
         <div class="cep-blocks">
-            ${ceps.length ? ceps.map((c, i) => _cepRenderCepBlock(c, pObj.product, i === 0, benchmark)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
+            ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product, false, benchmark)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
         </div>`;
 }
 

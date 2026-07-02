@@ -7857,3 +7857,51 @@ header > div:first-child { visibility: hidden; }
     .sb-logo { justify-content: center; padding: 0; }
     .sb-footer .sb-foot-btn { justify-content: center; }
 }
+
+/* ═══ CEP 성과 순위 카드 ═══ */
+.cep-ranking-section { background:#fff; border:1px solid #e8ecf3; border-radius:14px; padding:20px 22px; margin-bottom:16px; box-shadow:0 1px 3px rgba(15,23,42,.05); }
+.cep-ranking-header { display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.cep-ranking-title { font-size:14px; font-weight:800; color:#1e293b; }
+.cep-ranking-sub { font-size:11px; color:#94a3b8; }
+.cep-rank-cards { display:flex; flex-direction:column; gap:10px; }
+.cep-rank-card { display:flex; align-items:flex-start; gap:14px; padding:14px 16px; border-radius:12px; border:1.5px solid #e2e8f0; position:relative; transition:box-shadow .2s; background:#fff; }
+.cep-rank-card:hover { box-shadow:0 4px 16px rgba(15,23,42,.08); }
+.cep-rank-card--first  { border-color:#fbbf24; background:#fffbeb; }
+.cep-rank-card--second { border-color:#94a3b8; background:#f8fafc; }
+.cep-rank-card--third  { border-color:#cd7c3a; background:#fdf8f0; }
+.cep-rank-card--pending { border-color:#e2e8f0; background:#f8fafc; opacity:.65; }
+.cep-rank-medal { font-size:28px; line-height:1; flex-shrink:0; margin-top:2px; }
+.cep-rank-body { flex:1; min-width:0; }
+.cep-rank-name { font-size:15px; font-weight:700; color:#1e293b; margin-bottom:5px; }
+.cep-rank-metrics { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.cep-rank-roas { font-size:20px; font-weight:900; color:#4f46e5; }
+.cep-rank-sep { color:#cbd5e1; font-size:12px; }
+.cep-rank-cv   { font-size:13px; font-weight:700; color:#334155; }
+.cep-rank-cost { font-size:11px; color:#94a3b8; }
+.cep-rank-ctx  { font-size:11px; color:#64748b; line-height:1.55; display:flex; align-items:flex-start; gap:5px; padding:5px 8px; background:rgba(0,0,0,.03); border-radius:6px; margin-top:4px; }
+.cep-rank-ctx .fa-quote-left { font-size:9px; margin-top:2px; color:#cbd5e1; flex-shrink:0; }
+.cep-rank-pending-label { font-size:12px; color:#94a3b8; margin-bottom:4px; }
+.cep-verdict-chip { position:absolute; top:12px; right:14px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; white-space:nowrap; }
+.cep-verdict-chip--win     { background:#dcfce7; color:#059669; }
+.cep-verdict-chip--mid     { background:#fef9c3; color:#ca8a04; }
+.cep-verdict-chip--weak    { background:#fff7ed; color:#ea580c; }
+.cep-verdict-chip--fail    { background:#fee2e2; color:#dc2626; }
+.cep-verdict-chip--pending { background:#f1f5f9; color:#94a3b8; }
+
+/* ═══ 자동 인사이트 ═══ */
+.cep-auto-insight { display:flex; align-items:flex-start; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:12px; color:#1e40af; line-height:1.65; }
+.cep-auto-insight .fa-lightbulb { color:#3b82f6; flex-shrink:0; margin-top:2px; }
+
+/* ═══ 워킹 요인 · Next Action 메모 섹션 ═══ */
+.cep-note-section { background:#fff; border:1px solid #e8ecf3; border-radius:14px; padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(15,23,42,.05); }
+.cep-note-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:6px; }
+.cep-note-hint { font-size:10px; color:#94a3b8; }
+.cep-note-fields { display:flex; flex-direction:column; gap:10px; }
+.cep-note-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media(max-width:700px){ .cep-note-grid { grid-template-columns:1fr; } }
+.cep-note-field-label { font-size:11px; font-weight:700; color:#475569; margin-bottom:5px; }
+.cep-note-textarea { width:100%; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; color:#334155; font-family:inherit; resize:vertical; line-height:1.65; transition:border-color .2s,background .2s; box-sizing:border-box; }
+.cep-note-textarea:focus { outline:none; border-color:#6366f1; background:#fff; }
+.cep-note-textarea::placeholder { color:#cbd5e1; }
+.cep-section-detail-label { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin:18px 0 10px; display:flex; align-items:center; gap:6px; }
+.cep-section-detail-label::after { content:''; flex:1; height:1px; background:#f1f5f9; }
