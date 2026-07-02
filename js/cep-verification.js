@@ -733,29 +733,172 @@ function _cepRankingSectionHtml(pObj, benchmark) {
     </div>`;
 }
 
+// ── 다각도 프레임 × 실측 성과 자동 인사이트 ─────────────────────────────────
+// 하나의 프레임을 모든 제품에 강요하지 않는다. 여러 관점(긴급도/니즈 유형/상황
+// 구체성/사용 맥락)으로 CEP를 각각 분류해 실측 ROAS와 교차하고, 그 제품에서
+// 실제로 성과 차이를 가장 잘 설명하는 프레임을 자동 선택해 가설을 만든다.
+// 어떤 프레임도 설명력이 없으면 억지 결론 대신 "소재 실행 차이" 진단을 낸다.
+const CEP_FRAMES = [
+    { id: 'urgency', name: '긴급도', formula: '구매 전환 = 지금 불편하거나 · 지금 창피하거나 · 지금 급할 때',
+      buckets: [
+        { key: 'now',     emoji: '☀️', label: '지금 당장 — 가장 급함',
+          kw: ['지금', '당장', '즉시', '오후에', '수정 전', '직전', '틈새', '바쁜', '들뜨', '외출', '응급', '에어컨', '갈라져'],
+          verdict: '지금 겪는 불편(①지금 불편 ②매일 반복 ③해결책 명확)을 짚을 때 구매로 이어집니다' },
+        { key: 'today',   emoji: '😴', label: '오늘 안에 — 그나마 급함',
+          kw: ['전날', '다음 날', '내일', '아침', '오늘', '자는 동안', '취침', '밤', '수면', '잠', '출근', '통근', '세안 직후', 'D-'],
+          verdict: '하루 안에 해결하고 싶은 니즈가 가장 크게 반응합니다' },
+        { key: 'someday', emoji: '🪞', label: '언젠가는 — 급하지 않음', kw: [],
+          verdict: "'언젠가의 고민'이 오히려 반응합니다 — 고민의 무게 자체가 큰 카테고리로 보입니다" },
+      ] },
+    { id: 'need', name: '니즈 유형', formula: '불편을 없애려는 구매인가, 되고 싶은 모습을 사는 구매인가',
+      buckets: [
+        { key: 'problem', emoji: '🚨', label: '문제 해소형',
+          kw: ['건조', '처짐', '들뜨', '갈라', '칙칙', '푸석', '다크서클', '당길', '무너', '실패', '겁', '걱정', '불편', '고민', '주름', '못 잔'],
+          verdict: '불편을 없애주는 해결책 포지션이 워킹합니다 — 증상을 첫 장면에 보여주세요' },
+        { key: 'aspire', emoji: '✨', label: '열망 실현형',
+          kw: ['싶은 밤', '깨어나고 싶', '예쁘', '완성', '연출', '자신', '빛나', '아름', '단장'],
+          verdict: '되고 싶은 모습을 보여주는 열망 소구가 워킹합니다 — 결과 이미지를 앞세우세요' },
+      ] },
+    { id: 'scene', name: '상황 구체성', formula: '장면이 그려지는 CEP인가, 막연한 상태 서술인가',
+      buckets: [
+        { key: 'vivid', emoji: '🎬', label: '구체적 장면형',
+          kw: ['아침', '오후', '밤', '전날', '출근', '통근', '세안', '거울', '에어컨', '외출', '회의', '자리', '여행', '마스크', '수정', '화장'],
+          verdict: '시간·장소가 박혀 장면이 그려지는 CEP가 워킹합니다 — 소비자가 자기 얘기로 받아들입니다' },
+        { key: 'vague', emoji: '💭', label: '막연한 상태형', kw: [],
+          verdict: '구체 장면보다 상태·고민 자체를 정면으로 말하는 CEP가 워킹합니다' },
+      ] },
+    { id: 'occasion', name: '사용 맥락', formula: '매일의 루틴에 끼우는가, 특별한 날을 대비하는가',
+      buckets: [
+        { key: 'event', emoji: '🎉', label: '이벤트 대비형',
+          kw: ['중요한', '앞둔', '결혼', '촬영', '자리', '미팅', 'D-', '데이트'],
+          verdict: '특별한 날을 앞둔 데드라인 소구가 워킹합니다 — 시한이 구매를 만듭니다' },
+        { key: 'routine', emoji: '🔁', label: '일상 루틴형',
+          kw: ['매일', '아침', '밤', '자는 동안', '출근', '통근', '루틴', '세안', '하루', '오후'],
+          verdict: '매일 반복되는 순간에 끼워 넣는 소구가 워킹합니다 — 반복 사용 이유를 주세요' },
+      ] },
+];
+
+function _cepClassify(frame, title) {
+    return frame.buckets.find(b => b.kw.length ? b.kw.some(k => title.includes(k)) : true) || null;
+}
+
+// 프레임 하나를 이 제품의 실측 데이터로 평가: 버킷별 평균 ROAS와 설명력(버킷 간 격차)
+function _cepFrameEval(frame, items) {
+    const byBucket = new Map();
+    items.forEach(x => {
+        const b = _cepClassify(frame, x.info.title);
+        if (!b) return;
+        if (!byBucket.has(b.key)) byBucket.set(b.key, { bucket: b, items: [] });
+        byBucket.get(b.key).items.push(x);
+    });
+    const groups = [...byBucket.values()].map(g => ({ ...g, avg: g.items.reduce((s, x) => s + x.agg.roas, 0) / g.items.length }));
+    if (groups.length < 2) return null;   // 전부 한 버킷이면 이 관점으론 구분 불가
+    groups.sort((a, b) => b.avg - a.avg);
+    return { frame, groups, spread: groups[0].avg - groups[groups.length - 1].avg,
+             covered: groups.reduce((s, g) => s + g.items.length, 0) };
+}
+
+// 제품별 핵심 효능 메타 — 최고 성과 CEP가 "메인 효능 축"인지 "부가 니즈 축"인지 판별.
+// 부가 니즈로 팔린 경우 포지셔닝 갈림길(A/B)을 명시적으로 제시한다.
+const CEP_PRODUCT_META = {
+    'EyeCream':    { core: '처짐·탄력', coreKw: ['처짐', '탄력', '주름', '나이'], alt: '보습·즉각 케어' },
+    'NAD-Cream':   { core: '안티에이징(NAD 성분)', coreKw: ['노화', '안티에이징', '성분', '나이'], alt: '컨디션 회복·나이트 케어' },
+    'NAD-Cream-2': { core: '안티에이징(NAD 성분)', coreKw: ['노화', '안티에이징', '성분', '나이'], alt: '컨디션 회복·나이트 케어' },
+    'GelMist':     { core: '수분 보습', coreKw: ['수분', '보습', '촉촉', '건조', '당길'], alt: '메이크업 픽스·프렙' },
+    'GelMistx2':   { core: '수분 보습', coreKw: ['수분', '보습', '촉촉', '건조', '당길'], alt: '메이크업 픽스·프렙' },
+    'Asachuru':    { core: '모닝 리프팅·탄력', coreKw: ['탄력', '리프팅', '처짐'], alt: '이벤트 전 피부 프렙' },
+    '3D-Refill':   { core: '리프팅·탄력', coreKw: ['리프팅', '탄력', '처짐'], alt: '보습 케어' },
+};
+
 function _cepAutoInsightHtml(pObj) {
     const items = [...pObj.ceps.values()]
-        .map(c => ({ c, agg: _cepAggregate(c) }))
+        .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
         .filter(x => x.c.creatives.length > 0 && x.agg.cost > 0);
     if (items.length < 2) return '';
 
     const sorted = [...items].sort((a, b) => b.agg.roas - a.agg.roas);
     const top = sorted[0], bottom = sorted[sorted.length - 1];
-    if (top.agg.roas - bottom.agg.roas < 20) return '';
+    const gap = top.agg.roas - bottom.agg.roas;
+    const meta = CEP_PRODUCT_META[pObj.product] || null;
 
-    const topInfo = _cepSplitLabel(top.c.cepLabel);
-    const bottomInfo = _cepSplitLabel(bottom.c.cepLabel);
-    const topCtx = _cepContextFor(pObj.product, topInfo.title);
+    // 모든 프레임을 실측 데이터로 평가해 설명력(버킷 간 ROAS 격차) 순으로 정렬
+    const evals = CEP_FRAMES.map(f => _cepFrameEval(f, items)).filter(Boolean)
+        .sort((a, b) => b.spread - a.spread);
+    // 프레임 채택 기준: 버킷 간 평균 ROAS 격차 30%p 이상 + 전체 성과 편차도 유의미할 것
+    const best = (gap >= 20 && evals.length && evals[0].spread >= 30) ? evals[0] : null;
+    const second = (best && evals.length > 1 && evals[1].spread >= 30) ? evals[1] : null;
 
-    const urgencyLine = topCtx
-        ? `"${_cepEsc(topInfo.title)}"이 잘 된 이유: <b>소비자가 지금 당장 불편한 상황</b>("${_cepEsc(topCtx)}")을 구체적으로 짚어줬기 때문에 반응이 빨랐습니다.`
-        : `"${_cepEsc(topInfo.title)}"이 ROAS ${top.agg.roas.toFixed(0)}%로 가장 효율이 높았습니다.`;
-    const dirLine = `다음 방향: <b>"${_cepEsc(topInfo.title)}" 류의 CEP에 예산 비중을 더 두고</b>, "${_cepEsc(bottomInfo.title)}"(ROAS ${bottom.agg.roas.toFixed(0)}%)는 소구를 더 구체화하거나 우선순위를 낮추세요.`;
+    // CEP × 성과 표 — 채택된 프레임의 버킷으로 라벨링 (미채택 시 순수 순위표)
+    const rowsHtml = sorted.map((x, i) => {
+        const b = best ? _cepClassify(best.frame, x.info.title) : null;
+        return `
+        <div class="cep-urgency-row${i === 0 ? ' cep-urgency-row--top' : ''}${i === sorted.length - 1 ? ' cep-urgency-row--bottom' : ''}">
+            <span class="cep-urgency-emoji">${b ? b.emoji : '📌'}</span>
+            <span class="cep-urgency-title">${_cepEsc(x.info.title)}</span>
+            ${b ? `<span class="cep-urgency-desc">${_cepEsc(b.label)}</span>` : ''}
+            <span class="cep-urgency-roas">ROAS ${x.agg.roas.toFixed(0)}%</span>
+        </div>`;
+    }).join('');
+
+    // 워킹 요인 결론 — 채택된 프레임이 말하는 방향 + 하위 CEP 깔때기 진단
+    const hypoLines = [];
+    if (gap < 20) {
+        hypoLines.push(`CEP 간 성과 편차가 작아(최대 ROAS 차 ${gap.toFixed(0)}%p) 아직 워킹 요인을 단정하기 어렵습니다 — 표본(노출·기간)을 늘려 재검증이 필요합니다.`);
+    } else if (best) {
+        const tg = best.groups[0], bg = best.groups[best.groups.length - 1];
+        hypoLines.push(`[${best.frame.name} 관점] "${tg.bucket.label}" 유형(평균 ROAS ${tg.avg.toFixed(0)}%, ${tg.items.length}개)이 "${bg.bucket.label}" 유형(${bg.avg.toFixed(0)}%, ${bg.items.length}개)을 크게 앞섭니다 — ${tg.bucket.verdict}.`);
+        if (second) {
+            const sg = second.groups[0];
+            hypoLines.push(`[보조 관점 · ${second.frame.name}] "${sg.bucket.label}" 유형의 우위도 함께 관찰됩니다 (평균 ROAS ${sg.avg.toFixed(0)}%) — 두 관점을 모두 만족하는 CEP가 가장 안전한 확장 후보입니다.`);
+        }
+    } else {
+        hypoLines.push(`긴급도·니즈 유형·상황 구체성·사용 맥락 어느 관점으로도 뚜렷한 패턴이 없습니다 — 성과 차이는 CEP 선택보다 소재 실행(모델·영상 구성·카피)에서 났을 가능성이 큽니다.`);
+    }
+    // 하위 CEP 깔때기 진단 — CTR은 유지되는데 CVR이 낮으면 "클릭은 해도 구매까지는 안 간다"
+    if (gap >= 20) {
+        const clickNotBuy = bottom.agg.ctr >= top.agg.ctr * 0.7 && bottom.agg.cvr < top.agg.cvr;
+        hypoLines.push(`최하위 "${bottom.info.title}"(ROAS ${bottom.agg.roas.toFixed(0)}%)는 ${clickNotBuy ? '클릭(CTR)은 나오지만 구매까지 이어지지 않습니다 — 관심은 있어도 지금 살 이유가 없는 소구일 가능성' : '1차 반응(CTR)부터 약합니다 — 상황 공감 실패로 소구 재설계가 필요'}합니다.`);
+    }
+
+    // 핵심 효능 축 점검 — 1위 CEP가 메인 효능이 아니라 부가 니즈로 팔렸는지
+    const topIsCore = meta ? meta.coreKw.some(k => top.info.title.includes(k)) : true;
+    let coreLine = '', optA = '', optB = '';
+    if (meta && !topIsCore) {
+        coreLine = `단, 메인 효능(${meta.core})으로 팔린 게 아니라 ${meta.alt} 니즈로 팔렸을 가능성이 높습니다 — 포지셔닝 판단이 필요합니다.`;
+        optA = `${meta.alt} 포지션으로 계속 밀기 — "${top.info.title}"처럼 검증된 니즈를 공략하는 CEP를 추가 발굴`;
+        optB = `${meta.core}이라는 핵심 효능 밀기 — '지금 당장 급한' 상황을 새로 찾아 결합 (예: 결혼식 D-30, 중요한 촬영·미팅 전)`;
+    } else if (best) {
+        const tg = best.groups[0], bg = best.groups[best.groups.length - 1];
+        optA = `"${top.info.title}" (${tg.bucket.label}) 축 유지 — 같은 유형의 상황을 다른 모델·영상 구성으로 소재 증량`;
+        optB = `${bg.bucket.label} 소구를 ${tg.bucket.label} 요소와 결합해 재구성 후 1회 재검증 — 실패 시 예산 회수`;
+    } else {
+        optA = `1위 "${top.info.title}"의 소재 구성을 유지한 채 CEP만 바꿔 검증 — CEP 효과 분리 측정`;
+        optB = `최하위 CEP에 1위 소재의 모델·구성을 적용해 재검증 — 소재 실행 효과 분리 측정`;
+    }
+
+    const nextText = gap < 20
+        ? `현재 데이터로는 방향 결정이 이릅니다 — 상위 2개 CEP에 소재를 1개씩 추가해 편차를 벌린 뒤 판단하세요.`
+        : best
+            ? `"${best.groups[0].bucket.label}" 유형이 이 제품의 워킹 프레임입니다 — 차기 소재는 이 유형의 상황이 첫 장면에 드러나는 구성으로 제작하세요.${coreLine ? ' ' + coreLine : ''}`
+            : `CEP보다 소재 실행이 변수로 보입니다 — 1위 소재의 모델·구성 요소를 다른 CEP에 이식해 보세요.${coreLine ? ' ' + coreLine : ''}`;
 
     return `
-    <div class="cep-auto-insight">
-        <i class="fas fa-lightbulb"></i>
-        <div>${urgencyLine}<br>${dirLine}</div>
+    <div class="cep-insight-section">
+        <div class="cep-insight-header"><i class="fas fa-brain"></i> 검증 인사이트
+            <span class="cep-insight-sub">4개 관점 교차 분석 · 이 제품의 워킹 프레임 자동 선택</span>
+            ${best ? `<span class="cep-frame-chip">워킹 프레임: ${_cepEsc(best.frame.name)}</span>` : '<span class="cep-frame-chip cep-frame-chip--none">뚜렷한 프레임 없음</span>'}
+        </div>
+        <div class="cep-insight-label">워킹 요인 (가설)</div>
+        ${best ? `<p class="cep-insight-formula">${_cepEsc(best.frame.formula)}</p>` : ''}
+        <div class="cep-urgency-list">${rowsHtml}</div>
+        ${hypoLines.map(l => `<p class="cep-insight-note">${_cepEsc(l)}</p>`).join('')}
+        <div class="cep-insight-label">Next Action</div>
+        <p class="cep-insight-note cep-insight-note--action">${_cepEsc(nextText)}</p>
+        <div class="cep-insight-label">A/B Test</div>
+        <div class="cep-ab-grid">
+            <div class="cep-ab-card cep-ab-card--a"><div class="cep-ab-tag">Option A</div><p>${_cepEsc(optA)}</p></div>
+            <div class="cep-ab-card cep-ab-card--b"><div class="cep-ab-tag">Option B</div><p>${_cepEsc(optB)}</p></div>
+        </div>
     </div>`;
 }
 
