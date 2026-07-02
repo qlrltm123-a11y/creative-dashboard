@@ -257,9 +257,9 @@ const BRANDS = ['BOH','WM','CG'];
 // 기존 탭 (BOH/WM/CG): A열=제품코드 (무시), event 없음
 const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
 const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
-// 메가포 탭 (megapo_boh/wm/cg): A열=이벤트262Q, J열=이벤트261Q
-const COL_MEGAPO_262 = {event:0,date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
-const COL_MEGAPO_261 = {event:9,date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+// 메가포 탭: A열=event, B열=code, C열=제품, D열=date, E~G=유입/장바구니/구매 | K열~=261Q(event,date,유입,장바구니,구매)
+const COL_MEGAPO_262 = {event:0,  date:3,  product:2, inflow:4,  cart:5,  buy:6};
+const COL_MEGAPO_261 = {event:10, date:11, product:2, inflow:12, cart:13, buy:14};
 const C262 = {cart:'#6366f1',buy:'#a78bfa'};
 const C261 = {cart:'#f97316',buy:'#fb923c'};
 
@@ -269,39 +269,6 @@ let charts = {};
 
 // 전환 지표 필터: 'both' | 'cart' | 'buy' (유입 막대는 항상 표시)
 let _funnelMetric = 'both';
-// 이벤트 필터: 'all' | '상시' | 'megapo' 등
-let _funnelEvent = 'all';
-
-function _getEventList(rawData) {
-  const evs = new Set();
-  let hasBlank = false;
-  ['262Q','261Q'].forEach(q =>
-    Object.values(rawData[q]).forEach(rows =>
-      rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })
-    )
-  );
-  const result = [];
-  if (hasBlank && evs.size > 0) result.push('상시');
-  result.push(...[...evs].sort());
-  return result;
-}
-
-function _filterDataByEvent(rawData, event) {
-  if (event === 'all') return rawData;
-  const isBlank = event === '상시';
-  const filterRows = rows => rows.filter(r => isBlank ? !r.event : r.event === event);
-  const filtered262 = {}, filtered261 = {};
-  Object.entries(rawData['262Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered262[p]=f; });
-  Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered261[p]=f; });
-  return { '262Q': filtered262, '261Q': filtered261 };
-}
-
-function setFunnelEvent(v) {
-  _funnelEvent = v;
-  if (!brandData[currentBrand]) return;
-  render(currentBrand);
-  _restoreInner(currentBrand);
-}
 function _funnelMetricToggle(brand) {
   const opt = (v, label) => `<button class="fm-btn${_funnelMetric===v?' active':''}" onclick="setFunnelMetric('${v}')">${label}</button>`;
   return `<div class="fm-toggle">${opt('both','전체')}${opt('inflow','유입수')}${opt('cart','장바구니율')}${opt('buy','구매율')}</div>`;
@@ -318,7 +285,7 @@ function setFunnelMetric(v) {
       // 기존 차트 파괴
       Object.keys(charts).filter(k=>k.startsWith(b+'_t_')).forEach(k=>{charts[k].destroy();delete charts[k];});
       grid.innerHTML = '';
-      const data = brandData[b];
+      const data = _filterDataByEvent(brandData[b], _funnelEvent);
       const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
       renderTrendCharts(b, data, prods);
     }
@@ -334,7 +301,7 @@ function setFunnelMetric(v) {
   if (_activeInner === 'summary') {
     const id = `${b}_btrend`;
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
-    const data = brandData[b];
+    const data = _filterDataByEvent(brandData[b], _funnelEvent);
     const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
     renderSummaryTab(b, data, prods);
     document.querySelectorAll(`#inner-${b}-summary .fm-btn`).forEach(btn => {
@@ -348,17 +315,51 @@ function setFunnelMetric(v) {
   render(b); _restoreInner(b);
 }
 
+// ── 이벤트 필터 (상시=262Q 메가와리 / 메가포 등) ─────────────────────────────
+let _funnelEvent = 'all';
+// 이벤트명 정규화: '2607MEGAPO' / '2607 MEGAPO' → 'MEGAPO' (시즌 불문 동일 이벤트로 매칭)
+function _normFunnelEvent(ev) { return ev.replace(/^\d{4}\s*/, ''); }
+// 이벤트 없는 행(기존 퍼널 데이터)은 'MEGAWARI'로 취급 — 표시 라벨은 '262Q 메가와리'
+const _evLabel = ev => ev === 'MEGAWARI' ? '262Q 메가와리' : ev;
+function _getEventList(rawData) {
+  const evs = new Set(); let hasBlank = false;
+  ['262Q','261Q'].forEach(q => Object.values(rawData[q]).forEach(rows =>
+    rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })));
+  const result = [];
+  if (hasBlank && evs.size > 0 && !evs.has('MEGAWARI')) result.push('MEGAWARI');
+  result.push(...[...evs].sort());
+  return result;
+}
+function _filterDataByEvent(rawData, event) {
+  if (event === 'all') return rawData;
+  const filterRows = rows => rows.filter(r =>
+    event === 'MEGAWARI' ? (!r.event || r.event === 'MEGAWARI') : r.event === event);
+  const filtered262 = {}, filtered261 = {};
+  Object.entries(rawData['262Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered262[p]=f; });
+  Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered261[p]=f; });
+  return { '262Q': filtered262, '261Q': filtered261 };
+}
+function setFunnelEvent(v) {
+  _funnelEvent = v;
+  if (!brandData[currentBrand]) return;
+  render(currentBrand); _restoreInner(currentBrand);
+}
+
 // ── 기본 시트 URL (링크 공유 시 자동 로드) ──────────────────────────────────────
 const DEFAULT_URLS = {
   BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
   WM: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
   CG: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
 };
+// 메가포 탭 (2607 MEGAPO 시트, 콜겔 미스트/NAD/아이크림 등 = BOH 제품)
+const DEFAULT_MEGAPO_URLS = {
+  BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=28035682&single=true&output=csv',
+};
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
 const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
-const getMegapoUrl = b => localStorage.getItem(`furl_megapo_${b}`) || '';
+const getMegapoUrl = b => localStorage.getItem(`furl_megapo_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
 const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo_${b}`,u);
 
 // ── CSV fetch helper ──────────────────────────────────────────────────────────
@@ -371,19 +372,6 @@ async function fetchCsv(url) {
   return null;
 }
 
-// ── Merge two parsed sheet datasets ──────────────────────────────────────────
-function mergeSheetData(base, extra) {
-  const merged = {'262Q':{},'261Q':{}};
-  ['262Q','261Q'].forEach(q => {
-    const allProds = new Set([...Object.keys(base[q]||{}),...Object.keys(extra[q]||{})]);
-    allProds.forEach(prod => {
-      const a = base[q]?.[prod] || [];
-      const b = extra[q]?.[prod] || [];
-      merged[q][prod] = [...a,...b].sort((x,y)=>dateKey(x.date)-dateKey(y.date));
-    });
-  });
-  return merged;
-}
 
 // ── Brand switch ──────────────────────────────────────────────────────────────
 function switchBrand(brand, btn) {
@@ -406,7 +394,7 @@ function applyUrl(brand) {
 }
 function applyMegapoUrl(brand) {
   const u = document.getElementById(`url-megapo-input-${brand}`).value.trim();
-  saveMegapoUrl(brand, u);
+  saveMegapoUrl(brand, u);   // 빈 값이면 메가포 연동 해제
   loadBrand(brand, true);
 }
 
@@ -457,7 +445,7 @@ async function loadBrand(brand, force=false) {
   if (!text) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
   const regularData = parseSheet(parseCSV(text), COL_262, COL_261);
-  const megapoData  = megapoText ? parseSheet(parseCSV(megapoText), COL_MEGAPO_262, COL_MEGAPO_261) : null;
+  const megapoData  = megapoText ? parseSheet(parseCSV(megapoText), COL_MEGAPO_262, COL_MEGAPO_261, true) : null;
   brandData[brand]  = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
   _fSaveCache(brand);
   render(brand);
@@ -480,19 +468,26 @@ function parseCSV(text) {
 const parsePct = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace('%','').replace(',','')); return isNaN(n)?null:n; };
 const parseNum = v => { if(!v||v==='-') return null; const n=parseFloat(v.replace(/,/g,'')); return isNaN(n)?null:n; };
 
-function parseSheet(rows, cm262=COL_262, cm261=COL_261) {
+function parseSheet(rows, cm262=COL_262, cm261=COL_261, fillDate=false) {
   function ext(cm) {
     const d={};
+    const _minCol = cm.buyRate ?? cm.buy;   // 메가포 탭은 전환율 컬럼 미사용
+    let lastDate='';
     for(let i=1;i<rows.length;i++){
       const r=rows[i];
-      if(!r||r.length<cm.buyRate+1) continue;
-      const prod=r[cm.product]?.trim(), date=r[cm.date]?.trim();
+      if(!r || r.length < _minCol + 1) continue;
+      const prod=r[cm.product]?.trim();
+      let date=r[cm.date]?.trim();
+      // 메가포 탭: 날짜가 그룹 첫 행에만 있음 → 이전 행 날짜 채움
+      if(fillDate){ if(!date) date=lastDate; else lastDate=date; }
       if(!prod||!date||prod==='제품'||date==='date'||date==='') continue;
-      if(!d[prod]) d[prod]=[];
       const inflow=parseNum(r[cm.inflow]), cart=parseNum(r[cm.cart]), buy=parseNum(r[cm.buy]);
-      const event = (cm.event != null && r[cm.event] != null) ? r[cm.event].trim() : '';
+      if(inflow==null && cart==null && buy==null) continue;   // 아직 데이터 없는 미래 날짜 행 스킵
+      if(!d[prod]) d[prod]=[];
+      const rawEv = (cm.event != null && r[cm.event] != null) ? r[cm.event].trim() : '';
+      const event = rawEv ? _normFunnelEvent(rawEv) : '';
       d[prod].push({
-        date, event, inflow, cart, buy,
+        date, inflow, cart, buy, event,
         cartRate: (inflow>0 && cart!=null) ? cart/inflow*100 : null,
         buyRate:  (cart>0   && buy!=null)  ? buy/cart*100    : null,
       });
@@ -504,10 +499,25 @@ function parseSheet(rows, cm262=COL_262, cm261=COL_261) {
   return {'262Q':ext(cm262),'261Q':ext(cm261)};
 }
 
+// 기본 탭 + 메가포 탭 데이터 병합 (제품별로 행 합치고 날짜순 정렬)
+function mergeSheetData(base, extra) {
+  const merged = {'262Q':{},'261Q':{}};
+  ['262Q','261Q'].forEach(q => {
+    const allProds = new Set([...Object.keys(base[q]||{}),...Object.keys(extra[q]||{})]);
+    allProds.forEach(prod => {
+      const a = base[q]?.[prod] || []; const b = extra[q]?.[prod] || [];
+      merged[q][prod] = [...a,...b].sort((x,y)=>dateKey(x.date)-dateKey(y.date));
+    });
+  });
+  return merged;
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function render(brand) {
   const rawData = brandData[brand];
   const events = _getEventList(rawData);
+  // 존재하지 않는 이벤트가 선택돼 있으면 전체로 복귀
+  if (_funnelEvent !== 'all' && !events.includes(_funnelEvent)) _funnelEvent = 'all';
   const data = _filterDataByEvent(rawData, _funnelEvent);
   const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
   const panel = document.getElementById(`panel-${brand}`);
@@ -524,14 +534,6 @@ function render(brand) {
 }
 
 function buildPanelHTML(brand, events=[]) {
-  const evFilterHtml = events.length ? `
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e8ecf3;border-radius:10px;padding:10px 14px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.04)">
-      <span style="font-size:11px;font-weight:700;color:#64748b;white-space:nowrap">이벤트</span>
-      <div class="fm-toggle">
-        <button class="fm-btn${_funnelEvent==='all'?' active':''}" onclick="setFunnelEvent('all')">전체</button>
-        ${events.map(ev=>`<button class="fm-btn${_funnelEvent===ev?' active':''}" onclick="setFunnelEvent('${ev.replace(/'/g,"\\'")}')">${ev}</button>`).join('')}
-      </div>
-    </div>` : '';
   const tabsFn = (b) => `
     <div class="inner-tabs" id="itabs-${b}">
       <button class="inner-tab active" onclick="switchInner('${b}','summary',this)">📋 현황 요약</button>
@@ -539,6 +541,14 @@ function buildPanelHTML(brand, events=[]) {
       <button class="inner-tab" onclick="switchInner('${b}','delta',this)">↕ 어제 대비 변화</button>
       <button class="inner-tab" onclick="switchInner('${b}','trend',this)">📈 일별 추이</button>
     </div>`;
+  const evFilterHtml = events.length ? `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e8ecf3;border-radius:10px;padding:10px 14px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.04)">
+      <span style="font-size:11px;font-weight:700;color:#64748b;white-space:nowrap">이벤트</span>
+      <div class="fm-toggle">
+        <button class="fm-btn${_funnelEvent==='all'?' active':''}" onclick="setFunnelEvent('all')">전체</button>
+        ${events.map(ev=>`<button class="fm-btn${_funnelEvent===ev?' active':''}" onclick="setFunnelEvent('${ev.replace(/'/g,"\\'")}')">${_evLabel(ev)}</button>`).join('')}
+      </div>
+    </div>` : '';
   return `
     ${evFilterHtml}
     <div id="inner-${brand}-summary">
@@ -1106,6 +1116,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   BRANDS.forEach(b => {
     document.getElementById(`panel-${b}`).classList.toggle('active', b===init);
     document.getElementById(`url-${b}`).style.display = b===init ? '' : 'none';
+    document.getElementById(`url-megapo-${b}`).style.display = b===init ? '' : 'none';
   });
   loadBrand(init);
   // 자동 새로고침 비활성화 - '시트 갱신' 버튼으로만 갱신
