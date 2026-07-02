@@ -674,7 +674,7 @@ function renderSummaryTab(brand, data, prods) {
       <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${f(br261)} · ${n(agg261.buy)}건</div>
     </div>
     <div class="kpi-card green">
-      <div class="kpi-label">전��� 구매 전환 (유입→구매)</div>
+      <div class="kpi-label">🎯 전체 구매 전환 (유입→구매)</div>
       <div class="kpi-val" style="color:#059669">${f(rate(agg262.buy,agg262.inflow))}</div>
       <div class="kpi-sub">${prods.length}개 제품</div>
       ${badge(dlt(rate(agg262.buy,agg262.inflow), rate(agg261.buy,agg261.inflow)))}
