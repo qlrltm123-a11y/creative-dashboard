@@ -359,8 +359,9 @@ const DEFAULT_MEGAPO_URLS = {
 // ── Storage ───────────────────────────────────────────────────────────────────
 const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
 const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
-const getMegapoUrl = b => localStorage.getItem(`furl_megapo_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
-const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo_${b}`,u);
+// v2 키: 예전에 저장된 (구조 개선 전) 메가포 URL 무시하고 기본 URL 사용
+const getMegapoUrl = b => localStorage.getItem(`furl_megapo2_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
+const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo2_${b}`,u);
 
 // ── CSV fetch helper ──────────────────────────────────────────────────────────
 async function fetchCsv(url) {
@@ -399,7 +400,8 @@ function applyMegapoUrl(brand) {
 }
 
 // ── 캐시 (localStorage) — 새로고침 시 재fetch 없이 즉시 로드, '시트 갱신'만 재fetch ──
-const fcacheKey = b => `fdata_${b}`;
+// v2: 메가포 컬럼 매핑 변경으로 옛 캐시 무효화
+const fcacheKey = b => `fdata_v2_${b}`;
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
