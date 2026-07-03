@@ -521,7 +521,7 @@ window._ubAiAnalyze = async function(btn) {
     try {
         const res = await fetch('/api/ai-chat', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ contents:[{role:'user',parts:[{text:sys}]}], generationConfig:{temperature:0.4,maxOutputTokens:2048,thinkingConfig:{thinkingBudget:0}} })
+            body: JSON.stringify({ contents:[{role:'user',parts:[{text:sys}]}], q:'(오늘의 브리핑 자동 생성)', generationConfig:{temperature:0.4,maxOutputTokens:2048,thinkingConfig:{thinkingBudget:0}} })
         });
         const data = await res.json();
         if (data.text) {

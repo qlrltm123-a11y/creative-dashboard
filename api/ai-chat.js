@@ -47,12 +47,16 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'contents 배열이 필요합니다.' });
   }
 
-  // 첫 번째 사용자 메시지 추출 (로깅용)
+  // 로깅용 질문 추출: 클라이언트가 보낸 q(실제 유저 질문) 우선.
+  // 폴백은 마지막 user 메시지 — 첫 user 메시지는 시스템 프롬프트+데이터라 로그 가치가 없다.
   const _question = (() => {
-    const first = body.contents.find(c => c.role === 'user');
-    if (!first) return '';
-    const parts = first.parts || [];
-    return parts.map(p => p.text || '').join(' ').trim();
+    if (typeof body.q === 'string' && body.q.trim()) return body.q.trim();
+    const users = body.contents.filter(c => c.role === 'user');
+    if (!users.length) return '';
+    const parts = users[users.length - 1].parts || [];
+    return parts.map(p => p.text || '').join(' ')
+      .replace(/\n+\(반드시 한국어로[\s\S]*$/, '')   // 클라이언트가 덧붙이는 지시문 제거
+      .trim();
   })();
 
   // generationConfig 정규화 — 클라이언트가 뭘 보내든 thinking 끄고 토큰 한도 보장
