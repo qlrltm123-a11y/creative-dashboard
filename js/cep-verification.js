@@ -7,8 +7,27 @@
 
 const CEP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1751932102&single=true&output=csv';
 
-// 컬럼 인덱스: 브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트(CEP),검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
-const CEP_COL = { brand: 0, name: 1, product: 2, start: 3, end: 4, url: 5, cep: 6, detail: 7, imp: 8, click: 9, ctr: 10, cpc: 11, cost: 12, cv: 13, cvr: 14, cpa: 15, revenue: 16, roas: 17 };
+// 폴백용 고정 인덱스 (헤더 탐지 실패 시): 검증 완료,브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트,검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
+const CEP_COL = { brand: 1, name: 2, product: 3, url: 6, cep: 7, detail: 8, imp: 9, click: 10, ctr: 11, cost: 13, cv: 14, revenue: 17, roas: 18 };
+
+// 헤더명 → 필드 자동 매핑: 시트에 컬럼이 추가/이동돼도 헤더 텍스트로 위치를 찾는다
+const CEP_HEADER_NAMES = {
+    brand: '브랜드', name: '소재명', product: '제품', url: 'media urls',
+    cep: '소구포인트', detail: '검증 상세',
+    imp: 'IMP', click: 'Click', ctr: 'CTR', cost: 'COST', cv: 'CV', revenue: 'Revenue', roas: 'ROAS',
+};
+function _cepDetectCols(headerRow) {
+    const norm = c => (c || '').trim().toLowerCase();
+    const cells = (headerRow || []).map(norm);
+    const cols = {};
+    let found = 0;
+    Object.entries(CEP_HEADER_NAMES).forEach(([field, label]) => {
+        const idx = cells.indexOf(label.toLowerCase());
+        if (idx >= 0) { cols[field] = idx; found++; }
+    });
+    // 핵심 컬럼(소재명/제품/소구포인트)을 못 찾으면 폴백 사용
+    return (cols.name != null && cols.product != null && cols.cep != null) ? cols : CEP_COL;
+}
 
 const CEP_VERDICT_META = {
     pending: { emoji: '📝', label: '검증 대기' },
@@ -223,20 +242,22 @@ function _cepParseCSV(text) {
 }
 
 function _cepBuildModel(rows) {
-    const headerIdx = rows.findIndex(r => (r[CEP_COL.name] || '').trim() === '소재명');
+    // 헤더 행을 찾아 헤더명 기반으로 컬럼 위치 자동 결정 (컬럼 추가/이동에 견고)
+    const headerIdx = rows.findIndex(r => (r || []).some(c => (c || '').trim() === '소재명'));
+    const COL = headerIdx >= 0 ? _cepDetectCols(rows[headerIdx]) : CEP_COL;
     const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
     const products = new Map();
 
     dataRows.forEach(r => {
         if (!r || r.length < 3) return;
-        const brand = (r[CEP_COL.brand] || '').trim();
-        const product = _cepNormalizeProduct(r[CEP_COL.product]);
+        const brand = (r[COL.brand] || '').trim();
+        const product = _cepNormalizeProduct(r[COL.product]);
         if (!brand && !product) return;
 
-        const cepLines = (r[CEP_COL.cep] || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        const hypoLines = (r[CEP_COL.detail] || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        let mediaName = (r[CEP_COL.name] || '').trim();
-        const mediaUrl = (r[CEP_COL.url] || '').trim();
+        const cepLines = (r[COL.cep] || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        const hypoLines = (r[COL.detail] || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        let mediaName = (r[COL.name] || '').trim();
+        const mediaUrl = (r[COL.url] || '').trim();
         if (mediaName.toLowerCase() === 'ex') mediaName = ''; // 시트의 예시(템플릿) 행은 제외
         const hasResult = !!mediaName;
 
@@ -257,11 +278,11 @@ function _cepBuildModel(rows) {
             if (hasResult && i === 0) {
                 cepObj.creatives.push({
                     name: mediaName, url: mediaUrl, detail: hypoText,
-                    imp: _cepNum(r[CEP_COL.imp]), click: _cepNum(r[CEP_COL.click]),
-                    cost: _cepNum(r[CEP_COL.cost]), cv: _cepNum(r[CEP_COL.cv]),
-                    revenue: _cepNum(r[CEP_COL.revenue]),
+                    imp: _cepNum(r[COL.imp]), click: _cepNum(r[COL.click]),
+                    cost: _cepNum(r[COL.cost]), cv: _cepNum(r[COL.cv]),
+                    revenue: _cepNum(r[COL.revenue]),
                     // 시트가 직접 계산한 값(플랫폼 리포트 기준) — 단순 매출/비용 재계산과 다를 수 있어 표시용으로 그대로 사용
-                    ctrSheet: _cepNum(r[CEP_COL.ctr]), roasSheet: _cepNum(r[CEP_COL.roas]),
+                    ctrSheet: _cepNum(r[COL.ctr]), roasSheet: _cepNum(r[COL.roas]),
                 });
             }
         }

@@ -174,6 +174,31 @@ function _acBuildContext() {
         }
     } catch(e) {}
 
+    // ── 4) CEP 검증 결과: cep-verification.js 전역 (CEP 탭 방문 후 존재) ──
+    try {
+        if (typeof _cepProducts !== 'undefined' && _cepProducts && _cepProducts.size) {
+            const cepCtx = {};
+            _cepProducts.forEach(p => {
+                const rows = [...p.ceps.values()].map(c => {
+                    const has = c.creatives.length > 0;
+                    const a = has ? _cepAggregate(c) : null;
+                    const best = has ? c.creatives.filter(x=>x.cost>0).sort((x,y)=>y.roasSheet-x.roasSheet)[0] : null;
+                    return {
+                        CEP: (_cepSplitLabel(c.cepLabel).title || c.cepLabel).slice(0, 45),
+                        상태: has ? '검증완료' : '대기',
+                        ...(has && a ? {
+                            ROAS: a.roas.toFixed(0)+'%', CTR: a.ctr.toFixed(2)+'%', CVR: a.cvr.toFixed(2)+'%',
+                            광고비: Math.round(a.cost), 소재수: c.creatives.length,
+                            ...(best ? { 최고소재: best.name.slice(0, 40) } : {}),
+                        } : {}),
+                    };
+                });
+                cepCtx[`${p.brand}/${p.product}`] = rows;
+            });
+            ctx.데이터.CEP_검증결과 = cepCtx;
+        }
+    } catch(e) {}
+
     // ── 시장조사 데이터 주입 (핵심 요약만 — 토큰 절약) ──
     if (window.MARKET_RESEARCH) {
         const mr = window.MARKET_RESEARCH;
@@ -228,6 +253,12 @@ function _acBuildContext() {
 
 /* ── Gemini 호출 (서버 프록시 /api/ai-chat) ── */
 async function _acAsk(question) {
+    // CEP 검증 데이터가 아직 없으면 로드 시도 — 탭 방문 없이도 교차 분석 가능하게
+    try {
+        if (typeof _cepProducts !== 'undefined' && !_cepProducts && typeof renderCepVerification === 'function') {
+            await renderCepVerification(false);
+        }
+    } catch(e) {}
     const ctx = _acBuildContext();
     const hasData = ctx.데이터 && Object.keys(ctx.데이터).length;
     if (!hasData) {
@@ -255,7 +286,8 @@ async function _acAsk(question) {
 - 소재_일별추이: 브랜드×날짜 집계 추이
 - 소재_제품별: 브랜드×제품 집계
 - GMV_목표대비실적: 일별 목표 vs 실적
-- 퍼널_전환율: 유입→장바구니→구매 전환율
+- 퍼널_전환율: 제품별 유입→장바구니→구매 전환율 (262Q=이번 시즌, 261Q=직전 시즌)
+- CEP_검증결과: 제품별×CEP(소비자 진입 상황)별 광고 검증 성과 — 어떤 상황 소구가 실제로 팔렸는지 (CEP 탭 방문 후 포함됨)
 - 시장조사: 리스닝마인드 기반 제품별 CEP(소비자 진입 시점)/UGC 방향성/검색키워드/광고카피후보/공통전략 인사이트
 
 [언어 — 매우 중요]
@@ -276,20 +308,21 @@ async function _acAsk(question) {
 - 일본 소비자 특성(翌朝 체감, 구체적 상황 공감, 텍스처 클로즈업 선호)을 반영한 소재 방향 제시
 - 추이 분석은 날짜순 변화(상승/하락/%)와 원인 가설을 데이터 근거와 함께.
 
-[소재 기획안 요청 시 — 아래 구조로 답변]
-### 1. 워킹 패턴 분석
-- 고효율 소재의 공통 소구포인트·후킹·메시지 요소를 실제 수치와 함께 2~3개 짚기
-### 2. 신규 소재 기획안 (3개)
-각 안마다:
-- **컨셉**: 한 줄 요약
-- **핵심 소구포인트**: (데이터상 고효율 근거 명시)
-- **후킹 (첫 3초/헤드라인)**: 구체적 카피 문장 예시
-- **비주얼 디렉션**: 화면 구성·톤
-- **추천 매체/타겟**: 데이터 근거
-### 3. 기대 효과 & 검증 포인트
-- 어떤 지표로 성공을 판단할지
+[답변 방식 — 고정 템플릿 금지, 질문에 맞게 구조를 설계]
+- 매번 같은 형식으로 답하지 말 것. 질문의 성격(진단/비교/예산 판단/원인 분석/기획)에 맞춰 그때그때 구조를 설계하세요.
+- 단, 어떤 답변이든 이 흐름은 지키세요: ① 실제 수치 근거 → ② 왜 그런지 원인 해석(가설은 가설이라고 명시) → ③ 그래서 무엇을 할지 (제품/소재/예산 단위의 구체 액션 1~3개).
+- 이 챗봇의 핵심 가치는 **서로 다른 데이터 소스의 교차 분석**입니다:
+  · 예산 배분 질문 → 퍼널_전환율(제품별 구매 전환) × 소재_제품별(ROAS·광고비) × GMV 달성률을 교차해 "어느 제품에 증액, 어느 제품 감액"을 수치로 판단. 특히 불일치 신호를 발굴하세요: 전환율 높은데 광고비 적은 제품=증액 기회 / ROAS 높은데 퍼널 전환 낮은 제품=랜딩·오퍼 점검 / 유입만 많고 구매 안 되는 제품=소구-상품 미스매치.
+  · 성과 원인 질문 → CEP_검증결과(어떤 소비자 상황이 팔렸나) × 소재_검색결과(어떤 소재 표현이 워킹했나) × 시장조사(왜 그 상황이 존재하나)를 연결해 "왜 좋았는지 → 다음에 뭘 만들지/어디에 예산 쓸지"까지 제시.
+  · 데이터가 서로 모순되면 숨기지 말고 짚으세요 (예: "소재 ROAS는 높은데 퍼널 구매 전환이 낮음 — 광고는 워킹, 상세페이지가 병목").
+- 확신할 수 없는 부분은 "데이터로는 ~까지 확인되고, ~는 가설"이라고 구분하세요.
 
-문장은 간결하게, 핵심만. 표 대신 위 제목/불릿 구조 사용.
+[소재 기획안을 명시적으로 요청받은 경우에만 — 아래 구조 사용]
+### 1. 워킹 패턴 분석 (실제 수치 근거 2~3개)
+### 2. 신규 소재 기획안 (3개: 컨셉/핵심 소구/후킹 카피/비주얼 디렉션/추천 타겟)
+### 3. 기대 효과 & 검증 포인트
+
+문장은 간결하게, 핵심만.
 
 [약기법(薬機法) 컴플라이언스 — 카피·소재 제안 시 필수]
 - 일본 화장품 광고는 약기법 규제 대상. 다음은 **금지/위험**이니 제안 카피에 절대 쓰지 말 것:
@@ -299,7 +332,7 @@ async function _acAsk(question) {
 - 데이터상 고ROAS라도 위 표현이 보이면 "⚠️ 약기법 주의: ○○ 표현은 규제 소지" 라고 반드시 함께 안내.
 
 [통합 데이터]
-${(() => { const s = JSON.stringify(ctx); return s.length > 40000 ? s.slice(0, 40000) + '...(이하 생략)' : s; })()}`;
+${(() => { const s = JSON.stringify(ctx); return s.length > 60000 ? s.slice(0, 60000) + '...(이하 생략)' : s; })()}`;
 
     // 대화 히스토리 + 현재 질문
     const contents = [];
