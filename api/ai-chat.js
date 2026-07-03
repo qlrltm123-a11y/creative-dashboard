@@ -19,10 +19,12 @@ function _saveLog(question, model, answerLen) {
     rl: answerLen || 0,
   });
   // fire-and-forget — await 없이 전송
-  fetch(`${url}/lpush/chat_logs`, {
+  // Upstash REST는 path 방식에서 body를 '마지막 인자 원문'으로 쓰므로,
+  // 커맨드 배열 방식(POST /)으로 보내야 entry가 온전한 한 요소로 저장된다.
+  fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify([entry]),
+    body: JSON.stringify(['LPUSH', 'chat_logs', entry]),
   }).catch(() => {});
 }
 

@@ -30,9 +30,9 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: '인증 실패 — ?key=ADMIN_SECRET 파라미터가 필요합니다.' });
   }
 
-  // 전체 삭제
+  // 전체 삭제 (커맨드 배열 방식 — path 방식은 body가 추가 인자로 붙는 문제가 있음)
   if (req.query.clear === '1') {
-    await kvFetch(`/del/${LOG_KEY}`, { method: 'POST', body: JSON.stringify([]) });
+    await kvFetch('', { method: 'POST', body: JSON.stringify(['DEL', LOG_KEY]) });
     return res.status(200).json({ ok: true, message: '로그가 삭제되었습니다.' });
   }
 
@@ -47,7 +47,9 @@ module.exports = async function handler(req, res) {
   const rangeData = await kvFetch(`/lrange/${LOG_KEY}/${start}/${stop}`);
   let logs = (rangeData.result || []).map((s, i) => {
     try {
-      const obj = JSON.parse(s);
+      let obj = JSON.parse(s);
+      // 초기 버전이 ["{...}"] 형태로 이중 포장해 저장한 로그 복구
+      if (Array.isArray(obj)) obj = JSON.parse(obj[0]);
       obj._idx = start + i + 1;
       return obj;
     } catch {
