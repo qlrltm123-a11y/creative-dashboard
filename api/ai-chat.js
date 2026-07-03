@@ -7,9 +7,10 @@
 // 클라이언트는 키 없이 { contents, generationConfig } 만 보내면 됨.
 
 // Vercel KV에 대화 로그 저장 (fire-and-forget, 실패해도 무시)
+// 프리픽스는 연동 방식에 따라 KV_ / STORAGE_ / UPSTASH_ 로 달라질 수 있어 모두 지원
 function _saveLog(question, model, answerLen) {
-  const url  = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  const url  = process.env.KV_REST_API_URL || process.env.STORAGE_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.STORAGE_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return;
   const entry = JSON.stringify({
     t:  new Date().toISOString(),

@@ -9,8 +9,9 @@ const PAGE_SIZE = 100;
 const LOG_KEY   = 'chat_logs';
 
 async function kvFetch(path, opts = {}) {
-  const url   = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  // 프리픽스는 연동 방식에 따라 KV_ / STORAGE_ / UPSTASH_ 로 달라질 수 있어 모두 지원
+  const url   = process.env.KV_REST_API_URL || process.env.STORAGE_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.STORAGE_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error('KV 환경변수 미설정');
   const r = await fetch(`${url}${path}`, {
     ...opts,
