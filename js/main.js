@@ -271,6 +271,8 @@ function bindEvents() {
             if (window._aiMsProduct)    window._aiMsProduct.setSelected([]);
             if (window._aiMsCampaign)   window._aiMsCampaign.setSelected([]);
             invalidatePerformancePoolCache();  // ★ 공통 풀 캐시 무효화
+            // CEP 검증 탭도 선택 브랜드 제품만 표시
+            if (typeof window.cepSetBrand === 'function') window.cepSetBrand(currentBrand);
             debouncedUpdateDashboard();
         });
     });

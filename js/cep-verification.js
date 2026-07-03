@@ -993,9 +993,20 @@ function _cepRenderDetailForSelected() {
         </div>`;
 }
 
+// 상단 글로벌 브랜드 탭(BOH/WM/CG)과 동기화 — 선택된 브랜드의 제품만 표시
+let _cepBrand = '';
+function _cepActiveBrand() {
+    if (_cepBrand) return _cepBrand;
+    return (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? currentBrand : '';
+}
+window.cepSetBrand = function(brand) {
+    _cepBrand = (brand && brand !== 'ALL') ? brand : '';
+    if (_cepProducts) _cepApplyFilters();
+};
+
 function _cepApplyFilters() {
     if (!_cepProducts) return;
-    const brandSel = document.getElementById('cep-brand-filter')?.value || '';
+    const brandSel = _cepActiveBrand();
     const filtered = new Map([..._cepProducts.entries()].filter(([, p]) => !brandSel || p.brand === brandSel));
 
     _cepRenderSummary([...filtered.values()]);
