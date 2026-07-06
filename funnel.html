@@ -602,6 +602,36 @@ function buildPanelHTML(brand, events=[]) {
 // ── Summary Tab ───────────────────────────────────────────────────────────────
 const dateKey = d => { const[m,rest]=d.split('월'); return parseInt(m)*100+parseInt(rest?.replace('일','')||0); };
 
+// x축 라벨은 항상 이번 시즌(262Q) 날짜 기준.
+// 직전 시즌이 더 길면(이벤트 진행 중) 이번 시즌 마지막 날짜 뒤를 달력으로 이어붙여
+// 남은 이벤트 기간도 이번 시즌 날짜로 표시한다.
+// — 예전엔 더 긴 쪽(직전 시즌) 날짜를 축에 그대로 써서, 진행 중인 MEGAPO가
+//   직전 시즌 날짜(예: 04월 29일~) 위에 그려지는 문제가 있었음.
+function extendSeasonLabels(curDates, prevDates) {
+  if (!curDates.length) return [...prevDates];
+  const out = [...curDates];
+  const m = curDates[curDates.length - 1].match(/(\d+)월\s*(\d+)일/);
+  if (m) {
+    const dt = new Date(new Date().getFullYear(), parseInt(m[1]) - 1, parseInt(m[2]));
+    while (out.length < prevDates.length) {
+      dt.setDate(dt.getDate() + 1);
+      out.push(`${String(dt.getMonth() + 1).padStart(2, '0')}월 ${String(dt.getDate()).padStart(2, '0')}일`);
+    }
+  }
+  while (out.length < prevDates.length) out.push(prevDates[out.length]);
+  return out;
+}
+// 툴팁 제목: 이번 시즌 날짜(+예정 표기) · 직전 시즌 대응 날짜
+function seasonTooltipTitle(labels, curLen, prevSer) {
+  return items => {
+    if (!items.length) return '';
+    const i = items[0].dataIndex;
+    const lines = [`이번 시즌 ${labels[i]}${i >= curLen ? ' (예정)' : ''}`];
+    if (prevSer[i]) lines.push(`직전 시즌 ${prevSer[i].date}`);
+    return lines;
+  };
+}
+
 function brandDailySeries(qData, prods) {
   const map = {};
   prods.forEach(p => (qData[p]||[]).forEach(r=>{
@@ -682,7 +712,7 @@ function renderSummaryTab(brand, data, prods) {
     </div>`;
 
   // ── 브랜드 전체 추이 차트 ──
-  const labels = ser262.map(r=>r.date);
+  const labels = extendSeasonLabels(ser262.map(r=>r.date), ser261.map(r=>r.date));
   const pad = (arr,len)=>{const a=[...arr];while(a.length<len)a.push(null);return a;};
   const id = `${brand}_btrend`;
   if(charts[id]) charts[id].destroy();
@@ -724,7 +754,7 @@ function renderSummaryTab(brand, data, prods) {
     data:{ labels, datasets:_btDs },
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest',intersect:true},
       plugins:{legend:{labels:{color:'#64748b',font:{size:11},boxWidth:12,padding:8}},
-        tooltip:{callbacks:{label:c=>{const v=c.parsed.y;if(v===null)return `${c.dataset.label}: -`;return c.dataset.yAxisID==='cnt'?`${c.dataset.label}: ${n(v)}`:`${c.dataset.label}: ${v.toFixed(2)}%`;}}}},
+        tooltip:{callbacks:{title:seasonTooltipTitle(labels, ser262.length, ser261),label:c=>{const v=c.parsed.y;if(v===null)return `${c.dataset.label}: -`;return c.dataset.yAxisID==='cnt'?`${c.dataset.label}: ${n(v)}`:`${c.dataset.label}: ${v.toFixed(2)}%`;}}}},
       scales:{x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#f1f5f9'}},
         rate:{position:'left',ticks:{color:'#6366f1',font:{size:10},callback:v=>v+'%'},grid:{color:'#f1f5f9'},title:{display:true,text:'전환율',color:'#94a3b8',font:{size:9}}},
         cnt:{position:'right',ticks:{color:'#94a3b8',font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v},grid:{display:false},title:{display:true,text:'건수',color:'#94a3b8',font:{size:9}}}}}
@@ -935,7 +965,7 @@ function renderTrendCharts(brand, data, prods) {
         <div class="tc-title">${prod}</div>
         <div class="chart-wrap"><canvas id="${id}"></canvas></div>
       </div>`);
-    const labels = (d262.length>=d261.length?d262:d261).map(r=>r.date);
+    const labels = extendSeasonLabels(d262.map(r=>r.date), d261.map(r=>r.date));
     const pad = (arr,len) => { const a=[...arr]; while(a.length<len) a.push(null); return a; };
     const _showInflow = _funnelMetric === 'both' || _funnelMetric === 'inflow';
     const _showCart   = _funnelMetric === 'both' || _funnelMetric === 'cart';
@@ -975,7 +1005,9 @@ function renderTrendCharts(brand, data, prods) {
         interaction:{mode:'nearest',intersect:true},
         plugins:{
           legend:{labels:{color:'#64748b',font:{size:10},boxWidth:12,padding:7}},
-          tooltip:{callbacks:{label:c=>{
+          tooltip:{callbacks:{
+            title:seasonTooltipTitle(labels, d262.length, d261),
+            label:c=>{
             const v=c.parsed.y;
             if(v===null) return `${c.dataset.label}: -`;
             return c.dataset.yAxisID==='count'
