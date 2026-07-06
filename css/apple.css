@@ -229,7 +229,7 @@ header button[title="마케팅 용어 쉬운 설명"] {
   transition: background 0.15s !important;
 }
 
-.section-tab i {
+.section-tabs .section-tab i {
   color: #6e6e73 !important;
   font-size: 15px !important;
 }
@@ -1170,8 +1170,8 @@ main {
   white-space: nowrap !important;
 }
 
-/* 아이콘 숨김 — Apple은 텍스트 내비 */
-.section-tab > i { display: none !important; }
+/* 아이콘 숨김 — Apple은 텍스트 내비 (구 가로 탭 전용 — 사이드바 .sb-ico는 표시) */
+.section-tabs .section-tab > i { display: none !important; }
 
 .section-tab:hover {
   background: #f5f5f7 !important;
@@ -1349,4 +1349,84 @@ button:active { transform: scale(0.95) !important; }
   main { padding-left: 16px !important; padding-right: 16px !important; }
   #brand-tabs { padding: 10px 16px !important; margin: 0 -16px !important; }
   #section-tabs { margin: 0 -16px !important; }
+}
+
+/* ══════════════════════════════════════════════
+   ── 52. 반응형 라운드 (2607) — 헤더 간소화 + 모바일 하단 탭바 ──
+   배경: 사이드바가 1024px 이하에서 빈 막대가 되어 탭 이동 불가,
+   검정 헤더는 좁은 화면에서 줄바꿈으로 깨짐.
+══════════════════════════════════════════════ */
+
+/* 사이드바 아이콘: 구 가로탭 규칙(18px 회색) 대신 nugoona 디자인 유지 */
+.sb-nav .section-tab > i.sb-ico { font-size: 14px !important; color: #71717a !important; }
+.sb-nav .section-tab.active > i.sb-ico { color: #6366f1 !important; }
+
+/* 태블릿 이하: 헤더 간소화 — 환율·필터칩·업데이트시각 숨김 (줄바꿈 방지) */
+@media (max-width: 768px) {
+  header { padding: 0 12px !important; gap: 10px !important; }
+  .hdr-fx, .hdr-fx-divider, .hdr-sep, #last-updated, #active-filter-chip { display: none !important; }
+  /* 데스크톱에선 사이드바 로고와 중복이라 숨기지만, 모바일 하단 탭바엔 로고가 없음 */
+  header > div:first-child { visibility: visible; }
+  .hdr-center { justify-content: flex-start !important; }
+  .hdr-actions { gap: 10px !important; }
+}
+/* 초소형: 시트연동은 데스크톱 전용 작업이라 숨김 */
+@media (max-width: 480px) {
+  #btn-sheet-config { display: none !important; }
+}
+
+/* 태블릿 이하: 2패널(목록+인사이트/상세) → 세로 스택
+   대상: 성과 BEST TOP 20 · 인플루언서 · CEP 검증의 고정폭 사이드 패널 */
+@media (max-width: 768px) {
+  .section-panel .flex.gap-4.items-start { flex-direction: column !important; }
+  .section-panel .w-64.shrink-0, .section-panel .w-72.shrink-0 { width: 100% !important; }
+  .section-panel .w-64 .sticky, .section-panel .w-72 .sticky { position: static !important; }
+}
+
+/* 모바일: 좌측 레일 → 하단 탭바 */
+@media (max-width: 640px) {
+  :root { --sb-w: 0px; }
+  body { padding-left: 0 !important; }
+  #app-sidebar {
+    top: auto !important; bottom: 0 !important; left: 0 !important;
+    width: 100% !important; height: 60px !important;
+    flex-direction: row !important;
+    border-right: none !important; border-top: 1px solid #e5e5ea !important;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, .06) !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sb-logo, .sb-footer, .sb-group-label { display: none !important; }
+  .sb-nav {
+    display: flex !important; flex-direction: row !important; align-items: stretch !important;
+    flex: 1 !important; padding: 0 !important;
+    overflow-x: auto !important; overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sb-nav .section-tab {
+    flex: 1 0 58px !important; min-width: 58px;
+    display: flex !important; flex-direction: column !important;
+    align-items: center !important; justify-content: center !important;
+    gap: 3px !important; padding: 7px 2px !important; margin: 0 !important;
+    border-radius: 0 !important; background: none !important;
+  }
+  .sb-nav .section-tab > i.sb-ico { display: block !important; font-size: 15px !important; }
+  .sb-txt { display: flex !important; align-items: center !important; }
+  .sb-sub { display: none !important; }
+  .sb-label { font-size: 10px !important; font-weight: 600 !important; color: #6e6e73; letter-spacing: -0.1px !important; }
+  .sb-nav .section-tab.active .sb-label { color: #4f46e5; }
+  /* 콘텐츠·플로팅 요소가 탭바에 가리지 않게 */
+  main { padding-bottom: 88px !important; }
+  .ac-fab { bottom: 76px !important; }
+  .ac-panel { bottom: 142px !important; }
+  /* 날짜 필터: 우측 밀착 대신 한 줄 전체 사용 */
+  .date-range-filter { margin-left: 0 !important; width: 100%; justify-content: flex-start; }
+}
+
+/* 키보드 포커스 접근성 — 마우스 클릭엔 표시 안 됨 */
+.section-tab:focus-visible,
+.brand-tab:focus-visible,
+.ac-fab:focus-visible,
+header button:focus-visible {
+  outline: 2px solid #0066cc !important;
+  outline-offset: 2px;
 }
