@@ -7888,6 +7888,19 @@ header > div:first-child { visibility: hidden; }
 .cep-verdict-chip--fail    { background:#fee2e2; color:#dc2626; }
 .cep-verdict-chip--pending { background:#f1f5f9; color:#94a3b8; }
 
+/* 순위 카드: 이 CEP를 표현한 소재 썸네일 스트립 */
+.cep-rank-thumbs { margin-top:9px; padding-top:8px; border-top:1px dashed #e2e8f0; }
+.cep-rank-thumbs-label { font-size:10px; font-weight:700; color:#94a3b8; margin-bottom:6px; }
+.cep-rank-thumb-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.cep-rank-thumb { position:relative; width:48px; height:60px; border-radius:7px; overflow:hidden; border:1.5px solid #e2e8f0; background:#f1f5f9; flex:none; display:block; transition:transform .12s, box-shadow .12s; }
+.cep-rank-thumb:hover { transform:scale(1.07); box-shadow:0 4px 12px rgba(15,23,42,.18); z-index:1; }
+.cep-rank-thumb--best { border-color:#f59e0b; box-shadow:0 0 0 1px #fcd34d; }
+.cep-rank-thumb-img { width:100%; height:100%; object-fit:cover; display:block; }
+.cep-rank-thumb-noimg { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:14px; }
+.cep-rank-thumb-roas { position:absolute; left:0; right:0; bottom:0; font-size:8.5px; font-weight:800; text-align:center; padding:1px 0 2px; background:rgba(15,23,42,.62); color:#fff; letter-spacing:-0.2px; }
+.cep-rank-thumb--best .cep-rank-thumb-roas { background:rgba(180,83,9,.85); }
+.cep-rank-thumb-more { font-size:11px; font-weight:800; color:#64748b; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:7px; width:34px; height:60px; display:flex; align-items:center; justify-content:center; flex:none; }
+
 /* ═══ 자동 인사이트 ═══ */
 .cep-auto-insight { display:flex; align-items:flex-start; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:12px; color:#1e40af; line-height:1.65; }
 .cep-auto-insight .fa-lightbulb { color:#3b82f6; flex-shrink:0; margin-top:2px; }

@@ -694,6 +694,38 @@ function _cepCompareTableHtml(pObj) {
     </div>`;
 }
 
+// 순위 카드 하단: 이 CEP를 표현한 검증 소재 썸네일 스트립 (ROAS 높은 순, 클릭 시 원본)
+const CEP_RANK_THUMB_MAX = 5;
+function _cepRankThumbsHtml(cepObj) {
+    const items = [...cepObj.creatives].sort((a, b) => (b.roasSheet || 0) - (a.roasSheet || 0));
+    if (!items.length) return '';
+    const shown = items.slice(0, CEP_RANK_THUMB_MAX);
+    const rest = items.length - shown.length;
+    const cells = shown.map((cr, i) => {
+        const img = typeof window.buildDriveImgHtml === 'function'
+            ? window.buildDriveImgHtml(cr.url, {
+                className: 'cep-rank-thumb-img', alt: cr.name,
+                finalFallbackHtml: '<div class="cep-rank-thumb-noimg"><i class="fas fa-image"></i></div>',
+            })
+            : `<img class="cep-rank-thumb-img" src="${_cepEsc(cr.url)}" alt="${_cepEsc(cr.name)}" loading="lazy" referrerpolicy="no-referrer">`;
+        const roasTxt = cr.cost > 0 ? `${(cr.roasSheet || 0).toFixed(0)}%` : '-';
+        const isBest = i === 0 && shown.length > 1;
+        return `
+        <a class="cep-rank-thumb${isBest ? ' cep-rank-thumb--best' : ''}" href="${_cepEsc(cr.url)}" target="_blank" rel="noopener"
+           title="${_cepEsc(cr.name)} · ROAS ${roasTxt}${isBest ? ' (이 CEP에서 최고)' : ''}">
+            ${img}
+            <span class="cep-rank-thumb-roas">${isBest ? '★' : ''}${roasTxt}</span>
+        </a>`;
+    }).join('');
+    const moreHtml = rest > 0
+        ? `<span class="cep-rank-thumb-more" title="아래 CEP 상세의 '소재별 성과'에서 전체 확인">+${rest}</span>` : '';
+    return `
+    <div class="cep-rank-thumbs">
+        <div class="cep-rank-thumbs-label">이 CEP를 표현한 소재 ${items.length}개 · 클릭하면 원본</div>
+        <div class="cep-rank-thumb-row">${cells}${moreHtml}</div>
+    </div>`;
+}
+
 function _cepRankingSectionHtml(pObj, benchmark) {
     const medals = ['🥇', '🥈', '🥉'];
     const allCeps = [...pObj.ceps.values()];
@@ -725,6 +757,7 @@ function _cepRankingSectionHtml(pObj, benchmark) {
                     <span class="cep-rank-cost">${_cepFmtKRW(agg.cost)}</span>
                 </div>
                 ${ctx ? `<div class="cep-rank-ctx"><i class="fas fa-quote-left"></i><span>${_cepEsc(ctx)}</span></div>` : ''}
+                ${_cepRankThumbsHtml(c)}
             </div>
         </div>`;
     };
