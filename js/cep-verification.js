@@ -1097,6 +1097,31 @@ window.cepLookupCreative = function(name) {
     return idx.get(_cepNormName(name)) || null;
 };
 
+// ── 주간 리포트용: pKey 집합의 CEP별 집계 + 판정 (ROAS 높은 순) ──
+window.cepReportForKeys = function(pKeys) {
+    if (!_cepProducts) return null;
+    const wanted = new Set(pKeys);
+    const rows = [];
+    _cepProducts.forEach((pObj, pKey) => {
+        if (!wanted.has(pKey)) return;
+        pObj.ceps.forEach(cepObj => {
+            if (!cepObj.creatives.length) return;
+            const title = _cepSplitLabel(cepObj.cepLabel).title || cepObj.cepLabel;
+            if (!title || title.includes('CEP 미지정')) return; // CEP 없는 행은 판정 대상 아님
+            const agg = _cepAggregate(cepObj);
+            const meta = CEP_VERDICT_META[_cepVerdictTag(agg, true)] || {};
+            rows.push({
+                pKey, product: pObj.product, cepTitle: title,
+                roas: agg.roas, ctr: agg.ctr, cost: agg.cost, cv: agg.cv, revenue: agg.revenue,
+                verdict: `${meta.emoji || ''} ${meta.label || ''}`.trim(),
+            });
+        });
+    });
+    rows.sort((a, b) => b.roas - a.roas);
+    return rows;
+};
+window.cepEnsureData = _cepEnsureData;
+
 // ── 크로스링크: 다른 탭에서 CEP 검증 상세로 점프 ──
 window.cepJumpToProduct = async function(pKey) {
     if (typeof window.switchSection === 'function') window.switchSection('cep');

@@ -740,6 +740,32 @@ function renderWeeklyReport() {
 window.renderWeeklyReport = renderWeeklyReport;
 
 /* ─────────────────────────────────────────────
+   제품 TOP 5 ↔ CEP 검증 연결 분석 (복사용 리포트)
+   — 소재명 정규화 매칭(cepLookupCreative)으로 TOP 소재가 어떤 CEP 소속인지 찾고,
+     해당 제품의 CEP별 집계·판정을 가져온다. CEP 데이터 미로드 시 null.
+───────────────────────────────────────────── */
+function _wrCepAnalysis(byProduct) {
+    if (typeof window.cepLookupCreative !== 'function' || typeof window.cepReportForKeys !== 'function') return null;
+    if (window.cepLookupCreative('__probe__') === undefined) return null; // CEP 데이터 미로드
+    const entries = [];
+    byProduct.forEach(pd => {
+        const matched = pd.top5
+            .map((c, i) => ({ rank: i + 1, info: window.cepLookupCreative(c.name) }))
+            .filter(h => h.info);
+        if (!matched.length) return;
+        const pKeys = [...new Set(matched.map(h => h.info.pKey))];
+        const cepRows = window.cepReportForKeys(pKeys) || [];
+        if (!cepRows.length) return;
+        const ranksByCep = {};
+        matched.forEach(h => {
+            (ranksByCep[h.info.cepTitle] = ranksByCep[h.info.cepTitle] || []).push(h.rank);
+        });
+        entries.push({ product: pd.product, cepRows, ranksByCep, matchedRanks: matched.map(h => h.rank).sort((a, b) => a - b) });
+    });
+    return entries.length ? entries : null;
+}
+
+/* ─────────────────────────────────────────────
    Confluence HTML 빌드
 ───────────────────────────────────────────── */
 // imgMap: { originalUrl: base64DataUrl } — 없으면 원본 URL 폴백
@@ -789,9 +815,34 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
         .pct { font-size: 10px; color: #94a3b8; margin-left: 4px; }
     `;
 
+    // CEP 검증 연결 분석 (전체 요약·제품별 판정 표·Next Action에 공통 사용)
+    const cepEntries = _wrCepAnalysis(byProduct);
+    const allCepRows = cepEntries ? cepEntries.flatMap(e => e.cepRows) : [];
+    const bestCep = allCepRows.length ? allCepRows.reduce((a, b) => a.roas >= b.roas ? a : b) : null;
+    const worstCep = allCepRows.length > 1 ? allCepRows.reduce((a, b) => a.roas <= b.roas ? a : b) : null;
+
     let html = `<html><head><meta charset="UTF-8"><style>${css}</style></head><body>`;
     html += `<h2>📋 주간 업무 보고서</h2>`;
     html += `<p style="color:#64748b;font-size:12px;margin:0 0 16px">📅 <strong>${rangeText}</strong> &nbsp;|&nbsp; 🔍 ${filterText} &nbsp;|&nbsp; 소재 수: <strong>${list.length}개</strong></p>`;
+
+    /* 🎯 3줄 요약 (전체 보고서 복사 시에만) */
+    if (!sections && list.length) {
+        const topRoas = byCreative.length ? Math.max(...byCreative.map(c => c.roas || 0)) : 0;
+        const gapNote = kpi.roas > 0 && topRoas > kpi.roas * 2 ? ' — 소재 간 편차 큼' : '';
+        const line1 = `<strong>[성과]</strong> 소재 ${list.length}개 · 평균 ROAS ${_wrR(kpi.roas)}, TOP 소재 최고 ${_wrR(topRoas)}${gapNote}`;
+        const line2 = bestCep
+            ? `<strong>[원인]</strong> "${bestCep.cepTitle}" CEP가 ROAS ${bestCep.roas.toFixed(0)}%로 최고 — 소재빨이 아니라 <strong>메시지(상황 소구)가 성과를 견인</strong> (${bestCep.product})`
+            : `<strong>[원인]</strong> TOP 소재와 CEP 검증 로그가 아직 연결되지 않음 — 왜 잘됐는지는 CEP 검증 필요`;
+        const line3 = bestCep
+            ? `<strong>[다음 주]</strong> "${bestCep.cepTitle}" 소구 소재 증액 + 동일 CEP 추가 소재 제작${worstCep && worstCep !== bestCep ? ` / "${worstCep.cepTitle}"은 감액·보류` : ''}`
+            : `<strong>[다음 주]</strong> 고효율 소재 증액 테스트 + CEP 가설 수립 후 검증 시작`;
+        html += `<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 16px;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:6px">🎯 3줄 요약 (여기만 읽어도 됨)</div>
+            <ol style="margin:0;padding-left:18px;font-size:12px;color:#334155;line-height:1.9">
+                <li>${line1}</li><li>${line2}</li><li>${line3}</li>
+            </ol>
+        </div>`;
+    }
 
     /* KPI */
     if (!sections || sections.includes('kpi')) {
@@ -833,6 +884,9 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
 
     /* 제품별 인사이트 */
     if (!sections || sections.includes('products')) {
+        if (byProduct.length) {
+            html += `<p style="font-size:11px;color:#94a3b8;margin:16px 0 0">💡 <strong>읽는 법</strong>: 제품별 TOP 소재 표는 "이번 주 예산을 어디로 옮길까"(운영)를 정하는 표입니다. 그 아래 CEP 판정 표는 "왜 잘됐나 → 다음에 뭘 만들까"(기획)에 답합니다.</p>`;
+        }
         byProduct.forEach(pd => {
             html += `<h3>📦 ${pd.product} — 광고비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)} <span style="font-size:11px;color:#94a3b8;font-weight:400">(TOP 5 정렬: ${_wrTop5SortLabel()} 높은 순)</span></h3>`;
             // TOP 5 — 이미지 행 + 지표 행 분리 테이블
@@ -909,12 +963,46 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
                 html += `</td></tr></table>`;
             }
+
+            /* ── CEP 검증 연결: 브릿지 + 판정 표 ── */
+            const cepEntry = cepEntries && cepEntries.find(e => e.product === pd.product);
+            if (cepEntry) {
+                const { cepRows, ranksByCep, matchedRanks } = cepEntry;
+                html += `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:10px 14px;margin:10px 0 8px;font-size:12px;color:#5b21b6;line-height:1.7">
+                    <strong>❓ 여기서 질문 — 위 소재들은 '왜' 잘됐을까?</strong><br>
+                    모델 덕인지 메시지 덕인지 소재 랭킹만으로는 구분되지 않습니다.
+                    같은 상황 소구(CEP)를 쓴 소재들을 묶어 검증한 결과가 아래입니다.
+                    (위 TOP ${matchedRanks.join('·')}번 소재가 CEP 검증 로그와 연결됨)
+                </div>`;
+                const maxRev = Math.max(...cepRows.map(r => r.revenue));
+                html += `<table><thead><tr>
+                    <th style="text-align:left">CEP (상황 소구)</th><th>판정</th><th>ROAS</th><th>CV</th><th>매출</th><th style="text-align:left">비고</th>
+                </tr></thead><tbody>`;
+                cepRows.forEach((r, i) => {
+                    const ranks = ranksByCep[r.cepTitle];
+                    const notes = [];
+                    if (i === 0 && cepRows.length > 1) notes.push('✅ 효율 1위');
+                    if (r.revenue === maxRev && cepRows.length > 1) notes.push('📦 매출 최대');
+                    if (ranks) notes.push(`TOP ${[...ranks].sort((a, b) => a - b).join('·')}번 소재 소속`);
+                    html += `<tr>
+                        <td class="left"><strong>${r.cepTitle}</strong></td>
+                        <td style="text-align:center;white-space:nowrap">${r.verdict}</td>
+                        <td class="roas">${r.roas.toFixed(0)}%</td>
+                        <td class="num">${_wrN(r.cv)}</td>
+                        <td class="num">${_wrW(r.revenue)}</td>
+                        <td class="left" style="font-size:11px;color:#64748b">${notes.join(' · ') || '-'}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+                html += `<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">💡 <strong>읽는 법</strong>: CEP = 소비자가 이 제품을 떠올리는 구체적 상황. 같은 CEP를 여러 소재로 표현해도 성과가 좋으면, 소재 실행이 아니라 <strong>그 메시지가 통한다</strong>는 뜻입니다.</p>`;
+            }
         });
     }
 
     /* 소재별 (이미지 포함) — 이미지 행 + 지표 행 분리, 5열씩 */
     if (!sections || sections.includes('creatives')) {
         html += `<h3>🎨 소재별 성과 TOP ${byCreative.length} <span style="font-size:11px;color:#94a3b8;font-weight:400">(정렬 기준: ${_wrSortLabel()} 높은 순)</span></h3>`;
+        html += `<p style="font-size:11px;color:#94a3b8;margin:0 0 8px">💡 <strong>읽는 법</strong>: 전 제품 통합 소재 랭킹 — 효율 좋은데 광고비가 작은 소재는 증액 여력, 돈만 쓰는 소재는 감액 후보입니다.</p>`;
         const tdB = `border:1px solid #e2e8f0;padding:6px 8px;text-align:center;font-size:11px;`;
         const thB = `border:1px solid #e2e8f0;padding:6px 8px;background:#f8fafc;font-size:11px;font-weight:600;color:#64748b;text-align:left;white-space:nowrap;`;
         const cMets = [
@@ -958,6 +1046,22 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
             });
             html += `</tbody></table>`;
         }
+    }
+
+    /* ✅ Next Action (전체 보고서 복사 시에만) */
+    if (!sections && list.length) {
+        const opLine = bestCep
+            ? `"${bestCep.cepTitle}" CEP 소속 소재 증액 테스트${worstCep && worstCep !== bestCep ? ` / "${worstCep.cepTitle}"(ROAS ${worstCep.roas.toFixed(0)}%)는 감액·보류` : ''}`
+            : `고효율 TOP 소재 증액 테스트, 하위 소재 감액`;
+        const planLine = bestCep
+            ? `"${bestCep.cepTitle}" CEP를 다른 모델·영상 구성으로 2~3개 추가 제작 → 소재 실행 효과 분리 검증`
+            : `TOP 소재의 소구 상황을 CEP 가설로 정리해 검증 시작 (CEP 검증 탭)`;
+        html += `<h3>✅ Next Action</h3>
+        <table><tbody>
+            <tr><td class="left" style="width:110px;white-space:nowrap"><strong>운영 (예산)</strong></td><td class="left">${opLine}</td></tr>
+            <tr><td class="left"><strong>기획 (차기 소재)</strong></td><td class="left">${planLine}</td></tr>
+            <tr><td class="left"><strong>재측정</strong></td><td class="left">다음 주 이 리포트에서 증액분의 효율 유지 여부 확인</td></tr>
+        </tbody></table>`;
     }
 
     html += `<p style="font-size:10px;color:#cbd5e1;margin-top:24px">Generated by Performance Creative Dashboard</p></body></html>`;
@@ -1079,6 +1183,13 @@ async function _wrDoCopy(htmlStr, btnEl) {
 async function _wrCopyWithImages(sections, btnEl) {
     _wrBtnLoading(btnEl);
     try {
+        // 0) CEP 검증 데이터 확보 (판정 표·3줄 요약용 — 4초 내 미로드 시 해당 블록 없이 진행)
+        if (typeof window.cepEnsureData === 'function') {
+            await Promise.race([
+                window.cepEnsureData().catch(() => {}),
+                new Promise(r => setTimeout(r, 4000)),
+            ]);
+        }
         // 1) 썸네일 URL 수집 & 병렬 base64 변환
         const thumbUrls = _wrCollectThumbUrls();
         const imgMap    = thumbUrls.length ? await _wrFetchAllBase64(thumbUrls) : {};
