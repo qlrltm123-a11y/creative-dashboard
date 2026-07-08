@@ -339,6 +339,22 @@ function _filterDataByEvent(rawData, event) {
   Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered261[p]=f; });
   return { '262Q': filtered262, '261Q': filtered261 };
 }
+// 기본 선택 이벤트: 이번 시즌(262Q) 데이터가 가장 최근 날짜까지 있는 이벤트.
+// 동률이면 목록 뒤쪽(나중에 추가된 이벤트) 우선 → 진행 중인 이벤트가 선택된다.
+function _defaultFunnelEvent(rawData, events) {
+  if (!events.length) return 'all';
+  let bestEv = events[events.length - 1], bestKey = -1;
+  events.forEach(ev => {
+    let maxKey = -1;
+    Object.values(rawData['262Q']).forEach(rows => rows.forEach(r => {
+      const match = ev === 'MEGAWARI' ? (!r.event || r.event === 'MEGAWARI') : r.event === ev;
+      if (match && r.date) { const k = dateKey(r.date); if (k > maxKey) maxKey = k; }
+    }));
+    if (maxKey >= bestKey) { bestKey = maxKey; bestEv = ev; }
+  });
+  return bestEv;
+}
+
 function setFunnelEvent(v) {
   _funnelEvent = v;
   if (!brandData[currentBrand]) return;
@@ -518,8 +534,10 @@ function mergeSheetData(base, extra) {
 function render(brand) {
   const rawData = brandData[brand];
   const events = _getEventList(rawData);
-  // 존재하지 않는 이벤트가 선택돼 있으면 전체로 복귀
-  if (_funnelEvent !== 'all' && !events.includes(_funnelEvent)) _funnelEvent = 'all';
+  // '전체' 옵션은 제거됨 — 항상 특정 이벤트 기준으로 본다.
+  // 초기 상태거나 존재하지 않는 이벤트가 선택돼 있으면, 데이터가 가장 최근까지
+  // 있는 이벤트(=진행 중인 이벤트)를 기본 선택.
+  if (!events.includes(_funnelEvent)) _funnelEvent = _defaultFunnelEvent(rawData, events);
   const data = _filterDataByEvent(rawData, _funnelEvent);
   const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
   const panel = document.getElementById(`panel-${brand}`);
@@ -547,7 +565,6 @@ function buildPanelHTML(brand, events=[]) {
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #e8ecf3;border-radius:10px;padding:10px 14px;margin-bottom:16px;box-shadow:0 1px 3px rgba(15,23,42,.04)">
       <span style="font-size:11px;font-weight:700;color:#64748b;white-space:nowrap">이벤트</span>
       <div class="fm-toggle">
-        <button class="fm-btn${_funnelEvent==='all'?' active':''}" onclick="setFunnelEvent('all')">전체</button>
         ${events.map(ev=>`<button class="fm-btn${_funnelEvent===ev?' active':''}" onclick="setFunnelEvent('${ev.replace(/'/g,"\\'")}')">${_evLabel(ev)}</button>`).join('')}
       </div>
     </div>` : '';
