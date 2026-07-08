@@ -215,6 +215,25 @@ window._wrSetCreativeSort = v => {
 const _wrSortFn    = () => _WR_SORTS[_wrCreativeSort].fn;
 const _wrSortLabel = () => _WR_SORTS[_wrCreativeSort].label;
 
+// 제품별 '고효율 TOP 5 소재' 전용 정렬 기준 (잘된 광고 TOP과 독립)
+let _wrTop5Sort = localStorage.getItem('wr_top5_sort') || 'score';
+if (!_WR_SORTS[_wrTop5Sort]) _wrTop5Sort = 'score';
+window._wrSetTop5Sort = v => {
+    _wrTop5Sort = _WR_SORTS[v] ? v : 'score';
+    localStorage.setItem('wr_top5_sort', _wrTop5Sort);
+    _wrInvalidateCache();
+    renderWeeklyReport();
+};
+const _wrTop5SortFn    = () => _WR_SORTS[_wrTop5Sort].fn;
+const _wrTop5SortLabel = () => _WR_SORTS[_wrTop5Sort].label;
+// 정렬 셀렉트 공통 마크업
+function _wrSortSelectHtml(current, setter, ariaLabel) {
+    return `<select class="wr-select" style="font-size:11px;padding:4px 8px" onchange="${setter}(this.value)" aria-label="${ariaLabel}">
+        ${Object.entries(_WR_SORTS).map(([k, s]) =>
+            `<option value="${k}"${k === current ? ' selected' : ''}>${s.label}</option>`).join('')}
+    </select>`;
+}
+
 /* ── 포맷 헬퍼 ── */
 function _wrN(n)  { return Math.round(n).toLocaleString('ko-KR'); }
 function _wrW(n)  { return '₩' + _wrN(n); }
@@ -374,10 +393,7 @@ function _wrCreativeSectionHtml(byCreative) {
             <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>잘된 광고 TOP ${byCreative.length}</span>
             <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <label style="font-size:10px;color:#94a3b8;font-weight:600">정렬 기준</label>
-                <select class="wr-select" style="font-size:11px;padding:4px 8px" onchange="window._wrSetCreativeSort(this.value)" aria-label="TOP 소재 정렬 기준">
-                    ${Object.entries(_WR_SORTS).map(([k, s]) =>
-                        `<option value="${k}"${k === _wrCreativeSort ? ' selected' : ''}>${s.label}</option>`).join('')}
-                </select>
+                ${_wrSortSelectHtml(_wrCreativeSort, 'window._wrSetCreativeSort', 'TOP 소재 정렬 기준')}
                 <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
                     <i class="fas fa-copy mr-1"></i>복사
                 </button>
@@ -426,7 +442,7 @@ function _wrByProductInsight(list) {
                 platform: [...d.platforms].join(' · '),
                 ctr:  d.impr>0  ? d.clicks/d.impr : 0,
                 roas: d.spend>0 ? d.rev/d.spend    : 0 }))
-            .sort((a, b) => _wrSortFn()(b) - _wrSortFn()(a))
+            .sort((a, b) => _wrTop5SortFn()(b) - _wrTop5SortFn()(a))
             .slice(0, 5);
 
         // ── ROAS 가중 집계 헬퍼 ──
@@ -618,7 +634,7 @@ function _wrProductInsightSectionHtml(productData) {
             </div>
             <div class="wr-pi-body">
                 <div class="wr-pi-col wr-pi-col-main">
-                    <div class="wr-pi-sub-hd">🏆 고효율 TOP 5 소재 <span style="font-size:9px;color:#94a3b8;font-weight:400">정렬 기준: ${_wrSortLabel()} 높은 순</span></div>
+                    <div class="wr-pi-sub-hd">🏆 고효율 TOP 5 소재 <span style="font-size:9px;color:#94a3b8;font-weight:400">정렬 기준: ${_wrTop5SortLabel()} 높은 순</span></div>
                     <div class="wr-pi-rows">${top5Rows}</div>
                 </div>
                 <div class="wr-pi-col wr-pi-col-side">
@@ -643,9 +659,13 @@ function _wrProductInsightSectionHtml(productData) {
     <div class="wr-section" id="wr-product-section">
         <div class="wr-section-hd">
             <span><i class="fas fa-box-open mr-1.5" style="color:#f97316"></i>제품별 잘된 포인트 분석</span>
-            <button class="wr-copy-btn" onclick="window._wrCopySection('products', this)">
-                <i class="fas fa-copy mr-1"></i>복사
-            </button>
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <label style="font-size:10px;color:#94a3b8;font-weight:600">TOP 5 정렬 기준</label>
+                ${_wrSortSelectHtml(_wrTop5Sort, 'window._wrSetTop5Sort', '제품별 TOP 5 소재 정렬 기준')}
+                <button class="wr-copy-btn" onclick="window._wrCopySection('products', this)">
+                    <i class="fas fa-copy mr-1"></i>복사
+                </button>
+            </span>
         </div>
         <div class="wr-pi-grid">${prodCards}</div>
     </div>`;
@@ -814,7 +834,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     /* 제품별 인사이트 */
     if (!sections || sections.includes('products')) {
         byProduct.forEach(pd => {
-            html += `<h3>📦 ${pd.product} — 광고비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)}</h3>`;
+            html += `<h3>📦 ${pd.product} — 광고비 ${_wrW(pd.kpi.spend)} | ROAS ${_wrR(pd.kpi.roas)} | CTR ${_wrP(pd.kpi.ctr)} <span style="font-size:11px;color:#94a3b8;font-weight:400">(TOP 5 정렬: ${_wrTop5SortLabel()} 높은 순)</span></h3>`;
             // TOP 5 — 이미지 행 + 지표 행 분리 테이블
             const tdBase = `border:1px solid #e2e8f0;padding:6px 8px;text-align:center;font-size:11px;`;
             const thBase = `border:1px solid #e2e8f0;padding:6px 8px;background:#f8fafc;font-size:11px;font-weight:600;color:#64748b;text-align:left;white-space:nowrap;`;
