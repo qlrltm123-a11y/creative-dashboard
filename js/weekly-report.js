@@ -177,15 +177,18 @@ function _wrByCreative(list) {
         m[key].rev    += c.revenue     || 0;
         m[key].conv   += c.conversions || 0;
     });
-    // 복합 스코어: ROAS × log(주문수+1) — 효율 + 볼륨 동시 반영
-    const _effScore = d => (d.roas||0) * (1 + Math.log1p(d.conv||0) * 0.5);
     return Object.values(m).map(d => ({
         ...d,
         platform: [...d.platforms].join(' · '),
         ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
         roas: d.spend > 0 ? d.rev    / d.spend  : 0,
-    })).sort((a, b) => _effScore(b) - _effScore(a)).slice(0, 30);
+    })).sort((a, b) => _wrEffScore(b) - _wrEffScore(a)).slice(0, 30);
 }
+
+// 고효율 TOP 선정 스코어: 광고효율(ROAS) × 매출 가중
+// = 효율이 좋으면서 매출 규모도 큰 소재가 상위.
+//   매출은 log 가중 — 소액 매출 편차가 순위를 과하게 흔들지 않게.
+function _wrEffScore(d) { return (d.roas || 0) * (1 + Math.log10(1 + (d.rev || 0) / 10000) * 0.5); }
 
 /* ── 포맷 헬퍼 ── */
 function _wrN(n)  { return Math.round(n).toLocaleString('ko-KR'); }
@@ -343,7 +346,7 @@ function _wrCreativeSectionHtml(byCreative) {
     return `
     <div class="wr-section" id="wr-creative-section">
         <div class="wr-section-hd">
-            <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>잘된 광고 TOP ${byCreative.length}</span>
+            <span><i class="fas fa-images mr-1.5" style="color:#8b5cf6"></i>잘된 광고 TOP ${byCreative.length} <span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:4px">선정 기준: 광고효율(ROAS) × 매출</span></span>
             <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
                 <i class="fas fa-copy mr-1"></i>복사
             </button>
@@ -386,14 +389,12 @@ function _wrByProductInsight(list) {
             creMap[key].rev    += c.revenue     || 0;
             creMap[key].conv   += c.conversions || 0;
         });
-        // 복합 스코어: ROAS × log(주문수+1) — 효율 + 볼륨 동시 반영
-        const _effScore = d => (d.roas||0) * (1 + Math.log1p(d.conv||0) * 0.5);
         const top5 = Object.values(creMap)
             .map(d => ({ ...d,
                 platform: [...d.platforms].join(' · '),
                 ctr:  d.impr>0  ? d.clicks/d.impr : 0,
                 roas: d.spend>0 ? d.rev/d.spend    : 0 }))
-            .sort((a, b) => _effScore(b) - _effScore(a))
+            .sort((a, b) => _wrEffScore(b) - _wrEffScore(a))
             .slice(0, 5);
 
         // ── ROAS 가중 집계 헬퍼 ──
@@ -585,7 +586,7 @@ function _wrProductInsightSectionHtml(productData) {
             </div>
             <div class="wr-pi-body">
                 <div class="wr-pi-col wr-pi-col-main">
-                    <div class="wr-pi-sub-hd">🏆 고효율 TOP 5 소재 <span style="font-size:9px;color:#94a3b8;font-weight:400">ROAS×주문수 기준</span></div>
+                    <div class="wr-pi-sub-hd">🏆 고효율 TOP 5 소재 <span style="font-size:9px;color:#94a3b8;font-weight:400">선정 기준: 광고효율(ROAS) × 매출 — 효율 좋고 매출도 큰 순</span></div>
                     <div class="wr-pi-rows">${top5Rows}</div>
                 </div>
                 <div class="wr-pi-col wr-pi-col-side">
@@ -861,7 +862,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
 
     /* 소재별 (이미지 포함) — 이미지 행 + 지표 행 분리, 5열씩 */
     if (!sections || sections.includes('creatives')) {
-        html += `<h3>🎨 소재별 성과 TOP ${byCreative.length}</h3>`;
+        html += `<h3>🎨 소재별 성과 TOP ${byCreative.length} <span style="font-size:11px;color:#94a3b8;font-weight:400">(선정 기준: 광고효율 ROAS × 매출)</span></h3>`;
         const tdB = `border:1px solid #e2e8f0;padding:6px 8px;text-align:center;font-size:11px;`;
         const thB = `border:1px solid #e2e8f0;padding:6px 8px;background:#f8fafc;font-size:11px;font-weight:600;color:#64748b;text-align:left;white-space:nowrap;`;
         const cMets = [
