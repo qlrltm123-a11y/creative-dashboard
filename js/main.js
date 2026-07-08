@@ -4373,6 +4373,13 @@ function renderProductPerformance() {
     bestEl.querySelectorAll('.best-thumb-card').forEach((card, idx) => {
         card.addEventListener('click', () => openModal(card.dataset.id, best[idx]));
     });
+    // CEP 검증 보기 링크 (카드 모달 열림 방지 후 CEP 탭으로 점프)
+    bestEl.querySelectorAll('.btc-cep-link').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            if (typeof window.cepJumpToProduct === 'function') window.cepJumpToProduct(btn.dataset.cepKey);
+        });
+    });
 
     renderBestInsights(best, metric);
 
@@ -4557,6 +4564,17 @@ function createBestThumbCard(c, rank, metric) {
     const adName = (c.ad_name || c.creative_name || '(무제)').slice(0, 30);
     const brand = c.brand || '';
 
+    // CEP 검증 여부 배지 (undefined = CEP 데이터 아직 미로드 → 표시 안 함)
+    const cepInfo = typeof window.cepLookupCreative === 'function'
+        ? window.cepLookupCreative(c.ad_name || c.creative_name) : undefined;
+    let cepHtml = '';
+    if (cepInfo) {
+        cepHtml = `<button class="btc-cep-link" data-cep-key="${cepInfo.pKey.replace(/"/g, '&quot;')}"
+            title="CEP: ${cepInfo.cepTitle.replace(/"/g, '&quot;')} — 검증 상세로 이동">✅ CEP 검증 보기</button>`;
+    } else if (cepInfo === null) {
+        cepHtml = `<span class="btc-cep-none" title="이 소재는 CEP 검증 로그에 없어요 — 왜 잘됐는지 검증 후보">⚪ CEP 미검증</span>`;
+    }
+
     return `<div class="best-thumb-card" data-id="${c.id}">
         <div class="btc-img-wrap">
             <span class="btc-rank">${rank}</span>
@@ -4567,6 +4585,7 @@ function createBestThumbCard(c, rank, metric) {
             ${brand ? `<span class="btc-brand">${brand}</span>` : ''}
             <p class="btc-name" title="${adName}">${adName}</p>
             ${appealsHtml ? `<div class="btc-chips">${appealsHtml}</div>` : ''}
+            ${cepHtml}
         </div>
     </div>`;
 }
@@ -4593,7 +4612,26 @@ function renderBestInsights(best, metric) {
     const chipsOf = (pairs, cls = '') => pairs.map(([k, v]) =>
         `<span class="bi-chip ${cls}">${k}<span class="bi-cnt">${v}</span></span>`).join('');
 
+    // ── CEP 검증 후보 큐: BEST TOP인데 CEP 검증 로그에 없는 소재 = "왜 잘됐는지 모르는" 소재 ──
+    let cepQueueHtml = '';
+    if (typeof window.cepLookupCreative === 'function' && window.cepLookupCreative('__probe__') !== undefined) {
+        const unverified = best.filter(c => window.cepLookupCreative(c.ad_name || c.creative_name) === null);
+        if (unverified.length) {
+            const items = unverified.slice(0, 3).map(c => {
+                const nm = (c.ad_name || c.creative_name || '(무제)');
+                return `<li title="${nm.replace(/"/g, '&quot;')}">${nm.slice(0, 26)}</li>`;
+            }).join('');
+            cepQueueHtml = `
+        <div class="bi-section bi-cep-queue">
+            <div class="bi-title"><i class="fas fa-flask" style="color:#8b5cf6"></i> CEP 검증 후보 ${unverified.length}개</div>
+            <p class="bi-cep-queue-sub">TOP인데 검증 로그에 없어요 — 왜 잘됐는지 CEP 가설로 검증해보세요</p>
+            <ul class="bi-cep-queue-list">${items}</ul>
+        </div>`;
+        }
+    }
+
     panel.innerHTML = `
+        ${cepQueueHtml}
         <div class="bi-section">
             <div class="bi-title"><i class="fas fa-tags"></i> 강조 포인트</div>
             <div class="bi-chips">${chipsOf(appeals) || '<span class="bi-empty">없음</span>'}</div>
@@ -4611,6 +4649,10 @@ function renderBestInsights(best, metric) {
             <div class="bi-avg-val">${cfg.format(avg)}</div>
         </div>`;
 }
+// CEP 데이터가 뒤늦게 로드되면 배지/검증 후보 큐 반영해 재렌더
+document.addEventListener('cep-data-ready', () => {
+    if (typeof renderProductPerformance === 'function') renderProductPerformance();
+});
 
 // 순위 행 (썸네일 즉시 렌더링 + Drive URL 자동 변환 + AI 추론 코멘트)
 function createRankRow(c, rank, metric, type, benchmark) {

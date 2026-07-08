@@ -1048,25 +1048,79 @@ function _cepApplyFilters() {
 }
 window.cepApplyFilters = _cepApplyFilters;
 
+// ── 데이터 로더 (렌더와 분리 — 성과 분석 탭의 배지/크로스링크도 이 데이터를 쓴다) ──
+let _cepLoadPromise = null;
+function _cepEnsureData() {
+    if (_cepProducts) return Promise.resolve(_cepProducts);
+    if (!_cepLoadPromise) {
+        _cepLoadPromise = fetch(CEP_SHEET_URL, { cache: 'no-store' })
+            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); })
+            .then(text => {
+                if (text.includes('<HTML>') || text.includes('<!DOCTYPE')) {
+                    throw new Error('시트가 웹에 게시되지 않았거나 게시 링크가 잘못되었습니다.');
+                }
+                _cepProducts = _cepBuildModel(_cepParseCSV(text));
+                _cepCreativeIdx = null; // 소재 인덱스 재구축
+                document.dispatchEvent(new CustomEvent('cep-data-ready'));
+                return _cepProducts;
+            })
+            .finally(() => { _cepLoadPromise = null; });
+    }
+    return _cepLoadPromise;
+}
+
+// ── 소재명 → CEP 매칭 인덱스 (성과 분석 BEST TOP 배지·링크용) ──
+let _cepCreativeIdx = null;
+function _cepNormName(s) { return String(s || '').toLowerCase().replace(/[^가-힣a-z0-9]/g, ''); }
+function _cepGetCreativeIdx() {
+    if (_cepCreativeIdx || !_cepProducts) return _cepCreativeIdx;
+    _cepCreativeIdx = new Map();
+    _cepProducts.forEach((pObj, pKey) => {
+        pObj.ceps.forEach(cepObj => {
+            cepObj.creatives.forEach(cr => {
+                const k = _cepNormName(cr.name);
+                if (k && !_cepCreativeIdx.has(k)) {
+                    _cepCreativeIdx.set(k, {
+                        pKey, product: pObj.product, brand: pObj.brand,
+                        cepTitle: _cepSplitLabel(cepObj.cepLabel).title || cepObj.cepLabel,
+                    });
+                }
+            });
+        });
+    });
+    return _cepCreativeIdx;
+}
+// 소재명으로 CEP 검증 여부 조회. 데이터 미로드 시 undefined(모름), 미검증이면 null.
+window.cepLookupCreative = function(name) {
+    const idx = _cepGetCreativeIdx();
+    if (!idx) return undefined;
+    return idx.get(_cepNormName(name)) || null;
+};
+
+// ── 크로스링크: 다른 탭에서 CEP 검증 상세로 점프 ──
+window.cepJumpToProduct = async function(pKey) {
+    if (typeof window.switchSection === 'function') window.switchSection('cep');
+    try { await _cepEnsureData(); } catch (e) { return; }
+    if (!_cepProducts.has(pKey)) return;
+    _cepSelectedKey = pKey;
+    _cepPopulateBrandFilter(_cepProducts);
+    _cepApplyFilters();
+    document.getElementById('cep-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 async function renderCepVerification(forceReload) {
     const listEl = document.getElementById('cep-product-list');
     if (!listEl) return;
     if (_cepLoading) return;
     if (_cepProducts && !forceReload) { _cepApplyFilters(); return; }
+    if (forceReload) _cepProducts = null;
 
     _cepLoading = true;
     listEl.innerHTML = _cepEmptyHtml('fa-spinner', '검증 로그 불러오는 중...', { py: 'py-10', spin: true });
     const detailEl = document.getElementById('cep-detail');
     if (detailEl) detailEl.innerHTML = '';
     try {
-        const res = await fetch(CEP_SHEET_URL, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        if (text.includes('<HTML>') || text.includes('<!DOCTYPE')) {
-            throw new Error('시트가 웹에 게시되지 않았거나 게시 링크가 잘못되었습니다.');
-        }
-        const rows = _cepParseCSV(text);
-        _cepProducts = _cepBuildModel(rows);
+        await _cepEnsureData();
         _cepSelectedKey = null;
         _cepPopulateBrandFilter(_cepProducts);
         _cepApplyFilters();
@@ -1079,6 +1133,8 @@ async function renderCepVerification(forceReload) {
 window.renderCepVerification = renderCepVerification;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 성과 분석 탭 배지/검증 후보 큐용 백그라운드 로드 (핵심 데이터 로드와 경합하지 않게 지연)
+    setTimeout(() => { _cepEnsureData().catch(() => {}); }, 2500);
     document.getElementById('cep-brand-filter')?.addEventListener('change', _cepApplyFilters);
     document.getElementById('cep-status-filter')?.addEventListener('change', _cepRenderDetailForSelected);
     document.getElementById('cep-refresh-btn')?.addEventListener('click', () => renderCepVerification(true));
