@@ -457,11 +457,12 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
     if (hasResult) {
         const items = cepObj.creatives.filter(c => c.detail);
         if (items.length) {
-            hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">소재별 강조 포인트</div><ul class="cep-hypo-list">${items.map(c => {
+            // 소재 카드에 이미 강조점이 요약돼 있으므로, 전체 나열은 접어둔다 (필요할 때만)
+            hypoHtml = `<details class="cep-hypo cep-hypo--fold"><summary class="cep-hypo-label">소재별 강조 포인트 ${items.length}개 <i class="fas fa-chevron-down"></i></summary><ul class="cep-hypo-list">${items.map(c => {
                 const name = _cepDetailName(c.detail, c.name);
                 const emphasis = _cepEmphasisText(c.detail, commonSegs);
                 return `<li><b>${_cepEsc(name)}</b>${emphasis ? ` — ${_cepEsc(emphasis)} 강조` : ''}</li>`;
-            }).join('')}</ul></div>`;
+            }).join('')}</ul></details>`;
         }
     } else if (hypotheses.length) {
         hypoHtml = `<div class="cep-hypo"><div class="cep-hypo-label">기획 내용 (제작 예정 소재)</div><ul class="cep-hypo-list">${hypotheses.map(h => `<li>${_cepEsc(h)}</li>`).join('')}</ul></div>`;
@@ -540,7 +541,8 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
             <div class="cep-section-label">소재별 성과</div>
             ${creativeCardsHtml}
             <div class="cep-section-label">원인 분석</div>
-            <ul class="cep-cause-list">${causes.map(c => `<li class="cep-cause cep-cause--${c.type}"><i class="fas ${CEP_CAUSE_ICON[c.type] || CEP_CAUSE_ICON.neutral}"></i><span>${_cepEsc(c.text)}</span></li>`).join('')}</ul>
+            <ul class="cep-cause-list">${causes.slice(0, 2).map(c => `<li class="cep-cause cep-cause--${c.type}"><i class="fas ${CEP_CAUSE_ICON[c.type] || CEP_CAUSE_ICON.neutral}"></i><span>${_cepEsc(c.text)}</span></li>`).join('')}</ul>
+            ${causes.length > 2 ? `<details class="cep-cause-more"><summary>원인 ${causes.length - 2}개 더 보기 <i class="fas fa-chevron-down"></i></summary><ul class="cep-cause-list">${causes.slice(2).map(c => `<li class="cep-cause cep-cause--${c.type}"><i class="fas ${CEP_CAUSE_ICON[c.type] || CEP_CAUSE_ICON.neutral}"></i><span>${_cepEsc(c.text)}</span></li>`).join('')}</ul></details>` : ''}
             <div class="cep-nextstep">
                 <span class="cep-action-badge cep-action--${tag}">${meta.emoji} Next Step</span>
                 <p class="cep-action-text">${_cepEsc(nextText)}</p>
@@ -676,7 +678,6 @@ function _cepCompareTableHtml(pObj) {
     });
 
     return `
-    <div class="cep-section-label">CEP별 수치 비교</div>
     <div class="cep-compare-wrap">
         <table class="cep-compare-table">
             <thead><tr><th>CEP</th><th>상태</th><th>IMP</th><th>CTR</th><th>CVR</th><th>COST</th><th>CV</th><th>ROAS</th></tr></thead>
@@ -916,7 +917,7 @@ const CEP_PRODUCT_META = {
     '3D-Refill':   { core: '리프팅·탄력', coreKw: ['리프팅', '탄력', '처짐'], alt: '보습 케어' },
 };
 
-function _cepAutoInsightHtml(pObj) {
+function _cepAutoInsightHtml(pObj, bare) {
     const items = [...pObj.ceps.values()]
         .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
         .filter(x => x.c.creatives.length > 0 && x.agg.cost > 0);
@@ -988,12 +989,14 @@ function _cepAutoInsightHtml(pObj) {
             ? `"${best.groups[0].bucket.label}" 유형이 이 제품의 워킹 프레임입니다 — 차기 소재는 이 유형의 상황이 첫 장면에 드러나는 구성으로 제작하세요.${coreLine ? ' ' + coreLine : ''}`
             : `CEP보다 소재 실행이 변수로 보입니다 — 1위 소재의 모델·구성 요소를 다른 CEP에 이식해 보세요.${coreLine ? ' ' + coreLine : ''}`;
 
+    const frameChip = best ? `<span class="cep-frame-chip">워킹 프레임: ${_cepEsc(best.frame.name)}</span>` : '<span class="cep-frame-chip cep-frame-chip--none">뚜렷한 프레임 없음</span>';
     return `
-    <div class="cep-insight-section">
+    <div class="cep-insight-section${bare ? ' cep-insight-section--bare' : ''}">
+        ${bare ? `<div class="cep-insight-headrow">${frameChip}</div>` : `
         <div class="cep-insight-header"><i class="fas fa-brain"></i> 검증 인사이트
             <span class="cep-insight-sub">4개 관점 교차 분석 · 이 제품의 워킹 프레임 자동 선택</span>
-            ${best ? `<span class="cep-frame-chip">워킹 프레임: ${_cepEsc(best.frame.name)}</span>` : '<span class="cep-frame-chip cep-frame-chip--none">뚜렷한 프레임 없음</span>'}
-        </div>
+            ${frameChip}
+        </div>`}
         <div class="cep-insight-label">워킹 요인 (가설)</div>
         ${best ? `<p class="cep-insight-formula">${_cepEsc(best.frame.formula)}</p>` : ''}
         <div class="cep-urgency-list">${rowsHtml}</div>
@@ -1045,6 +1048,49 @@ function cepSaveNote(pKey, field, value) {
 }
 window.cepSaveNote = cepSaveNote;
 
+// 접이식 섹션 — 기본 화면에는 핵심만 남기고, 깊은 분석·표·노트는 필요할 때 펼쳐 본다.
+function _cepFoldHtml(icon, title, sub, inner, open) {
+    if (!inner) return '';
+    return `
+    <details class="cep-fold"${open ? ' open' : ''}>
+        <summary class="cep-fold-head"><i class="fas ${icon}"></i><span>${title}</span>${sub ? `<span class="cep-fold-sub">${sub}</span>` : ''}<i class="fas fa-chevron-down cep-fold-icon"></i></summary>
+        <div class="cep-fold-body">${inner}</div>
+    </details>`;
+}
+
+// 핵심 요약 3줄 — 이 제품에서 지금 알아야 할 것: 뭐가 잘됐고, 뭐가 안 됐고, 다음에 뭘 하나.
+function _cepKeySummaryHtml(pObj) {
+    const done = [...pObj.ceps.values()]
+        .filter(c => c.creatives.length > 0)
+        .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
+        .filter(x => x.agg.cost > 0)
+        .sort((a, b) => b.agg.roas - a.agg.roas);
+    if (!done.length) return '';
+    const pendingN = [...pObj.ceps.values()].filter(c => !c.creatives.length).length;
+    const top = done[0], bottom = done[done.length - 1];
+    const topMeta = CEP_VERDICT_META[_cepVerdictTag(top.agg, true)];
+
+    // 다음 할 일: 1위 CEP의 메시지 검증 단계에 따라 자동 제안 (넓게 → 좁게)
+    const msgs = _cepMsgGroups(top.c);
+    let next;
+    if (msgs.length >= 2) {
+        const code = (msgs[0].msg.match(/^M\d+/) || [msgs[0].msg.slice(0, 10)])[0];
+        next = `1위 CEP 안에서 ${code} 메시지가 우세 — 이 방향으로 소재를 늘리세요.`;
+    } else if (msgs.length === 1) {
+        next = `1위 CEP는 아직 메시지 1개만 검증 — 두 번째 메시지를 붙여 "무슨 말이 먹히는지" 좁히세요.`;
+    } else {
+        next = `1위 CEP에 메시지를 지정해 2차(메시지) 검증을 시작하세요.`;
+    }
+    if (pendingN > 0) next += ` (검증 대기 CEP ${pendingN}개)`;
+
+    return `
+    <div class="cep-keysum">
+        <div class="cep-keysum-row"><span class="cep-keysum-ico">🏆</span><span class="cep-keysum-label">잘된 상황</span><span class="cep-keysum-text">${_cepEsc(top.info.title)} — <b>ROAS ${top.agg.roas.toFixed(0)}%</b> ${topMeta.emoji} ${topMeta.label}</span></div>
+        ${done.length >= 2 ? `<div class="cep-keysum-row"><span class="cep-keysum-ico">⚠️</span><span class="cep-keysum-label">안 된 상황</span><span class="cep-keysum-text">${_cepEsc(bottom.info.title)} — <b>ROAS ${bottom.agg.roas.toFixed(0)}%</b></span></div>` : ''}
+        <div class="cep-keysum-row"><span class="cep-keysum-ico">▶</span><span class="cep-keysum-label">다음 할 일</span><span class="cep-keysum-text">${_cepEsc(next)}</span></div>
+    </div>`;
+}
+
 function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
@@ -1062,20 +1108,22 @@ function _cepRenderDetailForSelected() {
     const benchmark = _cepProductBenchmark(pObj);
     const compareTable = _cepCompareTableHtml(pObj);
 
+    // 기본 화면: 핵심 요약 → 순위 → CEP 블록. 수치 표·심화 분석·팀 노트는 접어둔다.
     detailEl.innerHTML = `
         <div class="cep-detail-header">
             <span class="cep-brand-tag">${_cepEsc(pObj.brand)}</span>
             <span class="cep-detail-title">${_cepEsc(pObj.product)}</span>
             <span class="cep-product-stat">CEP ${allCeps.length}개 · 완료 ${done} · 대기 ${allCeps.length - done}${avgRoas != null ? ` · 평균 ROAS ${avgRoas.toFixed(0)}%` : ''}</span>
         </div>
+        ${_cepKeySummaryHtml(pObj)}
         ${_cepRankingSectionHtml(pObj, benchmark)}
-        ${_cepAutoInsightHtml(pObj)}
-        ${_cepNoteEditorHtml(_cepSelectedKey)}
-        ${compareTable ? `<div class="cep-section-detail-label"><i class="fas fa-table"></i> 수치 상세</div>${compareTable}` : ''}
         <div class="cep-section-detail-label"><i class="fas fa-flask"></i> CEP별 소재 상세</div>
         <div class="cep-blocks">
             ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product, false, benchmark)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
-        </div>`;
+        </div>
+        ${_cepFoldHtml('fa-table', '수치로 보기', 'CEP별 IMP·CTR·CVR·COST 비교 표', compareTable)}
+        ${_cepFoldHtml('fa-brain', '심화 분석', '워킹 프레임 · A/B 테스트 아이디어', _cepAutoInsightHtml(pObj, true))}
+        ${_cepFoldHtml('fa-pen', '팀 노트', '가설·Next Action 기록 (자동 저장)', _cepNoteEditorHtml(_cepSelectedKey))}`;
 }
 
 // 상단 글로벌 브랜드 탭(BOH/WM/CG)과 동기화 — 선택된 브랜드의 제품만 표시
