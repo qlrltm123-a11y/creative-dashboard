@@ -13,7 +13,7 @@ const CEP_COL = { brand: 1, name: 2, product: 3, url: 6, cep: 7, detail: 8, imp:
 // 헤더명 → 필드 자동 매핑: 시트에 컬럼이 추가/이동돼도 헤더 텍스트로 위치를 찾는다
 const CEP_HEADER_NAMES = {
     brand: '브랜드', name: '소재명', product: '제품', url: 'media urls',
-    cep: '소구포인트', detail: '검증 상세',
+    cep: '소구포인트', detail: '검증 상세', message: '메시지',
     imp: 'IMP', click: 'Click', ctr: 'CTR', cost: 'COST', cv: 'CV', revenue: 'Revenue', roas: 'ROAS',
 };
 function _cepDetectCols(headerRow) {
@@ -278,6 +278,8 @@ function _cepBuildModel(rows) {
             if (hasResult && i === 0) {
                 cepObj.creatives.push({
                     name: mediaName, url: mediaUrl, detail: hypoText,
+                    // 메시지 컬럼(CEP=언제, 메시지=무슨 말): 없던 시트 버전도 있으므로 옵셔널
+                    message: COL.message != null ? (r[COL.message] || '').trim() : '',
                     imp: _cepNum(r[COL.imp]), click: _cepNum(r[COL.click]),
                     cost: _cepNum(r[COL.cost]), cv: _cepNum(r[COL.cv]),
                     revenue: _cepNum(r[COL.revenue]),
@@ -516,7 +518,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
                         ${isBest ? '<span class="cep-best-tag cep-best-tag--thumb">★최고</span>' : ''}
                     </a>
                     <div class="cep-creative-body">
-                        <div class="cep-creative-angle">${_cepEsc(_cepUniqueDetail(c.detail, commonSegs))}</div>
+                        <div class="cep-creative-angle">${(c.message || '').match(/^M\d+/) ? `<span class="cep-msg-chip" title="${_cepEsc(c.message)}">${c.message.match(/^M\d+/)[0]}</span>` : ''}${_cepEsc(_cepUniqueDetail(c.detail, commonSegs))}</div>
                         <div class="cep-creative-metrics">
                             <span><b>${_cepFmtInt(c.imp)}</b>IMP</span>
                             <span><b>${c.imp > 0 ? _cepFmtPct(c.ctrSheet) : '-'}</b>CTR</span>
@@ -534,6 +536,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
         <div class="cep-block-body">
             ${ctxHtml}
             ${hypoHtml}
+            ${_cepMsgTableHtml(cepObj)}
             <div class="cep-section-label">소재별 성과</div>
             ${creativeCardsHtml}
             <div class="cep-section-label">원인 분석</div>
@@ -691,6 +694,55 @@ function _cepCompareTableHtml(pObj) {
                 </tr>`).join('')}
             </tbody>
         </table>
+    </div>`;
+}
+
+// 한 CEP 안에서 소재를 '메시지'(시트의 메시지 컬럼) 단위로 묶는다 — CEP가 "언제(상황)"를
+// 검증했다면, 메시지는 "그 상황에서 무슨 말이 먹히는지"를 검증하는 2차(좁히기) 단계다.
+function _cepMsgGroups(cepObj) {
+    const byMsg = new Map();
+    cepObj.creatives.forEach(c => {
+        const m = (c.message || '').trim();
+        if (!m) return;
+        if (!byMsg.has(m)) byMsg.set(m, []);
+        byMsg.get(m).push(c);
+    });
+    return [...byMsg.entries()].map(([msg, creatives]) => {
+        const agg = _cepAggregate({ creatives });
+        return { msg, creatives, agg, tag: _cepVerdictTag(agg, true) };
+    }).sort((a, b) => b.agg.roas - a.agg.roas);
+}
+
+function _cepMsgTableHtml(cepObj) {
+    const groups = _cepMsgGroups(cepObj);
+    if (!groups.length) return '';
+    const noMsg = cepObj.creatives.length - groups.reduce((s, g) => s + g.creatives.length, 0);
+    const single = groups.length === 1;
+    const hint = single
+        ? '이 CEP는 아직 메시지 1개만 검증했습니다 — CEP가 이겼다면 같은 상황에 다른 메시지를 붙여 2차 검증을 진행하세요.'
+        : '같은 상황(CEP) 안에서 어떤 말이 먹혔는지 비교합니다 — 1위 메시지가 다음 소재의 카피 방향입니다.';
+    return `
+    <div class="cep-section-label">메시지별 성과 <span class="cep-msg-sub">이 상황에서 무슨 말이 먹혔나 · 2차 검증</span></div>
+    <div class="cep-compare-wrap">
+        <table class="cep-compare-table">
+            <thead><tr><th>메시지</th><th>소재</th><th>CTR</th><th>COST</th><th>CV</th><th>ROAS</th><th>판정</th></tr></thead>
+            <tbody>
+                ${groups.map((g, i) => {
+                    const meta = CEP_VERDICT_META[g.tag] || {};
+                    return `
+                <tr class="cep-compare-row--${g.tag}">
+                    <td class="cep-compare-title">${i === 0 && !single ? '🏆 ' : ''}${_cepEsc(g.msg)}</td>
+                    <td>${g.creatives.length}개</td>
+                    <td>${_cepFmtPct(g.agg.ctr)}</td>
+                    <td>${_cepFmtKRW(g.agg.cost)}</td>
+                    <td>${_cepFmtInt(g.agg.cv)}</td>
+                    <td class="cep-compare-roas"><b>${g.agg.roas.toFixed(0)}%</b></td>
+                    <td class="cep-msg-verdict">${meta.emoji || ''} ${meta.label || ''}</td>
+                </tr>`;
+                }).join('')}
+            </tbody>
+        </table>
+        <p class="cep-msg-hint">${noMsg > 0 ? `메시지 미지정 소재 ${noMsg}개는 집계 제외 · ` : ''}${hint}</p>
     </div>`;
 }
 
@@ -1128,7 +1180,12 @@ window.cepJumpToProduct = async function(pKey) {
     try { await _cepEnsureData(); } catch (e) { return; }
     if (!_cepProducts.has(pKey)) return;
     _cepSelectedKey = pKey;
+    // 글로벌 브랜드 탭과 다른 브랜드의 제품으로 점프하면 목록 필터가 선택을 첫 제품으로
+    // 리셋해버리므로, CEP 탭의 브랜드 필터를 대상 제품의 브랜드로 맞춰준다.
+    _cepBrand = _cepProducts.get(pKey).brand;
     _cepPopulateBrandFilter(_cepProducts);
+    const brandSel = document.getElementById('cep-brand-filter');
+    if (brandSel) brandSel.value = _cepBrand; // 필터 UI도 같이 동기화
     _cepApplyFilters();
     document.getElementById('cep-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
