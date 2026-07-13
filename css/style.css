@@ -325,6 +325,19 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
 .fw-stop-note { font-size: 11px; color: #be123c; margin: 8px 0 0; }
 .fw-stop-note--wait { color: #94a3b8; }
 
+/* 프레임워크 탭의 소재 썸네일은 순위 카드보다 크게 — 소재가 보고서의 주인공이므로 */
+.fw-msg-body .cep-rank-thumbs { border-top: none; padding-top: 2px; }
+.fw-msg-body .cep-rank-thumbs-label { font-size: 10.5px; }
+.fw-msg-body .cep-rank-thumb-row { gap: 10px; }
+.fw-msg-body .cep-rank-thumb { width: 128px; height: 160px; border-radius: 10px; }
+.fw-msg-body .cep-rank-thumb:hover { transform: scale(1.04); }
+.fw-msg-body .cep-rank-thumb-roas { font-size: 11px; padding: 3px 0 4px; }
+.fw-msg-body .cep-rank-thumb-more { width: 56px; height: 160px; border-radius: 10px; font-size: 12px; }
+@media (max-width: 640px) {
+    .fw-msg-body .cep-rank-thumb { width: 96px; height: 120px; }
+    .fw-msg-body .cep-rank-thumb-more { height: 120px; }
+}
+
 /* 나머지 상황 접기 */
 .fw-rest { margin-top: 4px; }
 .fw-rest > summary {
