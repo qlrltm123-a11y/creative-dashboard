@@ -338,15 +338,17 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
     .fw-msg-body .cep-rank-thumb-more { height: 120px; }
 }
 
-/* Level 1: 상황 카드 위에 얹는 Desired Outcome 라벨 (카드와 하나로 이어 보이게) */
-.fw-cep-outer { margin-bottom: 8px; }
-.fw-cep-outer .fw-cep { margin-bottom: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
-.fw-outcome {
-    display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap;
-    background: #fdfaff; border: 1px solid #e9d5ff; border-bottom: none;
-    border-radius: 10px 10px 0 0; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #6b21a8;
+/* Level 1: 제품 전체를 관통하는 마스터 Desired Outcome (진행판 헤더 바로 아래, 제품당 1개) */
+.fw-master {
+    background: #fdfaff; border: 1px solid #e9d5ff; border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 14px;
 }
-.fw-outcome-lv { font-size: 9px; font-weight: 800; color: #7c3aed; background: #f3e8ff; border-radius: 999px; padding: 1px 7px; letter-spacing: .3px; white-space: nowrap; }
+.fw-master-lv { font-size: 10.5px; font-weight: 800; color: #7c3aed; letter-spacing: .3px; margin-bottom: 4px; }
+.fw-master-text { font-size: 14px; font-weight: 700; color: #4c1d95; line-height: 1.5; }
+.fw-master-exceptions {
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e9d5ff;
+    font-size: 11px; color: #7c6f99; line-height: 1.7;
+}
 .fw-usp-hl { color: #7c3aed; background: #f3e8ff; border-radius: 3px; padding: 0 2px; }
 
 /* 나머지 상황 접기 */

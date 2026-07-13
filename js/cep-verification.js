@@ -1447,6 +1447,35 @@ function _fwHighlightUsp(text, product) {
     return esc.split(_cepEsc(kw)).join(`<b class="fw-usp-hl">${_cepEsc(kw)}</b>`);
 }
 
+// 제품 전체를 관통하는 마스터 Desired Outcome — 여러 CEP의 문장을 하나로 합친 최종 형태.
+// CEP별 문장은 전부 이 한 줄이 상황에 따라 갈라진 버전이며, 여기 안 맞는 CEP는
+// "핵심이 아닌 보조 니즈로 팔린 상황"이므로 억지로 합치지 않고 별도로 표시한다.
+const CEP_PRODUCT_MASTER_OUTCOME = {
+    '3D-Refill': '집에서도 시술 못지않은 탄력 케어를 하고 싶다',
+    'Asachuru': '언제 어디서든 처지지 않는 탄력 있는 피부이고 싶다',
+    'EyeCream': '눈가만큼은 나이 들어 보이지 않았으면 좋겠다',
+    'NAD-Cream': '하루 끝, 피부 컨디션만큼은 지치지 않았으면 좋겠다',
+    'NAD-Cream-2': '하루 끝, 피부 컨디션만큼은 지치지 않았으면 좋겠다',
+    'ColorCoverTint': '어떤 상황에서도 자연스러운 발색이 오래 유지됐으면 좋겠다',
+    'ColTonerSet': '계절이 바뀌어도 보송하고 윤기 있는 피부를 유지하고 싶다',
+    'FdBrush': '언제 발라도 얼룩 없이 밀착된 피부 표현을 하고 싶다',
+    'GelMist': '언제든 간편하게 수분을 채워 촉촉함을 유지하고 싶다',
+    'GelMistx2': '언제든 간편하게 수분을 채워 촉촉함을 유지하고 싶다',
+    'GlazeGloss': '자연스러운 윤기와 볼륨으로 입술을 돋보이게 하고 싶다',
+    'LastingGlowStick': '먹고 마셔도 립 컬러가 그대로 유지됐으면 좋겠다',
+    'LipDuoSet': '화장 고칠 틈 없어도 발색이 하루 종일 유지됐으면 좋겠다',
+    'Seamless': '땀·시간에 상관없이 처음 그 피부 표현이 유지됐으면 좋겠다',
+    'ShadingStick': '처음이어도 실패 없이 자연스러운 음영을 만들고 싶다',
+    'SoftBlurEye': '언제나 실패 없이 인상적인 눈매를 완성하고 싶다',
+};
+
+// 마스터 문장에 안 맞는(= USP 키워드가 없는) CEP만 골라 "보조 상황"으로 따로 반환
+function _fwMasterExceptions(rows, product) {
+    const kw = CEP_PRODUCT_USP[product];
+    if (!kw) return [];
+    return rows.filter(r => !_fwDesiredOutcome(r.info.title).includes(kw));
+}
+
 // Level 3: 컨텍스트(시즌·문화) — 이긴 상황을 계절·장면으로 확장할 때 쓰는 렌즈
 const FW_CONTEXTS = [
     { label: '여름·에어컨', kw: ['여름', '에어컨', '폭염', '냉방', '장마', '땀'] },
@@ -1570,20 +1599,17 @@ function _fwCepBlockHtml(r, rank, pObj) {
         ${!passed ? '<p class="fw-stop-note">탈락한 상황 — 메시지·표현 추가보다 상황 재설계 또는 중단을 권장합니다.</p>' : ''}`;
 
     return `
-    <div class="fw-cep-outer">
-        <div class="fw-outcome"><span class="fw-outcome-lv">Desired Outcome</span>${_fwHighlightUsp(_fwDesiredOutcome(r.info.title), pObj.product)}</div>
-        <details class="fw-cep fw-cep--${state}">
-            <summary class="fw-cep-head">
-                <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>
-                <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
-                <span class="fw-cep-title">${_cepEsc(r.info.title)}${ctxNow ? ` <span class="fw-ctx-chip">${_cepEsc(ctxNow.label)}</span>` : ''}</span>
-                ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
-                <span class="fw-state fw-state--${state}">${stateLabel}</span>
-                <i class="fas fa-chevron-down fw-chev"></i>
-            </summary>
-            <div class="fw-cep-body">${bodyHtml}</div>
-        </details>
-    </div>`;
+    <details class="fw-cep fw-cep--${state}">
+        <summary class="fw-cep-head">
+            <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>
+            <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
+            <span class="fw-cep-title">${_cepEsc(r.info.title)}${ctxNow ? ` <span class="fw-ctx-chip">${_cepEsc(ctxNow.label)}</span>` : ''}</span>
+            ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
+            <span class="fw-state fw-state--${state}">${stateLabel}</span>
+            <i class="fas fa-chevron-down fw-chev"></i>
+        </summary>
+        <div class="fw-cep-body">${bodyHtml}</div>
+    </details>`;
 }
 
 function _fwRenderBoard() {
@@ -1602,6 +1628,20 @@ function _fwRenderBoard() {
     const rankMap = new Map(scored.slice(0, 5).map((x, i) => [x.r.c, i + 1]));
     const rest = [...scored.slice(5).map(x => x.r), ...rows.filter(r => !r.agg)];
 
+    // 제품 전체를 관통하는 마스터 Desired Outcome — 여러 CEP 문장을 하나로 합친 최종 형태.
+    // 안 맞는(핵심 USP 키워드가 없는) CEP는 억지로 합치지 않고 보조 상황으로 따로 표시.
+    const masterText = CEP_PRODUCT_MASTER_OUTCOME[pObj.product];
+    const exceptions = masterText ? _fwMasterExceptions(rows, pObj.product) : [];
+    const masterHtml = masterText ? `
+        <div class="fw-master">
+            <div class="fw-master-lv">제품 전체 Desired Outcome <span class="fw-crit">CEP ${rows.length}개를 하나로 합친 문장</span></div>
+            <div class="fw-master-text">${_fwHighlightUsp(masterText, pObj.product)}</div>
+            ${exceptions.length ? `<div class="fw-master-exceptions">➕ 이 문장과 결이 다른 보조 상황 ${exceptions.length}개: ${exceptions.map(r => {
+                const m = CEP_VERDICT_META[r.tag] || {};
+                return `${m.emoji || ''} ${_cepEsc(_fwDesiredOutcome(r.info.title))}`;
+            }).join(' · ')}</div>` : ''}
+        </div>` : '';
+
     el.innerHTML = `
     <div class="fw-board">
         <div class="fw-board-head">
@@ -1609,6 +1649,7 @@ function _fwRenderBoard() {
             <span class="fw-board-title">${_cepEsc(pObj.product)}</span>
             <button class="fw-jump-btn" onclick="cepJumpToProduct('${safeKey}')"><i class="fas fa-flask"></i> CEP 검증 탭에서 상세 보기</button>
         </div>
+        ${masterHtml}
         <div class="fw-actions">
             <div class="fw-actions-title">▶ 다음 할 일</div>
             ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
