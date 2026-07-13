@@ -798,67 +798,6 @@ function _cepRankThumbsHtml(cepObj, labelPrefix) {
     </div>`;
 }
 
-function _cepRankingSectionHtml(pObj, benchmark) {
-    const medals = ['🥇', '🥈', '🥉'];
-    const allCeps = [...pObj.ceps.values()];
-    const done = allCeps.filter(c => c.creatives.length > 0);
-    const pending = allCeps.filter(c => c.creatives.length === 0);
-
-    const rankedDone = done
-        .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
-        .sort((a, b) => b.agg.roas - a.agg.roas);
-
-    if (!rankedDone.length && !pending.length) return '';
-
-    const modClass = i => i === 0 ? 'first' : i === 1 ? 'second' : i === 2 ? 'third' : '';
-    const cardHtml = (entry, i) => {
-        const { c, agg, info } = entry;
-        const tag = _cepVerdictTag(agg, true);
-        const meta = CEP_VERDICT_META[tag];
-        const ctx = _cepContextFor(pObj.product, info.title);
-        return `
-        <div class="cep-rank-card${modClass(i) ? ` cep-rank-card--${modClass(i)}` : ''}">
-            <span class="cep-verdict-chip cep-verdict-chip--${tag}">${meta.emoji} ${meta.label}</span>
-            <div class="cep-rank-medal">${medals[i] || '📌'}</div>
-            <div class="cep-rank-body">
-                <div class="cep-rank-name">${_cepEsc(info.title || c.cepLabel)}</div>
-                <div class="cep-rank-metrics">
-                    <span class="cep-rank-roas">${agg.roas.toFixed(0)}%</span>
-                    <span class="cep-rank-sep">|</span>
-                    <span class="cep-rank-cv">CV ${_cepFmtInt(agg.cv)}건</span>
-                    <span class="cep-rank-cost">${_cepFmtKRW(agg.cost)}</span>
-                </div>
-                ${ctx ? `<div class="cep-rank-ctx"><i class="fas fa-quote-left"></i><span>${_cepEsc(ctx)}</span></div>` : ''}
-                ${_cepRankThumbsHtml(c)}
-            </div>
-        </div>`;
-    };
-
-    const pendingCardsHtml = pending.map(c => {
-        const info = _cepSplitLabel(c.cepLabel);
-        return `
-        <div class="cep-rank-card cep-rank-card--pending">
-            <div class="cep-rank-medal">⏳</div>
-            <div class="cep-rank-body">
-                <div class="cep-rank-pending-label">검증 대기</div>
-                <div class="cep-rank-name">${_cepEsc(info.title || c.cepLabel)}</div>
-            </div>
-        </div>`;
-    }).join('');
-
-    return `
-    <div class="cep-ranking-section">
-        <div class="cep-ranking-header">
-            <span class="cep-ranking-title">CEP 성과 순위</span>
-            <span class="cep-ranking-sub">ROAS 기준 · 검증 완료 ${rankedDone.length}개</span>
-        </div>
-        <div class="cep-rank-cards">
-            ${rankedDone.map((entry, i) => cardHtml(entry, i)).join('')}
-            ${pendingCardsHtml}
-        </div>
-    </div>`;
-}
-
 // ── 다각도 프레임 × 실측 성과 자동 인사이트 ─────────────────────────────────
 // 하나의 프레임을 모든 제품에 강요하지 않는다. 여러 관점(긴급도/니즈 유형/상황
 // 구체성/사용 맥락)으로 CEP를 각각 분류해 실측 ROAS와 교차하고, 그 제품에서
@@ -1077,39 +1016,6 @@ function _cepFoldHtml(icon, title, sub, inner, open) {
     </details>`;
 }
 
-// 핵심 요약 3줄 — 이 제품에서 지금 알아야 할 것: 뭐가 잘됐고, 뭐가 안 됐고, 다음에 뭘 하나.
-function _cepKeySummaryHtml(pObj) {
-    const done = [...pObj.ceps.values()]
-        .filter(c => c.creatives.length > 0)
-        .map(c => ({ c, agg: _cepAggregate(c), info: _cepSplitLabel(c.cepLabel) }))
-        .filter(x => x.agg.cost > 0)
-        .sort((a, b) => b.agg.roas - a.agg.roas);
-    if (!done.length) return '';
-    const pendingN = [...pObj.ceps.values()].filter(c => !c.creatives.length).length;
-    const top = done[0], bottom = done[done.length - 1];
-    const topMeta = CEP_VERDICT_META[_cepVerdictTag(top.agg, true)];
-
-    // 다음 할 일: 1위 CEP의 메시지 검증 단계에 따라 자동 제안 (넓게 → 좁게)
-    const msgs = _cepMsgGroups(top.c);
-    let next;
-    if (msgs.length >= 2) {
-        const code = (msgs[0].msg.match(/^M\d+/) || [msgs[0].msg.slice(0, 10)])[0];
-        next = `1위 CEP 안에서 ${code} 메시지가 우세 — 이 방향으로 소재를 늘리세요.`;
-    } else if (msgs.length === 1) {
-        next = `1위 CEP는 아직 메시지 1개만 검증 — 두 번째 메시지를 붙여 "무슨 말이 먹히는지" 좁히세요.`;
-    } else {
-        next = `1위 CEP에 메시지를 지정해 2차(메시지) 검증을 시작하세요.`;
-    }
-    if (pendingN > 0) next += ` (검증 대기 CEP ${pendingN}개)`;
-
-    return `
-    <div class="cep-keysum">
-        <div class="cep-keysum-row"><span class="cep-keysum-ico">🏆</span><span class="cep-keysum-label">잘된 상황</span><span class="cep-keysum-text">${_cepEsc(top.info.title)} — <b>ROAS ${top.agg.roas.toFixed(0)}%</b> ${topMeta.emoji} ${topMeta.label}</span></div>
-        ${done.length >= 2 ? `<div class="cep-keysum-row"><span class="cep-keysum-ico">⚠️</span><span class="cep-keysum-label">안 된 상황</span><span class="cep-keysum-text">${_cepEsc(bottom.info.title)} — <b>ROAS ${bottom.agg.roas.toFixed(0)}%</b></span></div>` : ''}
-        <div class="cep-keysum-row"><span class="cep-keysum-ico">▶</span><span class="cep-keysum-label">다음 할 일</span><span class="cep-keysum-text">${_cepEsc(next)}</span></div>
-    </div>`;
-}
-
 function _cepRenderDetailForSelected() {
     const detailEl = document.getElementById('cep-detail');
     if (!detailEl || !_cepProducts) return;
@@ -1127,16 +1033,17 @@ function _cepRenderDetailForSelected() {
     const benchmark = _cepProductBenchmark(pObj);
     const compareTable = _cepCompareTableHtml(pObj);
 
-    // 기본 화면: 핵심 요약 → 순위 → CEP 블록. 수치 표·심화 분석·팀 노트는 접어둔다.
+    // 이 탭의 역할은 근거·기록(전체 CEP·원인 분석·팀 노트) — "지금 뭘 해야 하나"(마스터 문장·
+    // 다음 할 일·상위 5개 랭킹) 판단은 검증 프레임워크 탭에서 하므로 여기선 링크만 걸어둔다.
+    const safeKey = _cepEsc(_cepSelectedKey);
     detailEl.innerHTML = `
         <div class="cep-detail-header">
             <span class="cep-brand-tag">${_cepEsc(pObj.brand)}</span>
             <span class="cep-detail-title">${_cepEsc(pObj.product)}</span>
             <span class="cep-product-stat">CEP ${allCeps.length}개 · 완료 ${done} · 대기 ${allCeps.length - done}${avgRoas != null ? ` · 평균 ROAS ${avgRoas.toFixed(0)}%` : ''}</span>
+            <button class="fw-jump-btn" onclick="fwJumpToProduct('${safeKey}')"><i class="fas fa-route"></i> 검증 프레임워크에서 다음 할 일 보기</button>
         </div>
-        ${_cepKeySummaryHtml(pObj)}
-        ${_cepRankingSectionHtml(pObj, benchmark)}
-        <div class="cep-section-detail-label"><i class="fas fa-flask"></i> CEP별 소재 상세</div>
+        <div class="cep-section-detail-label"><i class="fas fa-flask"></i> CEP별 소재 상세 <span class="fw-crit">전체 ${ceps.length}개 · 근거·기록용</span></div>
         <div class="cep-blocks">
             ${ceps.length ? ceps.map(c => _cepRenderCepBlock(c, pObj.product, false, benchmark)).join('') : _cepEmptyHtml('fa-flask', '조건에 맞는 CEP가 없습니다.', { py: 'py-10' })}
         </div>
@@ -1820,6 +1727,16 @@ window.cepJumpToProduct = async function(pKey) {
     if (brandSel) brandSel.value = _cepBrand; // 필터 UI도 같이 동기화
     _cepApplyFilters();
     document.getElementById('cep-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// 역방향 점프: CEP 검증(근거·기록) → 검증 프레임워크(의사결정) — 같은 제품을 유지한 채 전환
+window.fwJumpToProduct = async function(pKey) {
+    if (typeof window.switchSection === 'function') window.switchSection('framework');
+    try { await _cepEnsureData(); } catch (e) { return; }
+    if (!_cepProducts.has(pKey)) return;
+    _fwSelectedKey = pKey;
+    if (typeof window.renderFrameworkTab === 'function') await window.renderFrameworkTab();
+    document.getElementById('fw-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 async function renderCepVerification(forceReload) {
