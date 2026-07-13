@@ -1203,13 +1203,45 @@ function _cepRenderFramework(productsMap) {
         },
     ];
 
+    // Level 1~4 구조 피라미드 — 니즈에서 출발해 크리에이티브까지 내려오는 전략 계층
+    const pyramid = `
+        <div class="fw-pyr">
+            <div class="fw-pyr-row">
+                <span class="fw-pyr-lv">Level 1</span>
+                <div class="fw-pyr-body"><b>니즈</b><span class="fw-pyr-q">변하지 않는 욕구 — 여기서 출발</span>
+                    <p>내일 피부 컨디션을 좋게 하고 싶다 · 피부 변화를 늦추고 싶다 · 공들인 스킨케어를 지키고 싶다 · 건조함을 해결하고 싶다</p></div>
+            </div>
+            <div class="fw-pyr-arrow">↓</div>
+            <div class="fw-pyr-row">
+                <span class="fw-pyr-lv">Level 2</span>
+                <div class="fw-pyr-body"><b>CEP (상황)</b><span class="fw-pyr-q">니즈가 구체화되어 제품이 떠오르는 순간</span>
+                    <p>중요한 날 전날 밤 · 거울을 봤을 때 · 스킨케어 마지막 단계 · 피부가 당긴다고 느끼는 순간</p></div>
+            </div>
+            <div class="fw-pyr-arrow">↓</div>
+            <div class="fw-pyr-row">
+                <span class="fw-pyr-lv">Level 3</span>
+                <div class="fw-pyr-body"><b>컨텍스트</b><span class="fw-pyr-q">이긴 상황을 확장하는 시즌·문화</span>
+                    <p>여름/에어컨 · 가을/환절기 · 겨울/난방 · 봄/꽃가루 · 여행 · 출근 · 비행기 · 온천</p></div>
+            </div>
+            <div class="fw-pyr-arrow">↓</div>
+            <div class="fw-pyr-row">
+                <span class="fw-pyr-lv">Level 4</span>
+                <div class="fw-pyr-body"><b>크리에이티브</b><span class="fw-pyr-q">메시지와 표현으로 구체화</span>
+                    <p>「塗るより、閉じ込める」 · 「朝の肌は夜で決まる」 · 「秋は、肌からやってくる」</p></div>
+            </div>
+        </div>
+        <p class="fw-pyr-note">검증은 <b>Level 2(상황)</b>부터 시작해 메시지→표현으로 좁히고(아래 1·2·3차),
+        이긴 상황은 <b>Level 3(컨텍스트)</b>로 계절·문화 확장합니다. 아래 진행판은 <b>Level 1 니즈</b>로 상황을 묶어 보여줍니다.</p>`;
+
     el.innerHTML = `
     <div class="cep-fw">
         <div class="cep-fw-header">
             <i class="fas fa-route"></i>
             <span class="cep-fw-title">검증 프레임워크</span>
-            <span class="cep-fw-sub">넓게 검증하고, 이긴 것만 좁힌다 — 이 탭이 도는 방식</span>
+            <span class="cep-fw-sub">니즈에서 출발해, 넓게 검증하고, 이긴 것만 좁힌다</span>
         </div>
+        ${pyramid}
+        <div class="cep-fw-header cep-fw-header--sub"><i class="fas fa-flask"></i><span class="cep-fw-title">검증 3단계</span><span class="cep-fw-sub">Level 2 → 4를 데이터로 검증하는 순서</span></div>
         <div class="cep-fw-steps">
             ${steps.map(st => `
             <div class="cep-fw-step">
@@ -1295,6 +1327,49 @@ function _fwNextActions(rows) {
     if (!acts.length) acts.push({ ico: '🚀', text: '1차 검증 시작 단계 — 상황(CEP)별 소재를 집행하세요' });
     return acts;
 }
+
+// ── Level 1: Human Needs — CEP(상황) 위의 변하지 않는 욕구 ─────────────────
+// 상황은 니즈가 구체화된 장면이다. 진행판에서 CEP를 니즈로 묶어 "왜 이 상황들을
+// 검증하는가"의 흐름(니즈 → 상황 → 컨텍스트 → 크리에이티브)이 보이게 한다.
+const FW_NEEDS = [
+    { key: 'prepare', emoji: '🌙', label: '내일·중요한 순간을 준비하고 싶다',
+      kw: ['내일', '다음 날', '전날 밤', '자는 동안', '자기 전', '깨어나', '중요한 날', '중요한 미팅', '면접', '당일', '앞두고'] },
+    { key: 'keep', emoji: '🛡️', label: '공들인 지금 상태를 오래 지키고 싶다',
+      kw: ['유지', '무너짐', '무너질', '무너지', '지워지', '지워질', '묻는', '묻지', '밤까지', '그대로', '오래 있어도', '고칠 틈'] },
+    { key: 'fix', emoji: '⚡', label: '지금의 불편함을 바로 해결하고 싶다',
+      kw: ['건조', '당길', '당김', '푸석', '수분', '다크서클', '피로', '피곤', '칙칙', '리셋', '보충', '잠을', '거칠'] },
+    { key: 'slow', emoji: '⏳', label: '피부 변화를 늦추고 싶다',
+      kw: ['노화', '나이', '처지', '처짐', '탄력', '주름', '어른 피부', '안티에이징', '30대', '예전 같지'] },
+    { key: 'shine', emoji: '✨', label: '더 나아 보이고 싶다',
+      kw: ['인상', '눈매', '혈색', '볼륨', '화사', '변신', '예쁘', '세련', '실패 없', '자연스럽', '보정', '발색', '균일'] },
+];
+const FW_NEED_ETC = { key: 'etc', emoji: '❓', label: '기타 니즈 (분류 전)' };
+
+// CEP 문장에서 니즈 추정: 키워드 매칭 수가 가장 많은 니즈 (동점이면 위 순서)
+function _fwNeedFor(title) {
+    let best = null, bestScore = 0;
+    FW_NEEDS.forEach(n => {
+        const score = n.kw.reduce((s, k) => s + (title.includes(k) ? 1 : 0), 0);
+        if (score > bestScore) { best = n; bestScore = score; }
+    });
+    return best || FW_NEED_ETC;
+}
+
+// Level 3: 컨텍스트(시즌·문화) — 이긴 상황을 계절·장면으로 확장할 때 쓰는 렌즈
+const FW_CONTEXTS = [
+    { label: '여름·에어컨', kw: ['여름', '에어컨', '폭염', '냉방', '장마', '땀'] },
+    { label: '가을·환절기', kw: ['환절기', '가을'] },
+    { label: '겨울·난방', kw: ['겨울', '난방'] },
+    { label: '출근·업무', kw: ['출근', '통근', '근무', '회의', '외근', '업무'] },
+    { label: '여행·출장', kw: ['여행', '출장', '호텔', '비행'] },
+    { label: '축제·모임', kw: ['축제', '이벤트', '모임', '식사', '카페'] },
+    { label: '밤·자기 전', kw: ['전날 밤', '자는 동안', '자기 전', '밤에'] },
+    { label: '아침', kw: ['아침'] },
+];
+function _fwContextFor(title) {
+    return FW_CONTEXTS.find(c => c.kw.some(k => title.includes(k))) || null;
+}
+const FW_CTX_POOL = ['여름·에어컨', '가을·환절기', '겨울·난방', '봄·꽃가루', '여행·출장', '출근길', '비행기 기내', '온천·목욕 후'];
 
 // 종합 점수 — ROAS가 좋아도 규모(매출·CV·광고비)가 작으면 뒤로 보낸다 (상위 5개 선별 기준)
 function _fwScore(agg) {
@@ -1387,20 +1462,27 @@ function _fwCepBlockHtml(r, rank, pObj) {
         todoHtml = `<div class="fw-msg-todo">✍️ 소재에 <b>메시지(M코드)</b>부터 지정하세요 — 시트 '메시지' 컬럼</div>`;
     }
 
+    // Level 3: 통과한 상황엔 컨텍스트 확장 제안 (같은 니즈·상황을 다른 계절·장면으로)
+    const ctxNow = _fwContextFor(r.info.title);
+    const ctxExpand = passed
+        ? `<div class="fw-ctx-expand">🧭 <b>컨텍스트 확장 (Level 3)</b> — ${ctxNow ? `"${ctxNow.label}"에서 통과한 상황을` : '이긴 상황을'} 다른 계절·장면으로: ${FW_CTX_POOL.filter(c => !ctxNow || c !== ctxNow.label).slice(0, 4).join(' · ')}</div>`
+        : '';
+
     const bodyHtml = r.tag === 'pending'
         ? `<p class="fw-stop-note fw-stop-note--wait">소재 집행 전 — 1차 판정 후 메시지 단계가 열립니다.</p>`
         : `
         <div class="fw-lv-label">2차 · 이 상황에서 검증한 메시지 (무슨 말)</div>
         ${groups.map((g, gi) => _fwMsgBlockHtml(g, namedCnt >= 2 && gi === 0 && !g.unassigned)).join('')}
         ${todoHtml}
+        ${ctxExpand}
         ${!passed ? '<p class="fw-stop-note">탈락한 상황 — 메시지·표현 추가보다 상황 재설계 또는 중단을 권장합니다.</p>' : ''}`;
 
     return `
     <details class="fw-cep fw-cep--${state}">
         <summary class="fw-cep-head">
-            <span class="fw-cep-rank">${rank ? `${rank}위` : '⏳'}</span>
+            <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>
             <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
-            <span class="fw-cep-title">${_cepEsc(r.info.title)}</span>
+            <span class="fw-cep-title">${_cepEsc(r.info.title)}${ctxNow ? ` <span class="fw-ctx-chip">${_cepEsc(ctxNow.label)}</span>` : ''}</span>
             ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
             <span class="fw-state fw-state--${state}">${stateLabel}</span>
             <i class="fas fa-chevron-down fw-chev"></i>
@@ -1419,10 +1501,40 @@ function _fwRenderBoard() {
     const acts = _fwNextActions(rows);
     const safeKey = _cepEsc(_fwSelectedKey);
 
-    // 상위 5개만 본문에: ROAS 단독이 아니라 매출·CV·광고비 규모를 보정한 종합 점수 순
-    const scored = rows.filter(r => r.agg).map(r => ({ ...r, score: _fwScore(r.agg) })).sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, 5);
-    const rest = [...scored.slice(5), ...rows.filter(r => !r.agg)];
+    // 종합 점수(ROAS×매출·CV·광고비 보정) 상위 5개에만 순위 배지 부여
+    const scored = rows.filter(r => r.agg).map(r => ({ r, score: _fwScore(r.agg) })).sort((a, b) => b.score - a.score);
+    const rankMap = new Map(scored.slice(0, 5).map((x, i) => [x.r.c, i + 1]));
+    const scoreMap = new Map(scored.map(x => [x.r.c, x.score]));
+
+    // Level 1: 니즈로 상황을 그룹핑 — 니즈 안에서는 점수 순(대기 뒤), 니즈끼리는 최고 점수 순
+    const needGroups = new Map();
+    rows.forEach(r => {
+        const need = _fwNeedFor(r.info.title);
+        if (!needGroups.has(need.key)) needGroups.set(need.key, { need, rows: [] });
+        needGroups.get(need.key).rows.push(r);
+    });
+    const glist = [...needGroups.values()].map(g => {
+        g.rows.sort((a, b) => (scoreMap.get(b.c) || -1) - (scoreMap.get(a.c) || -1));
+        g.best = g.rows.length ? (scoreMap.get(g.rows[0].c) || 0) : 0;
+        g.done = g.rows.filter(x => x.agg);
+        g.pass = g.rows.filter(x => x.tag === 'win' || x.tag === 'mid').length;
+        return g;
+    }).sort((a, b) => b.best - a.best);
+
+    const needHtml = (g, gi) => {
+        const bestRoas = g.done.length ? Math.max(...g.done.map(x => x.agg.roas)) : null;
+        return `
+        <details class="fw-need"${gi === 0 ? ' open' : ''}>
+            <summary class="fw-need-head">
+                <span class="fw-need-lv">니즈</span>
+                <span class="fw-need-emoji">${g.need.emoji}</span>
+                <span class="fw-need-label">${_cepEsc(g.need.label)}</span>
+                <span class="fw-need-stat">상황 ${g.rows.length}개 · 통과 ${g.pass}${bestRoas != null ? ` · 최고 ROAS ${bestRoas.toFixed(0)}%` : ''}</span>
+                <i class="fas fa-chevron-down fw-chev"></i>
+            </summary>
+            <div class="fw-need-body">${g.rows.map(r => _fwCepBlockHtml(r, rankMap.get(r.c) || 0, pObj)).join('')}</div>
+        </details>`;
+    };
 
     el.innerHTML = `
     <div class="fw-board">
@@ -1435,15 +1547,10 @@ function _fwRenderBoard() {
             <div class="fw-actions-title">▶ 다음 할 일</div>
             ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
         </div>
-        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> 1차 · 상황(CEP) 상위 ${top.length}개
-            <span class="fw-crit">선정 기준: ROAS에 매출·CV·광고비 규모 보정한 종합 점수</span></div>
-        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
-        ${top.length ? top.map((r, i) => _fwCepBlockHtml(r, i + 1, pObj)).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
-        ${rest.length ? `
-        <details class="fw-rest">
-            <summary>나머지 상황 ${rest.length}개 보기 (하위 성과·집행 대기 포함) <i class="fas fa-chevron-down fw-chev"></i></summary>
-            <div class="fw-rest-body">${rest.map((r, i) => _fwCepBlockHtml(r, r.agg ? i + 6 : 0, pObj)).join('')}</div>
-        </details>` : ''}
+        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> 니즈(Level 1) → 상황(Level 2) 진행판
+            <span class="fw-crit">순위 배지 = ROAS에 매출·CV·광고비 규모를 보정한 종합 점수 상위 5</span></div>
+        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 니즈를 누르면 상황이, 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
+        ${glist.length ? glist.map(needHtml).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
     </div>`;
 }
 
