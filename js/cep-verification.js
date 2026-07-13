@@ -1258,7 +1258,8 @@ function _cepRenderFramework(productsMap) {
             </div>
         </div>
         <p class="fw-pyr-note">검증은 <b>Level 2(CEP)</b>부터 시작해 메시지→표현으로 좁히고(아래 1·2·3차), 매 단계를 <b>Level 5(Performance)</b>로 판정합니다.
-        통과한 상황은 <b>Level 3(Context)</b>로 계절·문화를 확장합니다. 아래 진행판의 각 상황 카드에는 그 상황의 <b>Level 1 Desired Outcome</b>이 함께 표시됩니다.</p>`;
+        통과한 상황은 <b>Level 3(Context)</b>로 계절·문화를 확장합니다. 아래 진행판의 각 상황 카드에는 그 상황의 <b>Level 1 Desired Outcome</b>이 함께 표시되며,
+        문장 안에 <span class="fw-usp-hl">굵게 강조된 단어</span>는 그 제품의 핵심 USP 키워드입니다 — 같은 키워드가 다른 CEP·제품에도 등장하면 그 강점이 여러 상황에서 검증됐다는 뜻입니다.</p>`;
 
     el.innerHTML = `
     <div class="cep-fw">
@@ -1360,16 +1361,16 @@ function _fwNextActions(rows) {
 // 구체적인 한 줄을 직접 큐레이션한다(시트 문구 기준 — 신규 상황 대비 규칙 기반 폴백 포함).
 const CEP_DESIRED_OUTCOME = {
     '피부 처짐은 신경 쓰이지만 시술은 부담스러워, 집에서 할 수 있는 리프팅 케어를 찾을 때': '시술 없이도 탄력 있는 피부를 만들고 싶다',
-    '여름밤 스킨케어 마무리 단계에서, 수분과 탄력을 놓치지 않고 마지막에 꽉 잡아두고 싶을 때': '공들인 스킨케어 효과를 아침까지 잃고 싶지 않다',
-    '육아로 오랜만에 거울을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '거울 속 처진 얼굴선이 신경 쓰이지 않았으면 좋겠다',
-    '화면 속 얼굴을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '화면 속 내 얼굴선이 처져 보이지 않았으면 좋겠다',
-    '아침엔 윤기, 밤엔 탄력까지 하루 종일 나이 드는 피부 인상을 관리하고 싶을 때': '하루 종일 어려 보이는 피부 컨디션을 유지하고 싶다',
+    '여름밤 스킨케어 마무리 단계에서, 수분과 탄력을 놓치지 않고 마지막에 꽉 잡아두고 싶을 때': '공들인 탄력 케어 효과를 아침까지 잃고 싶지 않다',
+    '육아로 오랜만에 거울을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '거울 속 처진 얼굴선에 탄력을 되찾고 싶다',
+    '화면 속 얼굴을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '화면 속 내 얼굴선에 탄력을 되찾고 싶다',
+    '아침엔 윤기, 밤엔 탄력까지 하루 종일 나이 드는 피부 인상을 관리하고 싶을 때': '아침 윤기부터 밤 탄력까지 하루 종일 유지하고 싶다',
     '30대 중반, 문득 피부 처짐이 눈에 들어오기 시작해 탄력 케어가 필요하다고 느낄 때': '처지기 시작한 피부를 다시 탄력 있게 만들고 싶다',
     '중요한 날을 앞둔 전날 밤, 다음 날 아침 탄력 있는 피부로 깨어나고 싶을 때': '내일 아침 탄력 있는 피부로 깨어나고 싶다',
     '거울 속 피부가 푸석하고 윤기 없어 보일 때': '거울 속 피부가 윤기 있어 보이고 싶다',
     '예전 같지 않은 어른 피부가 느껴져, 나이에 맞는 케어가 필요하다고 생각될 때': '내 나이에 맞는 제대로 된 케어를 시작하고 싶다',
     '환절기 건조로 피부가 푸석해지고 탄력이 떨어졌다고 느껴질 때': '환절기에도 푸석해지지 않는 피부이고 싶다',
-    '화상회의·셀카 화면 속 내 얼굴을 보다가 처지고 나이 들어 보이는 인상을 느꼈을 때': '화면 속 내 얼굴이 나이 들어 보이지 않았으면 좋겠다',
+    '화상회의·셀카 화면 속 내 얼굴을 보다가 처지고 나이 들어 보이는 인상을 느꼈을 때': '화면 속 내 얼굴에 탄력이 없어 보이지 않았으면 좋겠다',
     '도중에 화장을 못 고치는 용무가 이어지는 날, 지장 없는 립을 찾을 때': '화장을 못 고쳐도 립 걱정 없이 지내고 싶다',
     '종일 근무·외근으로 화장 고칠 틈 없는 날, 립이 지워질까 걱정될 때': '화장 고칠 틈 없어도 립이 지워지지 않았으면 좋겠다',
     '어떤 립이든 예쁘게 올리기 위해, 거친 입술을 정돈하고 싶을 때': '어떤 립을 발라도 예쁘게 발색됐으면 좋겠다',
@@ -1425,6 +1426,25 @@ function _fwDesiredOutcome(title) {
     if (!seg) seg = title;
     if (!/(싶다|좋겠다)$/.test(seg)) seg += '았으면 좋겠다';
     return seg;
+}
+
+// 제품별 핵심 USP 키워드(1개) — Desired Outcome 문장 안에 이미 자연스럽게 들어있는 단어를
+// 굵게 강조해, 별도 태그 열 없이도 "이 강점이 어떤 제품·CEP에 걸쳐 있는지"를 한눈에 보이게 한다.
+// 문장에 키워드가 없으면(= 그 CEP는 이 제품의 핵심이 아니라 보조 니즈로 팔린 상황) 강조 없이 그대로 둔다.
+const CEP_PRODUCT_USP = {
+    '3D-Refill': '탄력', 'Asachuru': '탄력', 'EyeCream': '탄력',
+    'NAD-Cream': '컨디션', 'NAD-Cream-2': '컨디션',
+    'ColorCoverTint': '발색', 'ColTonerSet': '윤기', 'FdBrush': '밀착',
+    'GelMist': '수분', 'GelMistx2': '수분', 'GlazeGloss': '윤기',
+    'LastingGlowStick': '유지', 'LipDuoSet': '유지', 'Seamless': '유지',
+    'ShadingStick': '자연스러운', 'SoftBlurEye': '눈매',
+};
+
+function _fwHighlightUsp(text, product) {
+    const kw = CEP_PRODUCT_USP[product];
+    const esc = _cepEsc(text);
+    if (!kw || !text.includes(kw)) return esc;
+    return esc.split(_cepEsc(kw)).join(`<b class="fw-usp-hl">${_cepEsc(kw)}</b>`);
 }
 
 // Level 3: 컨텍스트(시즌·문화) — 이긴 상황을 계절·장면으로 확장할 때 쓰는 렌즈
@@ -1551,7 +1571,7 @@ function _fwCepBlockHtml(r, rank, pObj) {
 
     return `
     <div class="fw-cep-outer">
-        <div class="fw-outcome"><span class="fw-outcome-lv">Desired Outcome</span>${_cepEsc(_fwDesiredOutcome(r.info.title))}</div>
+        <div class="fw-outcome"><span class="fw-outcome-lv">Desired Outcome</span>${_fwHighlightUsp(_fwDesiredOutcome(r.info.title), pObj.product)}</div>
         <details class="fw-cep fw-cep--${state}">
             <summary class="fw-cep-head">
                 <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>

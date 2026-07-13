@@ -347,6 +347,7 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
     border-radius: 10px 10px 0 0; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #6b21a8;
 }
 .fw-outcome-lv { font-size: 9px; font-weight: 800; color: #7c3aed; background: #f3e8ff; border-radius: 999px; padding: 1px 7px; letter-spacing: .3px; white-space: nowrap; }
+.fw-usp-hl { color: #7c3aed; background: #f3e8ff; border-radius: 3px; padding: 0 2px; }
 
 /* 나머지 상황 접기 */
 .fw-rest { margin-top: 4px; }
