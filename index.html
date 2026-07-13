@@ -66,6 +66,10 @@
                 <i class="fas fa-flask sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">CEP 검증</span><span class="sb-sub">가설→소재→결과</span></span>
             </button>
+            <button class="section-tab" data-section="framework" title="검증 프레임워크">
+                <i class="fas fa-route sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">검증 프레임워크</span><span class="sb-sub">상황→메시지→표현</span></span>
+            </button>
             <div class="sb-group-label">운영 · 보고</div>
             <button class="section-tab" data-section="gmv" title="GMV">
                 <i class="fas fa-chart-line sb-ico"></i>
@@ -800,10 +804,37 @@
                 </div>
             </div>
 
-            <!-- 검증 프레임워크: 이 탭의 검증이 어떤 구조로 도는지 (JS가 실데이터 현황과 함께 렌더) -->
-            <div id="cep-framework"></div>
         </div>
         <!-- ============ /SECTION: CEP 검증 로그 ============ -->
+
+        <!-- ============ SECTION: 검증 프레임워크 ============ -->
+        <div class="section-panel" data-panel="framework">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-route text-violet-500"></i> 검증 프레임워크
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">넓게 검증하고, 이긴 것만 좁힌다 — 제품별로 어떤 상황이 워킹했고 다음에 뭘 검증할지</p>
+                </div>
+            </div>
+            <!-- 프레임워크 설명 (3단계 + 판정 기준 + 기록 규칙) -->
+            <div id="fw-explainer"></div>
+            <!-- 제품별 검증 진행판 -->
+            <div class="mt-6">
+                <div class="mb-3">
+                    <h3 class="text-sm font-bold text-slate-800"><i class="fas fa-diagram-project text-violet-400 mr-1"></i> 제품별 검증 진행판</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">제품을 고르면 상황(1차)→메시지(2차)→표현(3차) 진행 상태와 다음 할 일이 나옵니다</p>
+                </div>
+                <div id="fw-products" class="fw-products"></div>
+                <div id="fw-board">
+                    <div class="text-center text-slate-300 text-sm py-16">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3 opacity-30"></i>
+                        <p class="text-sm">검증 로그 불러오는 중...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- ============ /SECTION: 검증 프레임워크 ============ -->
 
         <!-- ============ SECTION: GMV 시뮬레이터 (iframe 통합) ============ -->
         <div class="section-panel" data-panel="gmv">
@@ -945,8 +976,8 @@
     <script defer src="js/weekly-report.js?v=260708e"></script>
     <script defer src="js/unified-briefing.js?v=260703"></script>
     <script defer src="js/market-research.js"></script>
-    <script defer src="js/cep-verification.js?v=260710c"></script>
+    <script defer src="js/cep-verification.js?v=260710d"></script>
     <script defer src="js/ai-chat.js?v=260703"></script>
-    <script defer src="js/main.js?v=260708"></script>
+    <script defer src="js/main.js?v=260710"></script>
 </body>
 </html>

@@ -628,6 +628,8 @@ function switchSection(sectionName) {
                 renderKRSection();
             } else if (sectionName === 'cep') {
                 if (typeof window.renderCepVerification === 'function') window.renderCepVerification();
+            } else if (sectionName === 'framework') {
+                if (typeof window.renderFrameworkTab === 'function') window.renderFrameworkTab();
             } else if (sectionName === 'funnel' || sectionName === 'gmv') {
                 // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드) + 전역 브랜드 전달
                 const frame = document.getElementById(sectionName + '-frame');
