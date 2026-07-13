@@ -1137,6 +1137,93 @@ window.cepSetBrand = function(brand) {
     if (_cepProducts) _cepApplyFilters();
 };
 
+// ── 검증 프레임워크 (탭 하단 고정 섹션) ─────────────────────────────────
+// 이 탭의 검증이 어떤 구조로 도는지 처음 보는 사람에게 설명한다:
+// 1차 상황(CEP) → 2차 메시지 → 3차 표현으로 "넓게 검증하고 이긴 것만 좁히는" 깔때기.
+// 각 단계에 실데이터 현황을 붙여 지금 어디까지 왔는지 같이 보여준다.
+function _cepFrameworkStats(productsMap) {
+    let totalCeps = 0, doneCeps = 0, msgTournaments = 0, exprGroups = 0;
+    productsMap.forEach(p => p.ceps.forEach(c => {
+        if ((c.cepLabel || '').includes('CEP 미지정')) return;
+        totalCeps++;
+        if (!c.creatives.length) return;
+        doneCeps++;
+        const groups = _cepMsgGroups(c);
+        if (groups.length >= 2) msgTournaments++;                    // 2차: 메시지 비교 성립
+        exprGroups += groups.filter(g => g.creatives.length >= 2).length; // 3차: 같은 메시지 소재 2개+
+    }));
+    return { totalCeps, doneCeps, msgTournaments, exprGroups };
+}
+
+function _cepRenderFramework(productsMap) {
+    const el = document.getElementById('cep-framework');
+    if (!el) return;
+    const s = _cepFrameworkStats(productsMap);
+
+    const steps = [
+        {
+            no: '1차', title: '상황(CEP) 검증', q: '언제 필요한가',
+            desc: '한 제품에 여러 상황(CEP)을 동시에 붙여, 반응이 나오는 상황부터 찾습니다. 시트의 <b>소구포인트</b> 컬럼이 이 단계입니다.',
+            where: '위 화면: 핵심 요약 · CEP 성과 순위',
+            stat: `검증 완료 <b>${s.doneCeps}</b> / 전체 CEP ${s.totalCeps}개`,
+            pass: '이긴 상황만 2차로',
+        },
+        {
+            no: '2차', title: '메시지 검증', q: '무슨 말이 먹히나',
+            desc: '이긴 상황 안에서 <b>메시지(M코드)</b>를 2개 이상 붙여 비교합니다. 같은 상황이라도 "올인원 세트"와 "지속력"은 다른 말입니다.',
+            where: '위 화면: CEP 블록 → 메시지별 성과 표',
+            stat: `메시지 비교 성립 CEP <b>${s.msgTournaments}</b>개`,
+            pass: '이긴 메시지만 3차로',
+        },
+        {
+            no: '3차', title: '표현 검증', q: '어떻게 보여주나',
+            desc: '이긴 메시지는 고정하고 <b>모델·포맷(영상/배너·비율)·연출</b>만 바꿔 증량합니다. 여기서부터는 크리에이티브 최적화 단계입니다.',
+            where: '위 화면: CEP 블록 → 소재별 성과 카드',
+            stat: `같은 메시지 반복 검증 <b>${s.exprGroups}</b>조합`,
+            pass: '성과 유지되면 예산 증량',
+        },
+    ];
+
+    el.innerHTML = `
+    <div class="cep-fw">
+        <div class="cep-fw-header">
+            <i class="fas fa-route"></i>
+            <span class="cep-fw-title">검증 프레임워크</span>
+            <span class="cep-fw-sub">넓게 검증하고, 이긴 것만 좁힌다 — 이 탭이 도는 방식</span>
+        </div>
+        <div class="cep-fw-steps">
+            ${steps.map(st => `
+            <div class="cep-fw-step">
+                <div class="cep-fw-step-head"><span class="cep-fw-step-no">${st.no}</span><span class="cep-fw-step-title">${st.title}</span><span class="cep-fw-step-q">"${st.q}"</span></div>
+                <p class="cep-fw-step-desc">${st.desc}</p>
+                <div class="cep-fw-step-where"><i class="fas fa-eye"></i> ${st.where}</div>
+                <div class="cep-fw-step-foot"><span class="cep-fw-step-stat">${st.stat}</span><span class="cep-fw-step-pass"><i class="fas fa-arrow-right"></i> ${st.pass}</span></div>
+            </div>`).join('')}
+        </div>
+        <div class="cep-fw-grid">
+            <div class="cep-fw-card">
+                <div class="cep-fw-card-title"><i class="fas fa-gavel"></i> 판정 기준 <span class="cep-fw-card-sub">CEP에 묶인 소재들의 COST·매출 합산 기준</span></div>
+                <div class="cep-fw-verdicts">
+                    <span class="cep-fw-verdict">✅ 검증 성공 <b>ROAS 200%↑</b></span>
+                    <span class="cep-fw-verdict">🟡 부분 검증 <b>100~199%</b></span>
+                    <span class="cep-fw-verdict">🟠 반응 약함 <b>100% 미만</b></span>
+                    <span class="cep-fw-verdict">❌ 가설 미입증 <b>구매 0건</b></span>
+                    <span class="cep-fw-verdict">📝 검증 대기 <b>집행 전</b></span>
+                </div>
+                <p class="cep-fw-note">판정 후: <b>성공</b> → 다음 단계로 좁히기 · <b>부분</b> → 메시지/표현 바꿔 1회 재검증 · <b>약함·미입증</b> → 상황 재설계 또는 중단(예산 회수)</p>
+            </div>
+            <div class="cep-fw-card">
+                <div class="cep-fw-card-title"><i class="fas fa-pen-ruler"></i> 시트 기록 규칙 <span class="cep-fw-card-sub">creatives_template · 검증 log 탭</span></div>
+                <ul class="cep-fw-rules">
+                    <li><b>소구포인트</b> = 언제(상황) · <b>메시지</b> = 무슨 말(한 문장) · <b>검증 상세</b> = 어떻게(모델·연출)</li>
+                    <li>한 소재 = 한 메시지. 메시지에 상황이나 모델 얘기가 섞이면 잘못 쓴 것</li>
+                    <li>새 메시지는 <b>메시지 사전</b> 탭에 먼저 등록(M코드 부여) 후 골라서 사용</li>
+                </ul>
+            </div>
+        </div>
+    </div>`;
+}
+
 function _cepApplyFilters() {
     if (!_cepProducts) return;
     const brandSel = _cepActiveBrand();
@@ -1145,6 +1232,7 @@ function _cepApplyFilters() {
     _cepRenderSummary([...filtered.values()]);
     _cepRenderProductList(filtered);
     _cepRenderDetailForSelected();
+    _cepRenderFramework(filtered);
 }
 window.cepApplyFilters = _cepApplyFilters;
 

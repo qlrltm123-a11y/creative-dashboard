@@ -188,6 +188,66 @@
 .cep-cause-more[open] > summary i { transform: rotate(180deg); }
 .cep-cause-more > .cep-cause-list { margin-top: 6px; }
 
+/* ── 검증 프레임워크 (CEP 탭 하단) ─────────────────────────────────────── */
+.cep-fw {
+    margin-top: 28px; padding: 20px 22px; background: #fff;
+    border: 1px solid #e8ecf3; border-radius: 14px; box-shadow: 0 1px 3px rgba(15,23,42,.05);
+}
+.cep-fw-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.cep-fw-header > i { color: #7c3aed; font-size: 13px; }
+.cep-fw-title { font-size: 14px; font-weight: 800; color: #1e293b; }
+.cep-fw-sub { font-size: 11.5px; color: #94a3b8; }
+
+.cep-fw-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.cep-fw-step {
+    position: relative; background: #f8fafc; border: 1px solid #eef2f7;
+    border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.cep-fw-step:not(:last-child)::after {
+    content: '\2192'; position: absolute; right: -13px; top: 50%; transform: translateY(-50%);
+    color: #c7d2fe; font-size: 16px; font-weight: 700; z-index: 1;
+}
+.cep-fw-step-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.cep-fw-step-no {
+    font-size: 10px; font-weight: 800; color: #7c3aed; background: #f3e8ff;
+    padding: 2px 7px; border-radius: 999px; letter-spacing: .3px;
+}
+.cep-fw-step-title { font-size: 12.5px; font-weight: 700; color: #1e293b; }
+.cep-fw-step-q { font-size: 11px; color: #7c3aed; font-weight: 600; }
+.cep-fw-step-desc { margin: 0; font-size: 11.5px; color: #475569; line-height: 1.65; }
+.cep-fw-step-desc b { color: #334155; }
+.cep-fw-step-where { font-size: 10.5px; color: #94a3b8; }
+.cep-fw-step-where i { font-size: 9px; margin-right: 2px; }
+.cep-fw-step-foot {
+    margin-top: auto; padding-top: 8px; border-top: 1px dashed #e2e8f0;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+}
+.cep-fw-step-stat { font-size: 11px; color: #475569; }
+.cep-fw-step-stat b { color: #4f46e5; font-size: 12.5px; }
+.cep-fw-step-pass { font-size: 10.5px; font-weight: 700; color: #059669; }
+.cep-fw-step-pass i { font-size: 9px; }
+
+.cep-fw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.cep-fw-card { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 13px 16px; }
+.cep-fw-card-title { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 9px; }
+.cep-fw-card-title i { color: #94a3b8; font-size: 11px; }
+.cep-fw-card-sub { font-size: 10.5px; font-weight: 400; color: #94a3b8; }
+.cep-fw-verdicts { display: flex; flex-wrap: wrap; gap: 6px; }
+.cep-fw-verdict {
+    font-size: 10.5px; color: #475569; background: #fff; border: 1px solid #e2e8f0;
+    border-radius: 999px; padding: 3px 9px; white-space: nowrap;
+}
+.cep-fw-verdict b { color: #1e293b; }
+.cep-fw-note { margin: 9px 0 0; font-size: 11px; color: #64748b; line-height: 1.65; }
+.cep-fw-rules { margin: 0; padding-left: 16px; }
+.cep-fw-rules li { font-size: 11.5px; color: #475569; line-height: 1.7; margin-bottom: 3px; }
+
+@media (max-width: 900px) {
+    .cep-fw-steps { grid-template-columns: 1fr; }
+    .cep-fw-step:not(:last-child)::after { content: '\2193'; right: auto; left: 50%; top: auto; bottom: -14px; transform: translateX(-50%); }
+    .cep-fw-grid { grid-template-columns: 1fr; }
+}
+
 /* 메시지별 성과(2차 검증) — CEP 블록 내부, cep-compare-table 스타일 공유 */
 .cep-msg-sub { font-weight: 400; font-size: 10.5px; color: #94a3b8; margin-left: 6px; }
 .cep-msg-hint { margin: 6px 2px 0; font-size: 11px; color: #64748b; line-height: 1.6; }
