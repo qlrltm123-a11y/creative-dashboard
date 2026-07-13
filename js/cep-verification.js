@@ -58,6 +58,18 @@ function _cepNormalizeProduct(raw) {
     return CEP_PRODUCT_ALIASES[s] || s;
 }
 
+// 시트에 표현만 다르게 입력된 "사실상 같은 상황(CEP)"을 하나로 통합
+// (예: Asachuru의 '중요한 날 전날 밤 → 다음 날 아침 탄력' 상황이 3가지 문장으로 존재)
+const CEP_LABEL_ALIASES = {
+    '중요한 다음 날을 앞두고, 자기 전 발라 아침에 탄력 있는 피부로 깨어나고 싶을 때': '중요한 날을 앞둔 전날 밤, 다음 날 아침 탄력 있는 피부로 깨어나고 싶을 때',
+    '중요한 날을 앞두고, 전날 밤부터 다음 날 아침 탄력을 미리 준비해두고 싶을 때': '중요한 날을 앞둔 전날 밤, 다음 날 아침 탄력 있는 피부로 깨어나고 싶을 때',
+    '중요한 자리를 앞둔 전날 밤, 다음 날 탄력 있는 피부로 깨어나고 싶을 때': '중요한 날을 앞둔 전날 밤, 다음 날 아침 탄력 있는 피부로 깨어나고 싶을 때',
+};
+function _cepNormalizeLabel(raw) {
+    const s = (raw || '').trim();
+    return CEP_LABEL_ALIASES[s] || s;
+}
+
 // 제품별 CEP 시장 컨텍스트 (boh-tankcream-dashboard.vercel.app 시장조사 대시보드 기반)
 // 시트의 CEP 번호는 입력 오타가 섞여있어(같은 번호가 다른 CEP에 중복 사용된 경우 발견) 신뢰할 수 없다.
 // 대신 CEP 제목에 포함된 키워드로 매칭한다.
@@ -267,7 +279,7 @@ function _cepBuildModel(rows) {
 
         const lineCount = Math.max(cepLines.length, hypoLines.length, 1);
         for (let i = 0; i < lineCount; i++) {
-            const cepLabel = cepLines[i] || cepLines[0] || '(CEP 미지정)';
+            const cepLabel = _cepNormalizeLabel(cepLines[i] || cepLines[0]) || '(CEP 미지정)';
             const hypoText = hypoLines[i] || hypoLines[0] || '';
             if (!pObj.ceps.has(cepLabel)) {
                 pObj.ceps.set(cepLabel, { cepLabel, hypotheses: new Set(), creatives: [] });
@@ -749,7 +761,7 @@ function _cepMsgTableHtml(cepObj) {
 
 // 순위 카드 하단: 이 CEP를 표현한 검증 소재 썸네일 스트립 (ROAS 높은 순, 클릭 시 원본)
 const CEP_RANK_THUMB_MAX = 5;
-function _cepRankThumbsHtml(cepObj) {
+function _cepRankThumbsHtml(cepObj, labelPrefix) {
     const items = [...cepObj.creatives].sort((a, b) => (b.roasSheet || 0) - (a.roasSheet || 0));
     if (!items.length) return '';
     const shown = items.slice(0, CEP_RANK_THUMB_MAX);
@@ -774,7 +786,7 @@ function _cepRankThumbsHtml(cepObj) {
         ? `<span class="cep-rank-thumb-more" title="아래 CEP 상세의 '소재별 성과'에서 전체 확인">+${rest}</span>` : '';
     return `
     <div class="cep-rank-thumbs">
-        <div class="cep-rank-thumbs-label">이 CEP를 표현한 소재 ${items.length}개 · 클릭하면 원본</div>
+        <div class="cep-rank-thumbs-label">${labelPrefix || '이 CEP를 표현한 소재'} ${items.length}개 · 클릭하면 원본</div>
         <div class="cep-rank-thumb-row">${cells}${moreHtml}</div>
     </div>`;
 }
@@ -1134,7 +1146,11 @@ function _cepActiveBrand() {
 }
 window.cepSetBrand = function(brand) {
     _cepBrand = (brand && brand !== 'ALL') ? brand : '';
-    if (_cepProducts) _cepApplyFilters();
+    if (_cepProducts) {
+        _cepApplyFilters();
+        // 검증 프레임워크 탭도 같은 브랜드로 갱신
+        if (typeof window.renderFrameworkTab === 'function') window.renderFrameworkTab();
+    }
 };
 
 // ── 검증 프레임워크 (탭 하단 고정 섹션) ─────────────────────────────────
@@ -1164,21 +1180,24 @@ function _cepRenderFramework(productsMap) {
         {
             no: '1차', title: '상황(CEP) 검증', q: '언제 필요한가',
             desc: '한 제품에 여러 상황(CEP)을 동시에 붙여, 반응이 나오는 상황부터 찾습니다. 시트의 <b>소구포인트</b> 컬럼이 이 단계입니다.',
-            where: '위 화면: 핵심 요약 · CEP 성과 순위',
+            ex: '예: 아이크림 하나에 "에어컨 건조" · "못 잔 다음 날" · "처져 보일 때" 3개 상황을 동시 검증',
+            where: '아래 진행판: 상황 카드',
             stat: `검증 완료 <b>${s.doneCeps}</b> / 전체 CEP ${s.totalCeps}개`,
             pass: '이긴 상황만 2차로',
         },
         {
             no: '2차', title: '메시지 검증', q: '무슨 말이 먹히나',
             desc: '이긴 상황 안에서 <b>메시지(M코드)</b>를 2개 이상 붙여 비교합니다. 같은 상황이라도 "올인원 세트"와 "지속력"은 다른 말입니다.',
-            where: '위 화면: CEP 블록 → 메시지별 성과 표',
+            ex: '예: 같은 "여름 축제" 상황에 "한 번에 끝내는 올인원" vs "윤기·발색 지속" 두 메시지를 대결',
+            where: '아래 진행판: 상황 카드를 누르면 메시지 목록',
             stat: `메시지 비교 성립 CEP <b>${s.msgTournaments}</b>개`,
             pass: '이긴 메시지만 3차로',
         },
         {
             no: '3차', title: '표현 검증', q: '어떻게 보여주나',
             desc: '이긴 메시지는 고정하고 <b>모델·포맷(영상/배너·비율)·연출</b>만 바꿔 증량합니다. 여기서부터는 크리에이티브 최적화 단계입니다.',
-            where: '위 화면: CEP 블록 → 소재별 성과 카드',
+            ex: '예: 이긴 메시지를 ① 모델 교체 ② 세로 9:16 ③ 배너 한 줄 카피 ④ Before&After 구성으로 변형',
+            where: '아래 진행판: 메시지를 누르면 소재(표현) 목록',
             stat: `같은 메시지 반복 검증 <b>${s.exprGroups}</b>조합`,
             pass: '성과 유지되면 예산 증량',
         },
@@ -1196,6 +1215,7 @@ function _cepRenderFramework(productsMap) {
             <div class="cep-fw-step">
                 <div class="cep-fw-step-head"><span class="cep-fw-step-no">${st.no}</span><span class="cep-fw-step-title">${st.title}</span><span class="cep-fw-step-q">"${st.q}"</span></div>
                 <p class="cep-fw-step-desc">${st.desc}</p>
+                <div class="cep-fw-step-ex">${st.ex}</div>
                 <div class="cep-fw-step-where"><i class="fas fa-eye"></i> ${st.where}</div>
                 <div class="cep-fw-step-foot"><span class="cep-fw-step-stat">${st.stat}</span><span class="cep-fw-step-pass"><i class="fas fa-arrow-right"></i> ${st.pass}</span></div>
             </div>`).join('')}
@@ -1276,73 +1296,117 @@ function _fwNextActions(rows) {
     return acts;
 }
 
-// 파이프라인 한 줄: [1차 상황] → [2차 메시지] → [3차 표현]
-function _fwPipeRowHtml(r) {
+// 종합 점수 — ROAS가 좋아도 규모(매출·CV·광고비)가 작으면 뒤로 보낸다 (상위 5개 선별 기준)
+function _fwScore(agg) {
+    return agg.roas
+        * (1 + Math.log10(1 + agg.revenue / 10000) * 0.5)
+        * (1 + Math.log10(1 + agg.cv) * 0.2)
+        * (1 + Math.log10(1 + agg.cost / 10000) * 0.3);
+}
+
+// 소재 이름에서 표현 구성(포맷·비율) 요약: "영상 1:1 ×3 · 배너 1:1 ×2"
+function _fwExprSummary(creatives) {
+    const counts = new Map();
+    creatives.forEach(c => {
+        const n = c.name || '';
+        const type = /_VID/i.test(n) ? '영상' : /_BNR/i.test(n) ? '배너' : '기타';
+        const ratio = /9x16/i.test(n) ? ' 9:16' : /1x1/i.test(n) ? ' 1:1' : '';
+        const k = type + ratio;
+        counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    return [...counts.entries()].map(([k, n]) => `${k} ×${n}`).join(' · ');
+}
+
+// 지금 없는 표현부터 제안하는 "다음 표현 예시" (3차 검증 아이디어)
+function _fwExprSuggestions(creatives) {
+    const names = creatives.map(c => c.name || '').join(' ');
+    const sug = [];
+    if (!/9x16/i.test(names)) sug.push('세로 9:16 버전 — 릴스·쇼츠 지면 대응');
+    if (!/_BNR/i.test(names)) sug.push('배너(정지) 버전 — 메시지를 한 줄 카피로 압축');
+    if (!/_VID/i.test(names)) sug.push('영상 버전 — 상황 재현 15초');
+    if (!/B&A/i.test(names)) sug.push('Before & After 구성 — 사용 전후 대비');
+    sug.push('첫 3초 훅 교체 — 카피 선공 vs 상황 재현 선공');
+    sug.push('모델 교체 — 같은 구성, 다른 인물로 반복 검증');
+    return sug.slice(0, 4);
+}
+
+// 이 제품의 다른 CEP에서 이미 검증한 메시지 중, 이 CEP에 아직 안 붙인 것 (두 번째 메시지 후보)
+function _fwOtherMsgs(pObj, cepObj) {
+    const used = new Set(cepObj.creatives.map(c => (c.message || '').trim()).filter(Boolean));
+    const all = new Set();
+    pObj.ceps.forEach(c => c.creatives.forEach(cr => { const m = (cr.message || '').trim(); if (m) all.add(m); }));
+    return [...all].filter(m => !used.has(m)).slice(0, 3);
+}
+
+// 3레벨: 메시지 블록 (누르면 표현 = 실제 소재 썸네일 + 다음 표현 예시)
+function _fwMsgBlockHtml(g, isWin) {
+    const code = g.unassigned ? '미지정' : _fwMsgCode(g.msg);
+    const text = g.unassigned ? '메시지 미지정 소재 — 시트 \'메시지\' 컬럼을 채워주세요' : g.msg.replace(/^M\d+\.\s*/, '');
+    return `
+    <details class="fw-msg${isWin ? ' fw-msg--win' : ''}${g.unassigned ? ' fw-msg--none' : ''}">
+        <summary class="fw-msg-head">
+            ${isWin ? '<span class="fw-msg-crown">🏆</span>' : ''}
+            <span class="fw-msg-code">${_cepEsc(code)}</span>
+            <span class="fw-msg-text">${_cepEsc(text)}</span>
+            <span class="fw-msg-metrics">ROAS <b>${g.agg.roas.toFixed(0)}%</b> · 소재 ${g.creatives.length}개</span>
+            <i class="fas fa-chevron-down fw-chev"></i>
+        </summary>
+        <div class="fw-msg-body">
+            <div class="fw-lv-label">3차 · 이 메시지의 표현 (어떻게)</div>
+            <div class="fw-expr-sum">지금까지: ${_cepEsc(_fwExprSummary(g.creatives) || '-')}</div>
+            ${_cepRankThumbsHtml({ creatives: g.creatives }, '이 메시지로 만든 소재')}
+            <div class="fw-expr-sug">
+                <div class="fw-lv-label">다음 표현 예시 <span class="fw-crit">지금 없는 표현부터 제안</span></div>
+                <ul>${_fwExprSuggestions(g.creatives).map(s => `<li>${_cepEsc(s)}</li>`).join('')}</ul>
+            </div>
+        </div>
+    </details>`;
+}
+
+// 2레벨: 상황(CEP) 블록 (누르면 메시지 목록)
+function _fwCepBlockHtml(r, rank, pObj) {
     const meta = CEP_VERDICT_META[r.tag] || {};
     const passed = r.tag === 'win' || r.tag === 'mid';
+    const state = r.tag === 'pending' ? 'wait' : passed ? 'pass' : 'stop';
+    const stateLabel = r.tag === 'pending' ? '대기' : passed ? '통과' : '탈락';
 
-    // 1차 칸
-    const s1State = r.tag === 'pending' ? 'wait' : passed ? 'pass' : 'stop';
-    const s1Label = r.tag === 'pending' ? '집행 대기' : passed ? '통과' : '탈락';
-    const s1 = `
-        <div class="fw-cell fw-cell--${s1State}">
-            <div class="fw-cell-tag">${meta.emoji || ''} ${meta.label || ''}${r.agg ? ` · ROAS <b>${r.agg.roas.toFixed(0)}%</b>` : ''}</div>
-            <div class="fw-cell-title">${_cepEsc(r.info.title)}</div>
-            <span class="fw-state fw-state--${s1State}">${s1Label}</span>
-        </div>`;
+    // 메시지 그룹 + 미지정 소재 묶음
+    const groups = [...r.msgs];
+    const noMsg = r.c.creatives.filter(c => !(c.message || '').trim());
+    if (noMsg.length) groups.push({ msg: '', creatives: noMsg, agg: _cepAggregate({ creatives: noMsg }), unassigned: true });
+    const namedCnt = r.msgs.length;
 
-    // 2차 칸
-    let s2;
-    if (r.tag === 'pending') {
-        s2 = `<div class="fw-cell fw-cell--dim"><div class="fw-cell-note">1차 결과 대기</div></div>`;
-    } else if (!passed) {
-        s2 = `<div class="fw-cell fw-cell--dim"><div class="fw-cell-note">진행 안 함 — 상황 재설계 또는 중단</div></div>`;
-    } else if (r.msgs.length >= 2) {
-        const w = r.msgs[0];
-        const others = r.msgs.slice(1).map(g => `${_fwMsgCode(g.msg)} ${g.agg.roas.toFixed(0)}%`).join(' · ');
-        s2 = `
-        <div class="fw-cell fw-cell--pass">
-            <div class="fw-cell-tag">🏆 <b>${_cepEsc(_fwMsgCode(w.msg))}</b> 우세 · ROAS <b>${w.agg.roas.toFixed(0)}%</b></div>
-            <div class="fw-cell-title">${_cepEsc(w.msg.replace(/^M\d+\.\s*/, ''))}</div>
-            <div class="fw-cell-note">vs ${_cepEsc(others)}</div>
-            <span class="fw-state fw-state--pass">통과</span>
-        </div>`;
-    } else if (r.msgs.length === 1) {
-        s2 = `
-        <div class="fw-cell fw-cell--todo">
-            <div class="fw-cell-tag">${_cepEsc(_fwMsgCode(r.msgs[0].msg))} 1개만 검증됨</div>
-            <div class="fw-cell-title">${_cepEsc(r.msgs[0].msg.replace(/^M\d+\.\s*/, ''))}</div>
-            <div class="fw-cell-note">+ 두 번째 메시지를 붙여 비교하세요</div>
-            <span class="fw-state fw-state--todo">다음 할 일</span>
-        </div>`;
-    } else {
-        s2 = `
-        <div class="fw-cell fw-cell--todo">
-            <div class="fw-cell-note">메시지 미지정 — 시트 '메시지' 컬럼 입력</div>
-            <span class="fw-state fw-state--todo">다음 할 일</span>
-        </div>`;
+    // 통과했는데 메시지가 1개뿐이면: 두 번째 메시지 제안 (같은 제품의 검증된 메시지 재활용 후보 포함)
+    let todoHtml = '';
+    if (passed && namedCnt === 1) {
+        const cands = _fwOtherMsgs(pObj, r.c);
+        todoHtml = `<div class="fw-msg-todo">➕ <b>두 번째 메시지</b>를 붙여 비교하세요${cands.length
+            ? ` — 이 제품에서 이미 검증한 메시지 재활용 후보: ${cands.map(m => `<b>${_cepEsc(_fwMsgCode(m))}</b> ${_cepEsc(m.replace(/^M\d+\.\s*/, '').slice(0, 18))}${m.replace(/^M\d+\.\s*/, '').length > 18 ? '…' : ''}`).join(' · ')}`
+            : ' — 시트 \'메시지 사전\' 탭에 새 메시지 등록 후 소재 제작'}</div>`;
+    } else if (passed && namedCnt === 0) {
+        todoHtml = `<div class="fw-msg-todo">✍️ 소재에 <b>메시지(M코드)</b>부터 지정하세요 — 시트 '메시지' 컬럼</div>`;
     }
 
-    // 3차 칸 — 현재 1위 메시지 기준 표현(소재) 반복 현황
-    let s3;
-    if (r.tag === 'pending' || !passed) {
-        s3 = `<div class="fw-cell fw-cell--dim"><div class="fw-cell-note">-</div></div>`;
-    } else if (r.msgs.length) {
-        const w = r.msgs[0];
-        const n = w.creatives.length;
-        const bestRoas = Math.max(...w.creatives.map(cr => cr.roasSheet || 0));
-        const ready = r.msgs.length >= 2; // 메시지 승자가 정해진 뒤가 진짜 3차
-        s3 = `
-        <div class="fw-cell fw-cell--${ready ? 'todo' : 'dim'}">
-            <div class="fw-cell-tag">${_cepEsc(_fwMsgCode(w.msg))} 소재 <b>${n}개</b>${n ? ` · 베스트 ROAS ${bestRoas.toFixed(0)}%` : ''}</div>
-            <div class="fw-cell-note">${ready ? '모델·포맷(영상/배너·비율) 변형으로 증량' : '2차(메시지 비교)가 먼저입니다'}</div>
-            ${ready ? '<span class="fw-state fw-state--todo">다음 할 일</span>' : ''}
-        </div>`;
-    } else {
-        s3 = `<div class="fw-cell fw-cell--dim"><div class="fw-cell-note">-</div></div>`;
-    }
+    const bodyHtml = r.tag === 'pending'
+        ? `<p class="fw-stop-note fw-stop-note--wait">소재 집행 전 — 1차 판정 후 메시지 단계가 열립니다.</p>`
+        : `
+        <div class="fw-lv-label">2차 · 이 상황에서 검증한 메시지 (무슨 말)</div>
+        ${groups.map((g, gi) => _fwMsgBlockHtml(g, namedCnt >= 2 && gi === 0 && !g.unassigned)).join('')}
+        ${todoHtml}
+        ${!passed ? '<p class="fw-stop-note">탈락한 상황 — 메시지·표현 추가보다 상황 재설계 또는 중단을 권장합니다.</p>' : ''}`;
 
-    return `<div class="fw-pipe-row">${s1}<span class="fw-pipe-arrow">→</span>${s2}<span class="fw-pipe-arrow">→</span>${s3}</div>`;
+    return `
+    <details class="fw-cep fw-cep--${state}">
+        <summary class="fw-cep-head">
+            <span class="fw-cep-rank">${rank ? `${rank}위` : '⏳'}</span>
+            <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
+            <span class="fw-cep-title">${_cepEsc(r.info.title)}</span>
+            ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
+            <span class="fw-state fw-state--${state}">${stateLabel}</span>
+            <i class="fas fa-chevron-down fw-chev"></i>
+        </summary>
+        <div class="fw-cep-body">${bodyHtml}</div>
+    </details>`;
 }
 
 function _fwRenderBoard() {
@@ -1355,6 +1419,11 @@ function _fwRenderBoard() {
     const acts = _fwNextActions(rows);
     const safeKey = _cepEsc(_fwSelectedKey);
 
+    // 상위 5개만 본문에: ROAS 단독이 아니라 매출·CV·광고비 규모를 보정한 종합 점수 순
+    const scored = rows.filter(r => r.agg).map(r => ({ ...r, score: _fwScore(r.agg) })).sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 5);
+    const rest = [...scored.slice(5), ...rows.filter(r => !r.agg)];
+
     el.innerHTML = `
     <div class="fw-board">
         <div class="fw-board-head">
@@ -1366,23 +1435,39 @@ function _fwRenderBoard() {
             <div class="fw-actions-title">▶ 다음 할 일</div>
             ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
         </div>
-        <div class="fw-pipe-head"><span>1차 · 상황 (언제)</span><span></span><span>2차 · 메시지 (무슨 말)</span><span></span><span>3차 · 표현 (어떻게)</span></div>
-        <div class="fw-pipe-rows">
-            ${rows.length ? rows.map(_fwPipeRowHtml).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
-        </div>
+        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> 1차 · 상황(CEP) 상위 ${top.length}개
+            <span class="fw-crit">선정 기준: ROAS에 매출·CV·광고비 규모 보정한 종합 점수</span></div>
+        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
+        ${top.length ? top.map((r, i) => _fwCepBlockHtml(r, i + 1, pObj)).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
+        ${rest.length ? `
+        <details class="fw-rest">
+            <summary>나머지 상황 ${rest.length}개 보기 (하위 성과·집행 대기 포함) <i class="fas fa-chevron-down fw-chev"></i></summary>
+            <div class="fw-rest-body">${rest.map((r, i) => _fwCepBlockHtml(r, r.agg ? i + 6 : 0, pObj)).join('')}</div>
+        </details>` : ''}
     </div>`;
+}
+
+// 글로벌 브랜드 탭(BOH/WM/CG)과 동기화 — 선택 브랜드의 제품만 표시
+function _fwBrandFilter() {
+    return (typeof currentBrand !== 'undefined' && currentBrand && currentBrand !== 'ALL') ? currentBrand : '';
 }
 
 function _fwRenderProducts() {
     const el = document.getElementById('fw-products');
     if (!el || !_cepProducts) return;
-    // 검증 기록이 있는 제품만, 브랜드 → 완료 CEP 많은 순
+    const brandSel = _fwBrandFilter();
+    // 검증 기록이 있는 + 선택 브랜드의 제품만, 완료 CEP 많은 순
     const items = [..._cepProducts.entries()]
+        .filter(([, p]) => !brandSel || p.brand === brandSel)
         .map(([key, p]) => ({ key, p, rows: _fwCepRows(p) }))
         .filter(x => x.rows.length)
         .sort((a, b) => a.p.brand.localeCompare(b.p.brand) || b.rows.length - a.rows.length);
-    if (!items.length) { el.innerHTML = ''; return; }
-    if (!_fwSelectedKey || !_cepProducts.has(_fwSelectedKey)) _fwSelectedKey = items[0].key;
+    if (!items.length) {
+        el.innerHTML = '';
+        _fwSelectedKey = null;
+        return;
+    }
+    if (!_fwSelectedKey || !items.some(x => x.key === _fwSelectedKey)) _fwSelectedKey = items[0].key;
 
     el.innerHTML = items.map(({ key, p, rows }) => {
         const cnt = t => rows.filter(r => r.tag === t).length;
@@ -1410,7 +1495,9 @@ window.renderFrameworkTab = async function() {
         if (board) board.innerHTML = _cepEmptyHtml('fa-triangle-exclamation', `검증 로그를 불러오지 못했습니다: ${e.message}`, { py: 'py-10' });
         return;
     }
-    _cepRenderFramework(_cepProducts); // 3단계 설명 + 전체 현황
+    const brandSel = _fwBrandFilter();
+    const filtered = new Map([..._cepProducts.entries()].filter(([, p]) => !brandSel || p.brand === brandSel));
+    _cepRenderFramework(filtered); // 3단계 설명 + 선택 브랜드 현황
     _fwRenderProducts();
     _fwRenderBoard();
 };

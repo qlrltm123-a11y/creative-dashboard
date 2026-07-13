@@ -278,39 +278,66 @@
 .fw-action-row { display: flex; gap: 8px; font-size: 12px; color: #334155; line-height: 1.6; margin-bottom: 4px; }
 .fw-action-row:last-child { margin-bottom: 0; }
 
-.fw-pipe-head {
-    display: grid; grid-template-columns: 1fr 18px 1fr 18px 1fr; gap: 0 4px;
-    font-size: 10.5px; font-weight: 800; color: #94a3b8; letter-spacing: .3px; margin-bottom: 8px; padding: 0 2px;
-}
-.fw-pipe-rows { display: flex; flex-direction: column; gap: 10px; }
-.fw-pipe-row { display: grid; grid-template-columns: 1fr 18px 1fr 18px 1fr; gap: 0 4px; align-items: stretch; }
-.fw-pipe-arrow { align-self: center; text-align: center; color: #c7d2fe; font-weight: 700; font-size: 13px; }
+.fw-guide { font-size: 11px; color: #94a3b8; margin: -4px 0 10px; }
+.fw-guide i { font-size: 10px; }
+.fw-crit { font-weight: 400; font-size: 10.5px; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.fw-lv-label { font-size: 10.5px; font-weight: 800; color: #7c3aed; letter-spacing: .3px; margin: 10px 0 6px; }
+.fw-chev { margin-left: 4px; color: #94a3b8; font-size: 10px; transition: transform .2s; }
+details[open] > summary > .fw-chev { transform: rotate(180deg); }
 
-.fw-cell { position: relative; border-radius: 10px; padding: 10px 12px 26px; border: 1px solid #e8ecf3; background: #fff; min-width: 0; }
-.fw-cell--pass { border-color: #a7f3d0; background: #f0fdf6; }
-.fw-cell--todo { border-color: #fde68a; background: #fffbeb; }
-.fw-cell--stop { border-color: #fecaca; background: #fef2f2; }
-.fw-cell--wait, .fw-cell--dim { background: #f8fafc; }
-.fw-cell--dim { display: flex; align-items: center; }
-.fw-cell--dim .fw-cell-note { margin: 0 auto; }
-.fw-cell-tag { font-size: 10.5px; color: #64748b; margin-bottom: 3px; }
-.fw-cell-tag b { color: #1e293b; }
-.fw-cell-title { font-size: 12px; font-weight: 600; color: #1e293b; line-height: 1.5; }
-.fw-cell-note { font-size: 10.5px; color: #94a3b8; margin-top: 3px; line-height: 1.5; }
-.fw-state {
-    position: absolute; right: 8px; bottom: 7px; font-size: 9.5px; font-weight: 800;
-    padding: 2px 7px; border-radius: 999px; letter-spacing: .3px;
-}
+/* 1레벨: 상황(CEP) 아코디언 */
+.fw-cep { border: 1px solid #e8ecf3; border-left-width: 3px; border-radius: 10px; background: #fff; margin-bottom: 8px; }
+.fw-cep--pass { border-left-color: #10b981; }
+.fw-cep--stop { border-left-color: #f87171; opacity: .8; }
+.fw-cep--wait { border-left-color: #cbd5e1; }
+.fw-cep-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; cursor: pointer; list-style: none; }
+.fw-cep-head::-webkit-details-marker { display: none; }
+.fw-cep-rank { font-size: 10px; font-weight: 800; background: #eef2ff; color: #4f46e5; border-radius: 999px; padding: 2px 8px; }
+.fw-cep-title { font-size: 12.5px; font-weight: 700; color: #1e293b; flex: 1 1 220px; min-width: 0; line-height: 1.5; }
+.fw-cep-metrics { font-size: 10.5px; color: #64748b; white-space: nowrap; }
+.fw-cep-metrics b { color: #4f46e5; font-size: 12px; }
+.fw-cep-body { padding: 0 14px 12px; }
+.fw-state { font-size: 9.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; letter-spacing: .3px; }
 .fw-state--pass { background: #d1fae5; color: #047857; }
 .fw-state--todo { background: #fef3c7; color: #b45309; }
 .fw-state--stop { background: #fee2e2; color: #be123c; }
 .fw-state--wait { background: #f1f5f9; color: #94a3b8; }
 
-@media (max-width: 900px) {
-    .fw-pipe-head { display: none; }
-    .fw-pipe-row { grid-template-columns: 1fr; gap: 4px; }
-    .fw-pipe-arrow { transform: rotate(90deg); }
-    .fw-pipe-rows { gap: 16px; }
+/* 2레벨: 메시지 아코디언 (펼치면 3레벨 = 소재 썸네일 + 표현 예시) */
+.fw-msg { border: 1px solid #eef2f7; background: #f8fafc; border-radius: 8px; margin-bottom: 6px; }
+.fw-msg--win { background: #f0fdf6; border-color: #a7f3d0; }
+.fw-msg--none { border-style: dashed; }
+.fw-msg-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 8px 12px; cursor: pointer; list-style: none; }
+.fw-msg-head::-webkit-details-marker { display: none; }
+.fw-msg-code { font-size: 10px; font-weight: 800; background: #eef2ff; color: #4f46e5; border-radius: 4px; padding: 1px 6px; }
+.fw-msg--win .fw-msg-code { background: #d1fae5; color: #047857; }
+.fw-msg-text { font-size: 12px; font-weight: 600; color: #334155; flex: 1 1 200px; min-width: 0; line-height: 1.5; }
+.fw-msg-metrics { font-size: 10.5px; color: #64748b; white-space: nowrap; }
+.fw-msg-metrics b { color: #4f46e5; }
+.fw-msg-body { padding: 0 12px 10px; }
+.fw-expr-sum { font-size: 11px; color: #475569; margin-bottom: 4px; }
+.fw-expr-sug ul { margin: 0; padding-left: 16px; }
+.fw-expr-sug li { font-size: 11.5px; color: #475569; line-height: 1.7; }
+.fw-msg-todo {
+    background: #fffbeb; border: 1px dashed #fde68a; border-radius: 8px;
+    padding: 8px 12px; font-size: 11.5px; color: #92400e; line-height: 1.7; margin-top: 6px;
+}
+.fw-stop-note { font-size: 11px; color: #be123c; margin: 8px 0 0; }
+.fw-stop-note--wait { color: #94a3b8; }
+
+/* 나머지 상황 접기 */
+.fw-rest { margin-top: 4px; }
+.fw-rest > summary {
+    cursor: pointer; list-style: none; font-size: 11.5px; font-weight: 700; color: #64748b;
+    padding: 9px 4px;
+}
+.fw-rest > summary::-webkit-details-marker { display: none; }
+.fw-rest-body { margin-top: 6px; }
+
+/* 프레임워크 설명 카드의 단계별 예시 줄 */
+.cep-fw-step-ex {
+    font-size: 10.5px; color: #7c3aed; background: #faf5ff; border-radius: 6px;
+    padding: 5px 8px; line-height: 1.55;
 }
 
 /* 메시지별 성과(2차 검증) — CEP 블록 내부, cep-compare-table 스타일 공유 */
