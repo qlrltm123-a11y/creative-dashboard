@@ -69,6 +69,8 @@ const CEP_LABEL_ALIASES = {
     '야근·외출로 지친 하루 끝, 밤에 칙칙해진 피부를 리셋하고 싶을 때': '야근·외출로 지친 하루 끝, 밤에 피부까지 쌓인 피로를 리셋하고 싶을 때',
     // SoftBlurEye: '통근 전 아침 실패 없는 아이메이크업' 동일 상황 (어미만 다름)
     '통근 전 아침, 자연스럽고 실패 없는 아이메이크업을 원할때': '통근 전 아침, 자연스럽고 실패 없는 아이메이크업을 하고 싶을 때',
+    // SoftBlurEye: '취직·면접 당일 아침' 동일 상황 (조사·동사만 다름)
+    '취직이나 면접 당일 아침, 깔끔하고 인상에 남는 눈매를 완성하고 싶을 때': '취직·면접 당일 아침, 깔끔하고 인상에 남는 눈매를 만들고 싶을 때',
 };
 function _cepNormalizeLabel(raw) {
     const s = (raw || '').trim();
@@ -1208,35 +1210,55 @@ function _cepRenderFramework(productsMap) {
         },
     ];
 
-    // Level 1~4 구조 피라미드 — 니즈에서 출발해 크리에이티브까지 내려오는 전략 계층
+    // Level 1~5 구조 피라미드 — 되고 싶은 상태에서 출발해 성과로 닫히는 전략 계층
     const pyramid = `
         <div class="fw-pyr">
             <div class="fw-pyr-row">
                 <span class="fw-pyr-lv">Level 1</span>
-                <div class="fw-pyr-body"><b>니즈</b><span class="fw-pyr-q">변하지 않는 욕구 — 여기서 출발</span>
-                    <p>내일 피부 컨디션을 좋게 하고 싶다 · 피부 변화를 늦추고 싶다 · 공들인 스킨케어를 지키고 싶다 · 건조함을 해결하고 싶다</p></div>
+                <div class="fw-pyr-body"><b>Desired Outcome</b><span class="fw-pyr-q">되고 싶은 상태 — 여기서 출발</span>
+                    <p>내일 아침 피부 컨디션이 좋아 보이고 싶다 · 공들여 한 스킨케어를 아침까지 유지하고 싶다 · 거울 속 피부가 윤기 있어 보이고 싶다 · 메이크업이 들뜨지 않았으면 좋겠다</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
                 <span class="fw-pyr-lv">Level 2</span>
-                <div class="fw-pyr-body"><b>CEP (상황)</b><span class="fw-pyr-q">니즈가 구체화되어 제품이 떠오르는 순간</span>
-                    <p>중요한 날 전날 밤 · 거울을 봤을 때 · 스킨케어 마지막 단계 · 피부가 당긴다고 느끼는 순간</p></div>
+                <div class="fw-pyr-body"><b>CEP</b><span class="fw-pyr-q">제품이 떠오르는 상황</span>
+                    <p>중요한 날 전날 · 스킨케어 마지막 단계 · 아침 거울 · 화장 수정 전</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
                 <span class="fw-pyr-lv">Level 3</span>
-                <div class="fw-pyr-body"><b>컨텍스트</b><span class="fw-pyr-q">이긴 상황을 확장하는 시즌·문화</span>
-                    <p>여름/에어컨 · 가을/환절기 · 겨울/난방 · 봄/꽃가루 · 여행 · 출근 · 비행기 · 온천</p></div>
+                <div class="fw-pyr-body"><b>Context</b><span class="fw-pyr-q">계절·문화·이벤트</span>
+                    <p>여행 · 에어컨 · 환절기 · 오후 건조 · 출근 · 온천</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
                 <span class="fw-pyr-lv">Level 4</span>
-                <div class="fw-pyr-body"><b>크리에이티브</b><span class="fw-pyr-q">메시지와 표현으로 구체화</span>
-                    <p>「塗るより、閉じ込める」 · 「朝の肌は夜で決まる」 · 「秋は、肌からやってくる」</p></div>
+                <div class="fw-pyr-body"><b>Creative Angle</b><span class="fw-pyr-q">메시지와 표현으로 구체화</span>
+                    <p>「朝の肌は夜で決まる」 · 「塗るより、閉じ込める」 · 「秋は、肌からやってくる」 · 「3秒うるおいチャージ」</p></div>
+            </div>
+            <div class="fw-pyr-arrow">↓</div>
+            <div class="fw-pyr-row">
+                <span class="fw-pyr-lv">Level 5</span>
+                <div class="fw-pyr-body"><b>Performance</b><span class="fw-pyr-q">이 조합이 통했는지 데이터로 판정</span>
+                    <p>ROAS·CV·매출로 검증 — 통과한 조합만 다음 단계(컨텍스트 확장 또는 표현 증량)로</p></div>
             </div>
         </div>
-        <p class="fw-pyr-note">검증은 <b>Level 2(상황)</b>부터 시작해 메시지→표현으로 좁히고(아래 1·2·3차),
-        이긴 상황은 <b>Level 3(컨텍스트)</b>로 계절·문화 확장합니다. 아래 진행판은 <b>Level 1 니즈</b>로 상황을 묶어 보여줍니다.</p>`;
+        <div class="fw-pyr-example">
+            <div class="fw-pyr-example-title">예시 <span class="fw-crit">한 행 = 하나의 검증 조합</span></div>
+            <div class="cep-compare-wrap">
+                <table class="cep-compare-table fw-pyr-table">
+                    <thead><tr><th>Desired Outcome</th><th>CEP</th><th>Context</th><th>Creative</th></tr></thead>
+                    <tbody>
+                        <tr><td>내일 아침 피부 컨디션이 좋아 보이고 싶다</td><td>중요한 날 전날</td><td>여행</td><td>「朝の肌は夜で決まる」</td></tr>
+                        <tr><td>공들여 한 스킨케어를 아침까지 유지하고 싶다</td><td>스킨케어 마지막 단계</td><td>에어컨</td><td>「塗るより、閉じ込める」</td></tr>
+                        <tr><td>거울 속 피부가 윤기 있어 보이고 싶다</td><td>아침 거울</td><td>환절기</td><td>「秋は、肌からやってくる」</td></tr>
+                        <tr><td>메이크업이 들뜨지 않았으면 좋겠다</td><td>화장 수정 전</td><td>오후 건조</td><td>「3秒うるおいチャージ」</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="fw-pyr-note">검증은 <b>Level 2(CEP)</b>부터 시작해 메시지→표현으로 좁히고(아래 1·2·3차), 매 단계를 <b>Level 5(Performance)</b>로 판정합니다.
+        통과한 상황은 <b>Level 3(Context)</b>로 계절·문화를 확장합니다. 아래 진행판의 각 상황 카드에는 그 상황의 <b>Level 1 Desired Outcome</b>이 함께 표시됩니다.</p>`;
 
     el.innerHTML = `
     <div class="cep-fw">
@@ -1246,7 +1268,7 @@ function _cepRenderFramework(productsMap) {
             <span class="cep-fw-sub">니즈에서 출발해, 넓게 검증하고, 이긴 것만 좁힌다</span>
         </div>
         ${pyramid}
-        <div class="cep-fw-header cep-fw-header--sub"><i class="fas fa-flask"></i><span class="cep-fw-title">검증 3단계</span><span class="cep-fw-sub">Level 2 → 4를 데이터로 검증하는 순서</span></div>
+        <div class="cep-fw-header cep-fw-header--sub"><i class="fas fa-flask"></i><span class="cep-fw-title">검증 3단계</span><span class="cep-fw-sub">Level 2→4를 Level 5(Performance)로 판정하며 검증하는 순서</span></div>
         <div class="cep-fw-steps">
             ${steps.map(st => `
             <div class="cep-fw-step">
@@ -1333,31 +1355,76 @@ function _fwNextActions(rows) {
     return acts;
 }
 
-// ── Level 1: Human Needs — CEP(상황) 위의 변하지 않는 욕구 ─────────────────
-// 상황은 니즈가 구체화된 장면이다. 진행판에서 CEP를 니즈로 묶어 "왜 이 상황들을
-// 검증하는가"의 흐름(니즈 → 상황 → 컨텍스트 → 크리에이티브)이 보이게 한다.
-const FW_NEEDS = [
-    { key: 'prepare', emoji: '🌙', label: '내일·중요한 순간을 준비하고 싶다',
-      kw: ['내일', '다음 날', '전날 밤', '자는 동안', '자기 전', '깨어나', '중요한 날', '중요한 미팅', '면접', '당일', '앞두고'] },
-    { key: 'keep', emoji: '🛡️', label: '공들인 지금 상태를 오래 지키고 싶다',
-      kw: ['유지', '무너짐', '무너질', '무너지', '지워지', '지워질', '묻는', '묻지', '밤까지', '그대로', '오래 있어도', '고칠 틈'] },
-    { key: 'fix', emoji: '⚡', label: '지금의 불편함을 바로 해결하고 싶다',
-      kw: ['건조', '당길', '당김', '푸석', '수분', '다크서클', '피로', '피곤', '칙칙', '리셋', '보충', '잠을', '거칠'] },
-    { key: 'slow', emoji: '⏳', label: '피부 변화를 늦추고 싶다',
-      kw: ['노화', '나이', '처지', '처짐', '탄력', '주름', '어른 피부', '안티에이징', '30대', '예전 같지'] },
-    { key: 'shine', emoji: '✨', label: '더 나아 보이고 싶다',
-      kw: ['인상', '눈매', '혈색', '볼륨', '화사', '변신', '예쁘', '세련', '실패 없', '자연스럽', '보정', '발색', '균일'] },
-];
-const FW_NEED_ETC = { key: 'etc', emoji: '❓', label: '기타 니즈 (분류 전)' };
+// ── Level 1: Desired Outcome — CEP(상황) 위의 "되고 싶은 상태" ──────────────
+// 5개 넓은 니즈 버킷으로 뭉치면 단조로워 보이므로, CEP 문장 하나하나에 맞춘
+// 구체적인 한 줄을 직접 큐레이션한다(시트 문구 기준 — 신규 상황 대비 규칙 기반 폴백 포함).
+const CEP_DESIRED_OUTCOME = {
+    '피부 처짐은 신경 쓰이지만 시술은 부담스러워, 집에서 할 수 있는 리프팅 케어를 찾을 때': '시술 없이도 탄력 있는 피부를 만들고 싶다',
+    '여름밤 스킨케어 마무리 단계에서, 수분과 탄력을 놓치지 않고 마지막에 꽉 잡아두고 싶을 때': '공들인 스킨케어 효과를 아침까지 잃고 싶지 않다',
+    '육아로 오랜만에 거울을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '거울 속 처진 얼굴선이 신경 쓰이지 않았으면 좋겠다',
+    '화면 속 얼굴을 본 순간, 하안부 처짐·노화가 눈에 들어올 때': '화면 속 내 얼굴선이 처져 보이지 않았으면 좋겠다',
+    '아침엔 윤기, 밤엔 탄력까지 하루 종일 나이 드는 피부 인상을 관리하고 싶을 때': '하루 종일 어려 보이는 피부 컨디션을 유지하고 싶다',
+    '30대 중반, 문득 피부 처짐이 눈에 들어오기 시작해 탄력 케어가 필요하다고 느낄 때': '처지기 시작한 피부를 다시 탄력 있게 만들고 싶다',
+    '중요한 날을 앞둔 전날 밤, 다음 날 아침 탄력 있는 피부로 깨어나고 싶을 때': '내일 아침 탄력 있는 피부로 깨어나고 싶다',
+    '거울 속 피부가 푸석하고 윤기 없어 보일 때': '거울 속 피부가 윤기 있어 보이고 싶다',
+    '예전 같지 않은 어른 피부가 느껴져, 나이에 맞는 케어가 필요하다고 생각될 때': '내 나이에 맞는 제대로 된 케어를 시작하고 싶다',
+    '환절기 건조로 피부가 푸석해지고 탄력이 떨어졌다고 느껴질 때': '환절기에도 푸석해지지 않는 피부이고 싶다',
+    '화상회의·셀카 화면 속 내 얼굴을 보다가 처지고 나이 들어 보이는 인상을 느꼈을 때': '화면 속 내 얼굴이 나이 들어 보이지 않았으면 좋겠다',
+    '도중에 화장을 못 고치는 용무가 이어지는 날, 지장 없는 립을 찾을 때': '화장을 못 고쳐도 립 걱정 없이 지내고 싶다',
+    '종일 근무·외근으로 화장 고칠 틈 없는 날, 립이 지워질까 걱정될 때': '화장 고칠 틈 없어도 립이 지워지지 않았으면 좋겠다',
+    '어떤 립이든 예쁘게 올리기 위해, 거친 입술을 정돈하고 싶을 때': '어떤 립을 발라도 예쁘게 발색됐으면 좋겠다',
+    '입술이 거칠어 평소엔 보습 중심이지만, 그래도 정돈해 보이고 싶은 날': '입술이 거칠어도 정돈된 것처럼 보이고 싶다',
+    '신경 쓰이는 입술 톤을 자연스럽게 보정해, 안색까지 화사해 보이고 싶을 때': '입술 톤을 보정해 안색까지 화사해 보이고 싶다',
+    '종일 화장 고칠 틈 없는 날, 아침에 바른 립 발색이 밤까지 그대로 유지되길 바랄 때': '아침에 바른 립 발색이 밤까지 그대로였으면 좋겠다',
+    '입술이 칙칙하고 혈색이 없어, 내 퍼스널컬러에 맞게 자연스러운 혈색으로 보정하고 싶을 때': '칙칙한 입술에 자연스러운 혈색을 더하고 싶다',
+    '장마가 끝나고 본격적인 여름을 앞두고, 끈적임·화장 무너짐 없이 보송윤기 피부로 대비하고 싶을 때': '끈적임 없이 보송하고 윤기 있는 피부이고 싶다',
+    '한여름 폭염과 실내 냉방을 오가며 기온차로 피부가 계속 흔들리고 지친다고 느낄 때': '냉난방을 오가도 피부 컨디션이 흔들리지 않았으면 좋겠다',
+    '여름철 에어컨 바람에 눈가가 건조하고 푸석해졌다고 느낄 때': '에어컨 바람에도 눈가가 촉촉했으면 좋겠다',
+    '잠을 제대로 못 잔 다음 날 아침, 다크서클과 칙칙한 눈가가 눈에 띌 때': '못 잔 다음 날에도 눈가가 맑아 보이고 싶다',
+    '거울 속 눈가가 처지고 탄력이 없어 보여, 나이 들어 보인다고 느꼈을 때': '눈가에 탄력이 있어 어려 보이고 싶다',
+    '파운데이션이 얼룩지거나 뭉쳐, 얼룩 없이 균일하게 밀착된 피부 표현을 하고 싶을 때': '얼룩·뭉침 없이 균일하게 밀착된 피부이고 싶다',
+    '면접·미팅처럼 첫인상이 중요한 날, 모공 없이 얇고 깔끔한 피부 표현을 완성하고 싶을 때': '중요한 날, 모공 없이 깔끔한 첫인상을 주고 싶다',
+    '화장 전 피부가 건조해, 메이크업이 들뜰까 걱정될 때': '화장이 들뜨지 않게 촉촉한 베이스를 만들고 싶다',
+    '오후에 화장이 들뜨고 갈라져, 수정 전 수분부터 채우고 싶을 때': '화장이 갈라지기 전에 빠르게 수분을 채우고 싶다',
+    '바쁜 하루 중 피부가 당길 때, 틈새에 간편하게 수분을 채우고 싶을 때': '바쁜 중에도 간편하게 수분을 채우고 싶다',
+    '사무실·외출 중 건조해진 피부를 자리에서 간편하게 리프레시하고 싶을 때': '자리에서 바로 피부를 리프레시하고 싶다',
+    '실내 에어컨 바람에 피부가 건조해져, 바로 수분을 보충하고 싶을 때': '건조함을 느낀 순간 바로 수분을 채우고 싶다',
+    '여름철 화장 전, 피부가 건조해 메이크업이 잘 안 먹거나 들뜰까 걱정될 때': '여름에도 화장이 잘 밀착됐으면 좋겠다',
+    '입술이 얇고 볼륨 없어 보여, 자연스럽게 도톰하고 윤기 있는 입술을 연출하고 싶을 때': '입술이 자연스럽게 도톰하고 윤기 있어 보이고 싶다',
+    '식사나 음료를 마실 때, 잔·컵이나 상대에게 립 색이 묻는 게 신경 쓰일 때': '먹고 마셔도 립 색이 묻어나지 않았으면 좋겠다',
+    '식사·카페·모임 자리에서, 먹고 마시는 동안 립 컬러가 지워질까 신경 쓰일 때': '먹고 마시는 동안에도 립 컬러가 유지됐으면 좋겠다',
+    '종일 회의·근무로 화장 고칠 틈이 없는 날, 립이 오래 유지되길 바랄 때': '화장 고칠 틈 없어도 립이 오래갔으면 좋겠다',
+    '학교 생활처럼 종일 화장 고칠 틈 없는 하루, 바른 직후의 립 컬러가 지워지지 않고 계속 유지되길 바랄 때': '바른 직후 그 발색이 하루 종일 유지됐으면 좋겠다',
+    '여름 축제나 땀나는 날, 오래 있어도 바른 직후 윤기와 발색이 그대로 유지되길 바랄 때': '땀나는 날에도 윤기와 발색이 그대로였으면 좋겠다',
+    '아침에 세안하고 거울을 봤는데, 어제와 다르게 칙칙하고 푸석해 보일 때': '세안 후 거울 속 피부가 어제보다 맑아 보이고 싶다',
+    '낮엔 챙길 틈이 없어, 자는 동안만이라도 안티에이징을 관리하고 싶은 밤': '자는 동안이라도 안티에이징 관리를 하고 싶다',
+    '야근·외출로 지친 하루 끝, 밤에 피부까지 쌓인 피로를 리셋하고 싶을 때': '지친 하루 끝, 피부 피로만큼은 리셋하고 싶다',
+    '중요한 미팅·약속이 있는 날 아침, 화장 전에 피부 상태부터 확인할 때': '중요한 날 아침, 화장 전부터 좋은 피부 컨디션이고 싶다',
+    '예전 같지 않게 노화가 체감이 되어 안티에이징에 입문하려고 할 때': '체감되는 노화에 지금부터 제대로 대비하고 싶다',
+    '하루 종일 피곤에 지쳐, 밤 거울 속 피부까지 피로해 보일 때': '피곤한 하루 끝에도 피부만큼은 지쳐 보이지 않았으면 좋겠다',
+    '피부과 시술 예약을 잡고 나서, 시술 전 며칠간 컨디션을 미리 끌어올리고 싶을 때': '시술 전, 미리 피부 컨디션을 끌어올리고 싶다',
+    '여름철 땀·피지로 오후엔 화장이 무너질까 걱정되는 날, 아침 상태 그대로 유지되길 바랄 때': '땀나는 오후에도 아침 화장 그대로였으면 좋겠다',
+    '아침에 화장하고 나서, 무너짐 걱정 없이 밤까지 깔끔한 피부 상태가 유지되길 바랄 때': '아침 화장이 무너짐 없이 밤까지 유지됐으면 좋겠다',
+    '쉐딩이 처음이라, 음영이 진해져 부자연스러워질까 겁날 때': '처음이어도 실패 없이 자연스러운 음영을 내고 싶다',
+    '통근 전 아침, 자연스럽고 실패 없는 아이메이크업을 하고 싶을 때': '바쁜 아침에도 실패 없이 자연스러운 눈매를 만들고 싶다',
+    '취직·면접 당일 아침, 깔끔하고 인상에 남는 눈매를 만들고 싶을 때': '중요한 날, 깔끔하고 인상에 남는 눈매를 만들고 싶다',
+    '이벤트·모임에서 시선을 끄는 또렷한 눈매를 연출하고 싶을 때': '모임에서 시선을 끄는 또렷한 눈매를 연출하고 싶다',
+    '통근 전 바쁜 아침, 빠르게 자연스럽고 실패 없는 아이메이크업을 원할때': '바쁜 아침, 빠르게 실패 없는 눈매를 완성하고 싶다',
+    '새로운 분위기로 이미지 변신을 하고 싶어, 평소와 다른 인상적인 눈매를 연출하고 싶을 때': '평소와 다른 인상적인 눈매로 분위기를 바꾸고 싶다',
+    '1박 여행이나 출장 중에, 호텔에서도 하나만으로 눈매를 완성할 수 있는 제품을 고를 때': '짐을 줄여도 눈매만큼은 제대로 완성하고 싶다',
+    '여름 축제 같은 이벤트 날, 오래 있어도 무너지지 않고 예쁜 눈매를 유지하고 싶을 때': '오래 있어도 무너지지 않는 예쁜 눈매이고 싶다',
+};
 
-// CEP 문장에서 니즈 추정: 키워드 매칭 수가 가장 많은 니즈 (동점이면 위 순서)
-function _fwNeedFor(title) {
-    let best = null, bestScore = 0;
-    FW_NEEDS.forEach(n => {
-        const score = n.kw.reduce((s, k) => s + (title.includes(k) ? 1 : 0), 0);
-        if (score > bestScore) { best = n; bestScore = score; }
-    });
-    return best || FW_NEED_ETC;
+// 사전에 없는 새 상황 대비 규칙 기반 폴백 — 문장 끝 상황 표지를 지우고 남는 절을 그대로 쓴다
+function _fwDesiredOutcome(title) {
+    const cur = CEP_DESIRED_OUTCOME[title];
+    if (cur) return cur;
+    const parts = title.split(/,\s*/);
+    let seg = (parts.length > 1 ? parts[parts.length - 1] : title).trim();
+    seg = seg.replace(/(하고\s*싶을\s*때|하고싶을때|되고\s*싶을\s*때|이길\s*바랄\s*때|바랄\s*때|싶을\s*때|겁날\s*때|걱정될\s*때|느낄\s*때|느꼈을\s*때|보일\s*때|띌\s*때|일\s*때|할\s*때|때)$/, '').trim();
+    if (!seg) seg = title;
+    if (!/(싶다|좋겠다)$/.test(seg)) seg += '았으면 좋겠다';
+    return seg;
 }
 
 // Level 3: 컨텍스트(시즌·문화) — 이긴 상황을 계절·장면으로 확장할 때 쓰는 렌즈
@@ -1483,17 +1550,20 @@ function _fwCepBlockHtml(r, rank, pObj) {
         ${!passed ? '<p class="fw-stop-note">탈락한 상황 — 메시지·표현 추가보다 상황 재설계 또는 중단을 권장합니다.</p>' : ''}`;
 
     return `
-    <details class="fw-cep fw-cep--${state}">
-        <summary class="fw-cep-head">
-            <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>
-            <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
-            <span class="fw-cep-title">${_cepEsc(r.info.title)}${ctxNow ? ` <span class="fw-ctx-chip">${_cepEsc(ctxNow.label)}</span>` : ''}</span>
-            ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
-            <span class="fw-state fw-state--${state}">${stateLabel}</span>
-            <i class="fas fa-chevron-down fw-chev"></i>
-        </summary>
-        <div class="fw-cep-body">${bodyHtml}</div>
-    </details>`;
+    <div class="fw-cep-outer">
+        <div class="fw-outcome"><span class="fw-outcome-lv">Desired Outcome</span>${_cepEsc(_fwDesiredOutcome(r.info.title))}</div>
+        <details class="fw-cep fw-cep--${state}">
+            <summary class="fw-cep-head">
+                <span class="fw-cep-rank">${r.tag === 'pending' ? '⏳' : rank ? `${rank}위` : '—'}</span>
+                <span class="cep-verdict-chip cep-verdict-chip--${r.tag}">${meta.emoji} ${meta.label}</span>
+                <span class="fw-cep-title">${_cepEsc(r.info.title)}${ctxNow ? ` <span class="fw-ctx-chip">${_cepEsc(ctxNow.label)}</span>` : ''}</span>
+                ${r.agg ? `<span class="fw-cep-metrics">ROAS <b>${r.agg.roas.toFixed(0)}%</b> · 매출 ${_cepFmtKRW(r.agg.revenue)} · CV ${_cepFmtInt(r.agg.cv)} · 광고비 ${_cepFmtKRW(r.agg.cost)}</span>` : ''}
+                <span class="fw-state fw-state--${state}">${stateLabel}</span>
+                <i class="fas fa-chevron-down fw-chev"></i>
+            </summary>
+            <div class="fw-cep-body">${bodyHtml}</div>
+        </details>
+    </div>`;
 }
 
 function _fwRenderBoard() {
@@ -1506,40 +1576,11 @@ function _fwRenderBoard() {
     const acts = _fwNextActions(rows);
     const safeKey = _cepEsc(_fwSelectedKey);
 
-    // 종합 점수(ROAS×매출·CV·광고비 보정) 상위 5개에만 순위 배지 부여
+    // 종합 점수(ROAS×매출·CV·광고비 보정) 상위 5개만 본문에, 나머지는 접어서
     const scored = rows.filter(r => r.agg).map(r => ({ r, score: _fwScore(r.agg) })).sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 5).map(x => x.r);
     const rankMap = new Map(scored.slice(0, 5).map((x, i) => [x.r.c, i + 1]));
-    const scoreMap = new Map(scored.map(x => [x.r.c, x.score]));
-
-    // Level 1: 니즈로 상황을 그룹핑 — 니즈 안에서는 점수 순(대기 뒤), 니즈끼리는 최고 점수 순
-    const needGroups = new Map();
-    rows.forEach(r => {
-        const need = _fwNeedFor(r.info.title);
-        if (!needGroups.has(need.key)) needGroups.set(need.key, { need, rows: [] });
-        needGroups.get(need.key).rows.push(r);
-    });
-    const glist = [...needGroups.values()].map(g => {
-        g.rows.sort((a, b) => (scoreMap.get(b.c) || -1) - (scoreMap.get(a.c) || -1));
-        g.best = g.rows.length ? (scoreMap.get(g.rows[0].c) || 0) : 0;
-        g.done = g.rows.filter(x => x.agg);
-        g.pass = g.rows.filter(x => x.tag === 'win' || x.tag === 'mid').length;
-        return g;
-    }).sort((a, b) => b.best - a.best);
-
-    const needHtml = (g, gi) => {
-        const bestRoas = g.done.length ? Math.max(...g.done.map(x => x.agg.roas)) : null;
-        return `
-        <details class="fw-need"${gi === 0 ? ' open' : ''}>
-            <summary class="fw-need-head">
-                <span class="fw-need-lv">니즈</span>
-                <span class="fw-need-emoji">${g.need.emoji}</span>
-                <span class="fw-need-label">${_cepEsc(g.need.label)}</span>
-                <span class="fw-need-stat">상황 ${g.rows.length}개 · 통과 ${g.pass}${bestRoas != null ? ` · 최고 ROAS ${bestRoas.toFixed(0)}%` : ''}</span>
-                <i class="fas fa-chevron-down fw-chev"></i>
-            </summary>
-            <div class="fw-need-body">${g.rows.map(r => _fwCepBlockHtml(r, rankMap.get(r.c) || 0, pObj)).join('')}</div>
-        </details>`;
-    };
+    const rest = [...scored.slice(5).map(x => x.r), ...rows.filter(r => !r.agg)];
 
     el.innerHTML = `
     <div class="fw-board">
@@ -1552,10 +1593,15 @@ function _fwRenderBoard() {
             <div class="fw-actions-title">▶ 다음 할 일</div>
             ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
         </div>
-        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> 니즈(Level 1) → 상황(Level 2) 진행판
-            <span class="fw-crit">순위 배지 = ROAS에 매출·CV·광고비 규모를 보정한 종합 점수 상위 5</span></div>
-        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 니즈를 누르면 상황이, 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
-        ${glist.length ? glist.map(needHtml).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
+        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> Desired Outcome → CEP 상위 ${top.length}개
+            <span class="fw-crit">선정 기준: ROAS에 매출·CV·광고비 규모를 보정한 종합 점수</span></div>
+        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
+        ${top.length ? top.map(r => _fwCepBlockHtml(r, rankMap.get(r.c) || 0, pObj)).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
+        ${rest.length ? `
+        <details class="fw-rest">
+            <summary>나머지 상황 ${rest.length}개 보기 (하위 성과·집행 대기 포함) <i class="fas fa-chevron-down fw-chev"></i></summary>
+            <div class="fw-rest-body">${rest.map(r => _fwCepBlockHtml(r, 0, pObj)).join('')}</div>
+        </details>` : ''}
     </div>`;
 }
 
