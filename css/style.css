@@ -386,6 +386,23 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
     background: #faf5ff; border: 1px dashed #d8b4fe; border-radius: 10px;
 }
 .fw-pyr-loop b { color: #6b21a8; }
+/* 조건부 분기: 결과가 애매할 때만 도는 CEP↔연출 확인 루프 (본 흐름과 구분되게 다른 색·점선) */
+.fw-pyr-branch {
+    background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 10px;
+    padding: 10px 14px; margin: 2px 0;
+}
+.fw-pyr-branch-q { font-size: 11px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+.fw-pyr-branch-flow {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 6px; flex-wrap: wrap;
+}
+.fw-pyr-branch-step {
+    font-size: 11px; font-weight: 700; color: #b45309; background: #fef3c7;
+    border-radius: 999px; padding: 4px 10px;
+}
+.fw-pyr-branch-step i { font-weight: 400; font-style: normal; color: #92400e; }
+.fw-pyr-branch-arrow { color: #fbbf24; font-weight: 700; font-size: 14px; }
+.fw-pyr-branch p { margin: 0; font-size: 10.5px; color: #92400e; line-height: 1.6; }
 .fw-pyr-note { margin: 8px 0 16px; font-size: 11.5px; color: #64748b; line-height: 1.7; }
 .fw-pyr-note b { color: #475569; }
 .cep-fw-header--sub { margin-top: 4px; }

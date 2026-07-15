@@ -1133,7 +1133,17 @@ function _cepRenderFramework(productsMap) {
                 <div class="fw-pyr-body"><b>Performance</b><span class="fw-pyr-q">결과값으로 어떤 상황이 이겼는지 판정</span>
                     <p>ROAS·CV·매출로 검증 완료 / 부분 검증 / 반응 약함을 가른다 — 아직 "왜"는 묻지 않는다</p></div>
             </div>
-            <div class="fw-pyr-arrow">↓</div>
+            <div class="fw-pyr-arrow">↓ 결과가 애매하면</div>
+            <div class="fw-pyr-branch">
+                <div class="fw-pyr-branch-q">CEP(상황)가 약한가, 연출(표현)이 약한가? <span class="fw-crit">비슷한 CEP끼리 성과가 다르거나, 관심(CTR·CV)은 있는데 전환이 안 될 때</span></div>
+                <div class="fw-pyr-branch-flow">
+                    <span class="fw-pyr-branch-step">4. Creative Angle <i>같은 CEP, 다른 표현</i></span>
+                    <span class="fw-pyr-branch-arrow">⇄</span>
+                    <span class="fw-pyr-branch-step">2. Performance <i>재검증</i></span>
+                </div>
+                <p>CEP 문제인지 연출 문제인지 분리될 때까지 반복 — 결과가 처음부터 깔끔하면(표본 크고 일관됨) 이 단계는 건너뛰고 바로 3으로</p>
+            </div>
+            <div class="fw-pyr-arrow">↓ 명확해지면</div>
             <div class="fw-pyr-row">
                 <span class="fw-pyr-lv">3</span>
                 <div class="fw-pyr-body"><b>Desired Outcome</b><span class="fw-pyr-q">결과를 비교해 니즈를 가설로 역추론</span>
@@ -1168,7 +1178,8 @@ function _cepRenderFramework(productsMap) {
             </div>
         </div>
         <p class="fw-pyr-note"><b>니즈(Desired Outcome)를 먼저 가정하지 않습니다</b> — 먼저 CEP를 넓게 검증하고(1), 결과가 나오면(2) 이긴/진 상황을 비교해 니즈를 가설로 역추론합니다(3).
-        그 가설로 연출 방향을 정하고(4), 같은 원인을 공유하는 신규 CEP·시즌으로 확장해(5) 가설이 맞는지 다시 검증합니다 — 이게 <b>1로 돌아가는 루프</b>입니다.
+        단, 결과가 애매하면 곧바로 3으로 가지 않고 <b>같은 CEP를 다른 연출로 재검증</b>해(2↔4 조건부 분기) CEP 자체의 문제인지 연출의 문제인지부터 가려냅니다.
+        가설이 서면 그걸로 연출 방향을 정하고(4), 같은 원인을 공유하는 신규 CEP·시즌으로 확장해(5) 가설이 맞는지 다시 검증합니다 — 이게 <b>1로 돌아가는 루프</b>입니다.
         아래 진행판의 각 상황 카드에는 이렇게 역추론된 Desired Outcome이 함께 표시되며, 문장 안에 <span class="fw-usp-hl">굵게 강조된 단어</span>는 그 제품의 핵심 USP 키워드입니다.</p>`;
 
     el.innerHTML = `
