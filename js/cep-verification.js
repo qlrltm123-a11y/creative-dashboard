@@ -1379,6 +1379,18 @@ const CEP_PRODUCT_MASTER_OUTCOME = {
     'SoftBlurEye': '언제나 실패 없이 인상적인 눈매를 완성하고 싶다',
 };
 
+// 왜 이 가설을 세웠나 — 위 CEP 결과들을 가로질러 비교했을 때 나온 근거.
+// 니즈 하나만 보고 짐작한 게 아니라, 이긴/진 CEP를 대조해서 뽑은 이유이므로
+// "가설이 결과에서 나왔다"는 게 문장 자체에서 드러나야 한다. 아직 3D-Refill만 예시로 채움 —
+// 나머지 제품은 CEP를 대조 분석한 뒤 같은 형식으로 채워 넣는다.
+const CEP_PRODUCT_WHY_WON = {
+    '3D-Refill': [
+        '습관적 타이밍이라 새 결정이 필요 없음 — 매일 거치는 "마무리 단계" CEP가 ROAS는 2위(214%)여도 CV 552로 압도적 볼륨을 만듦',
+        '발견형 CEP는 서사가 구체적이어야 함 — 같은 "거울/화면에서 처짐 발견" 유형인데 "육아로 오랜만에"는 구체적 서사가 있어 전체 최고 효율(283%), "화면 속 얼굴"은 막연해서 최저(85%)',
+        '"결심이 필요한" 상황은 중간에 머묾 — "시술 대신 홈케어"는 니즈를 직접 언급해도 새 결정을 요구해 습관형·서사형보다 항상 낮음(197%)',
+    ],
+};
+
 // 마스터 문장에 안 맞는(= USP 키워드가 없는) CEP만 골라 "보조 상황"으로 따로 반환
 function _fwMasterExceptions(rows, product) {
     const kw = CEP_PRODUCT_USP[product];
@@ -1543,6 +1555,7 @@ function _fwRenderBoard() {
     // CEP는 억지로 합치지 않고 보조 상황으로 따로 표시.
     const masterText = CEP_PRODUCT_MASTER_OUTCOME[pObj.product];
     const exceptions = masterText ? _fwMasterExceptions(rows, pObj.product) : [];
+    const whyWon = CEP_PRODUCT_WHY_WON[pObj.product] || [];
     const masterHtml = masterText ? `
         <div class="fw-master">
             <div class="fw-master-lv">3. Desired Outcome <span class="fw-crit">위 CEP ${rows.length}개 결과를 비교해 역추론한 가설</span></div>
@@ -1551,6 +1564,12 @@ function _fwRenderBoard() {
                 const m = CEP_VERDICT_META[r.tag] || {};
                 return `${m.emoji || ''} ${_cepEsc(_fwDesiredOutcome(r.info.title))}`;
             }).join(' · ')}</div>` : ''}
+            ${whyWon.length ? `
+            <div class="fw-master-why">
+                <div class="fw-master-why-lv">왜 이 가설을 세웠나 <span class="fw-crit">CEP를 가로질러 비교한 근거</span></div>
+                <ul>${whyWon.map(w => `<li>${_cepEsc(w)}</li>`).join('')}</ul>
+            </div>` : `
+            <div class="fw-master-why fw-master-why--empty">왜 이 가설을 세웠나 — 아직 비교 분석 전. CEP들을 대조해 근거를 채워 넣으세요.</div>`}
         </div>` : '';
 
     el.innerHTML = `

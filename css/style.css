@@ -337,6 +337,17 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
     margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e9d5ff;
     font-size: 11px; color: #7c6f99; line-height: 1.7;
 }
+.fw-master-why {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e9d5ff;
+}
+.fw-master-why-lv { font-size: 10.5px; font-weight: 800; color: #6b21a8; letter-spacing: .3px; margin-bottom: 6px; }
+.fw-master-why ul { margin: 0; padding-left: 17px; }
+.fw-master-why li { font-size: 12px; color: #3f3552; line-height: 1.65; margin-bottom: 5px; }
+.fw-master-why li:last-child { margin-bottom: 0; }
+.fw-master-why--empty {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e9d5ff;
+    font-size: 11.5px; color: #a599c2; font-style: italic;
+}
 .fw-usp-hl { color: #7c3aed; background: #f3e8ff; border-radius: 3px; padding: 0 2px; }
 
 /* 나머지 상황 접기 */
