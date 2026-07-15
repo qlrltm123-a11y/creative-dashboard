@@ -1117,66 +1117,69 @@ function _cepRenderFramework(productsMap) {
         },
     ];
 
-    // Level 1~5 구조 피라미드 — 되고 싶은 상태에서 출발해 성과로 닫히는 전략 계층
+    // 검증 루프 — 니즈를 먼저 가정하지 않는다. 넓게 검증하고, 결과를 보고서야
+    // "이 사람들이 진짜 원한 게 뭐였나"를 역추론한다. 니즈를 먼저 정하면 틀릴 수 있다는 게
+    // 이미 실데이터로 확인됐기 때문(예: '밤 피로 회복'이라 가정했지만 실제론 '아침 컨디션'이 이긴 사례).
     const pyramid = `
         <div class="fw-pyr">
             <div class="fw-pyr-row">
-                <span class="fw-pyr-lv">Level 1</span>
-                <div class="fw-pyr-body"><b>Desired Outcome</b><span class="fw-pyr-q">되고 싶은 상태 — 여기서 출발</span>
-                    <p>내일 아침 피부 컨디션이 좋아 보이고 싶다 · 공들여 한 스킨케어를 아침까지 유지하고 싶다 · 거울 속 피부가 윤기 있어 보이고 싶다 · 메이크업이 들뜨지 않았으면 좋겠다</p></div>
+                <span class="fw-pyr-lv">1</span>
+                <div class="fw-pyr-body"><b>CEP 검증</b><span class="fw-pyr-q">니즈를 모르는 채로, 상황부터 넓게 던진다</span>
+                    <p>중요한 날 전날 · 스킨케어 마지막 단계 · 아침 거울 · 화장 수정 전 — 한 제품에 여러 상황을 동시 검증</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
-                <span class="fw-pyr-lv">Level 2</span>
-                <div class="fw-pyr-body"><b>CEP</b><span class="fw-pyr-q">제품이 떠오르는 상황</span>
-                    <p>중요한 날 전날 · 스킨케어 마지막 단계 · 아침 거울 · 화장 수정 전</p></div>
+                <span class="fw-pyr-lv">2</span>
+                <div class="fw-pyr-body"><b>Performance</b><span class="fw-pyr-q">결과값으로 어떤 상황이 이겼는지 판정</span>
+                    <p>ROAS·CV·매출로 검증 완료 / 부분 검증 / 반응 약함을 가른다 — 아직 "왜"는 묻지 않는다</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
-                <span class="fw-pyr-lv">Level 3</span>
-                <div class="fw-pyr-body"><b>Context</b><span class="fw-pyr-q">계절·문화·이벤트</span>
-                    <p>여행 · 에어컨 · 환절기 · 오후 건조 · 출근 · 온천</p></div>
+                <span class="fw-pyr-lv">3</span>
+                <div class="fw-pyr-body"><b>Desired Outcome</b><span class="fw-pyr-q">결과를 비교해 니즈를 가설로 역추론</span>
+                    <p>이긴/진 상황들을 가로질러 비교: 내일 아침 컨디션이 좋아 보이고 싶다 · 공들인 케어를 잃고 싶지 않다 · 메이크업이 들뜨지 않았으면 좋겠다</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
-                <span class="fw-pyr-lv">Level 4</span>
-                <div class="fw-pyr-body"><b>Creative Angle</b><span class="fw-pyr-q">메시지와 표현으로 구체화</span>
+                <span class="fw-pyr-lv">4</span>
+                <div class="fw-pyr-body"><b>Creative Angle</b><span class="fw-pyr-q">가설에 맞춰 메시지·연출 방향을 정한다</span>
                     <p>「朝の肌は夜で決まる」 · 「塗るより、閉じ込める」 · 「秋は、肌からやってくる」 · 「3秒うるおいチャージ」</p></div>
             </div>
             <div class="fw-pyr-arrow">↓</div>
             <div class="fw-pyr-row">
-                <span class="fw-pyr-lv">Level 5</span>
-                <div class="fw-pyr-body"><b>Performance</b><span class="fw-pyr-q">이 조합이 통했는지 데이터로 판정</span>
-                    <p>ROAS·CV·매출로 검증 — 통과한 조합만 다음 단계(컨텍스트 확장 또는 표현 증량)로</p></div>
+                <span class="fw-pyr-lv">5</span>
+                <div class="fw-pyr-body"><b>확장</b><span class="fw-pyr-q">가설을 신규 CEP·시즌으로 재검증</span>
+                    <p>같은 원인(습관적 타이밍 등)을 공유하는 새 상황을 예측해 다음 라운드에 투입 — 맞으면 가설 확인, 틀리면 가설 수정</p></div>
             </div>
+            <div class="fw-pyr-loop">↻ 다시 <b>1. CEP 검증</b>으로 — 예측이 맞았는지 새 데이터로 확인</div>
         </div>
         <div class="fw-pyr-example">
-            <div class="fw-pyr-example-title">예시 <span class="fw-crit">한 행 = 하나의 검증 조합</span></div>
+            <div class="fw-pyr-example-title">예시 <span class="fw-crit">한 행 = 하나의 검증 사이클 (왼쪽에서 오른쪽 순서로 읽기)</span></div>
             <div class="cep-compare-wrap">
                 <table class="cep-compare-table fw-pyr-table">
-                    <thead><tr><th>Desired Outcome</th><th>CEP</th><th>Context</th><th>Creative</th></tr></thead>
+                    <thead><tr><th>1. CEP</th><th>2. Performance</th><th>3. Desired Outcome(가설)</th><th>4. Creative Angle</th></tr></thead>
                     <tbody>
-                        <tr><td>내일 아침 피부 컨디션이 좋아 보이고 싶다</td><td>중요한 날 전날</td><td>여행</td><td>「朝の肌は夜で決まる」</td></tr>
-                        <tr><td>공들여 한 스킨케어를 아침까지 유지하고 싶다</td><td>스킨케어 마지막 단계</td><td>에어컨</td><td>「塗るより、閉じ込める」</td></tr>
-                        <tr><td>거울 속 피부가 윤기 있어 보이고 싶다</td><td>아침 거울</td><td>환절기</td><td>「秋は、肌からやってくる」</td></tr>
-                        <tr><td>메이크업이 들뜨지 않았으면 좋겠다</td><td>화장 수정 전</td><td>오후 건조</td><td>「3秒うるおいチャージ」</td></tr>
+                        <tr><td>중요한 날 전날</td><td>✅ 검증 성공</td><td>내일 아침 피부 컨디션이 좋아 보이고 싶다</td><td>「朝の肌は夜で決まる」</td></tr>
+                        <tr><td>스킨케어 마지막 단계</td><td>✅ 검증 성공</td><td>공들여 한 스킨케어를 아침까지 유지하고 싶다</td><td>「塗るより、閉じ込める」</td></tr>
+                        <tr><td>아침 거울</td><td>🟡 부분 검증</td><td>거울 속 피부가 윤기 있어 보이고 싶다</td><td>「秋は、肌からやってくる」</td></tr>
+                        <tr><td>화장 수정 전</td><td>✅ 검증 성공</td><td>메이크업이 들뜨지 않았으면 좋겠다</td><td>「3秒うるおいチャージ」</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
-        <p class="fw-pyr-note">검증은 <b>Level 2(CEP)</b>부터 시작해 메시지→표현으로 좁히고(아래 1·2·3차), 매 단계를 <b>Level 5(Performance)</b>로 판정합니다.
-        통과한 상황은 <b>Level 3(Context)</b>로 계절·문화를 확장합니다. 아래 진행판의 각 상황 카드에는 그 상황의 <b>Level 1 Desired Outcome</b>이 함께 표시되며,
-        문장 안에 <span class="fw-usp-hl">굵게 강조된 단어</span>는 그 제품의 핵심 USP 키워드입니다 — 같은 키워드가 다른 CEP·제품에도 등장하면 그 강점이 여러 상황에서 검증됐다는 뜻입니다.</p>`;
+        <p class="fw-pyr-note"><b>니즈(Desired Outcome)를 먼저 가정하지 않습니다</b> — 먼저 CEP를 넓게 검증하고(1), 결과가 나오면(2) 이긴/진 상황을 비교해 니즈를 가설로 역추론합니다(3).
+        그 가설로 연출 방향을 정하고(4), 같은 원인을 공유하는 신규 CEP·시즌으로 확장해(5) 가설이 맞는지 다시 검증합니다 — 이게 <b>1로 돌아가는 루프</b>입니다.
+        아래 진행판의 각 상황 카드에는 이렇게 역추론된 Desired Outcome이 함께 표시되며, 문장 안에 <span class="fw-usp-hl">굵게 강조된 단어</span>는 그 제품의 핵심 USP 키워드입니다.</p>`;
 
     el.innerHTML = `
     <div class="cep-fw">
         <div class="cep-fw-header">
             <i class="fas fa-route"></i>
             <span class="cep-fw-title">검증 프레임워크</span>
-            <span class="cep-fw-sub">니즈에서 출발해, 넓게 검증하고, 이긴 것만 좁힌다</span>
+            <span class="cep-fw-sub">니즈를 가정하지 않는다 — 넓게 검증하고, 결과에서 가설을 세우고, 가설을 다시 검증한다</span>
         </div>
         ${pyramid}
-        <div class="cep-fw-header cep-fw-header--sub"><i class="fas fa-flask"></i><span class="cep-fw-title">검증 3단계</span><span class="cep-fw-sub">Level 2→4를 Level 5(Performance)로 판정하며 검증하는 순서</span></div>
+        <div class="cep-fw-header cep-fw-header--sub"><i class="fas fa-flask"></i><span class="cep-fw-title">CEP 좁히기 3단계</span><span class="cep-fw-sub">위 1번(CEP 검증) 안에서, 상황→메시지→표현 순으로 좁히는 방법</span></div>
         <div class="cep-fw-steps">
             ${steps.map(st => `
             <div class="cep-fw-step">

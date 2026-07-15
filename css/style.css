@@ -367,6 +367,11 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
 .fw-pyr-q { font-size: 10.5px; color: #94a3b8; }
 .fw-pyr-body p { margin: 3px 0 0; font-size: 11.5px; color: #475569; line-height: 1.6; }
 .fw-pyr-arrow { text-align: center; color: #c7d2fe; font-weight: 700; font-size: 13px; line-height: 1; margin: 1px 0; }
+.fw-pyr-loop {
+    margin-top: 6px; padding: 8px 14px; text-align: center; font-size: 11.5px; color: #7c3aed;
+    background: #faf5ff; border: 1px dashed #d8b4fe; border-radius: 10px;
+}
+.fw-pyr-loop b { color: #6b21a8; }
 .fw-pyr-note { margin: 8px 0 16px; font-size: 11.5px; color: #64748b; line-height: 1.7; }
 .fw-pyr-note b { color: #475569; }
 .cep-fw-header--sub { margin-top: 4px; }
