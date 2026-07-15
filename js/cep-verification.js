@@ -1538,15 +1538,16 @@ function _fwRenderBoard() {
     const rankMap = new Map(scored.slice(0, 5).map((x, i) => [x.r.c, i + 1]));
     const rest = [...scored.slice(5).map(x => x.r), ...rows.filter(r => !r.agg)];
 
-    // 제품 전체를 관통하는 마스터 Desired Outcome — 여러 CEP 문장을 하나로 합친 최종 형태.
-    // 안 맞는(핵심 USP 키워드가 없는) CEP는 억지로 합치지 않고 보조 상황으로 따로 표시.
+    // 제품 전체를 관통하는 마스터 Desired Outcome — 아래 CEP 검증 결과를 비교해 역추론한 가설.
+    // 니즈를 먼저 가정하지 않으므로 CEP 결과 다음에 배치한다. 안 맞는(핵심 USP 키워드가 없는)
+    // CEP는 억지로 합치지 않고 보조 상황으로 따로 표시.
     const masterText = CEP_PRODUCT_MASTER_OUTCOME[pObj.product];
     const exceptions = masterText ? _fwMasterExceptions(rows, pObj.product) : [];
     const masterHtml = masterText ? `
         <div class="fw-master">
-            <div class="fw-master-lv">제품 전체 Desired Outcome <span class="fw-crit">CEP ${rows.length}개를 하나로 합친 문장</span></div>
+            <div class="fw-master-lv">3. Desired Outcome <span class="fw-crit">위 CEP ${rows.length}개 결과를 비교해 역추론한 가설</span></div>
             <div class="fw-master-text">${_fwHighlightUsp(masterText, pObj.product)}</div>
-            ${exceptions.length ? `<div class="fw-master-exceptions">➕ 이 문장과 결이 다른 보조 상황 ${exceptions.length}개: ${exceptions.map(r => {
+            ${exceptions.length ? `<div class="fw-master-exceptions">➕ 이 가설과 결이 다른 보조 상황 ${exceptions.length}개: ${exceptions.map(r => {
                 const m = CEP_VERDICT_META[r.tag] || {};
                 return `${m.emoji || ''} ${_cepEsc(_fwDesiredOutcome(r.info.title))}`;
             }).join(' · ')}</div>` : ''}
@@ -1559,20 +1560,20 @@ function _fwRenderBoard() {
             <span class="fw-board-title">${_cepEsc(pObj.product)}</span>
             <button class="fw-jump-btn" onclick="cepJumpToProduct('${safeKey}')"><i class="fas fa-flask"></i> CEP 검증 탭에서 상세 보기</button>
         </div>
-        ${masterHtml}
-        <div class="fw-actions">
-            <div class="fw-actions-title">▶ 다음 할 일</div>
-            ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
-        </div>
-        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> Desired Outcome → CEP 상위 ${top.length}개
+        <div class="cep-section-detail-label"><i class="fas fa-layer-group"></i> 1~2. CEP 검증 · Performance 상위 ${top.length}개
             <span class="fw-crit">선정 기준: ROAS에 매출·CV·광고비 규모를 보정한 종합 점수</span></div>
-        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 상황을 누르면 메시지가, 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
+        <p class="fw-guide"><i class="fas fa-hand-pointer"></i> 상황을 누르면 메시지가(4. Creative Angle), 메시지를 누르면 소재(표현)와 다음 표현 예시가 펼쳐집니다</p>
         ${top.length ? top.map(r => _fwCepBlockHtml(r, rankMap.get(r.c) || 0, pObj)).join('') : _cepEmptyHtml('fa-flask', '검증 기록이 없는 제품입니다.', { py: 'py-8' })}
         ${rest.length ? `
         <details class="fw-rest">
             <summary>나머지 상황 ${rest.length}개 보기 (하위 성과·집행 대기 포함) <i class="fas fa-chevron-down fw-chev"></i></summary>
             <div class="fw-rest-body">${rest.map(r => _fwCepBlockHtml(r, 0, pObj)).join('')}</div>
         </details>` : ''}
+        ${masterHtml}
+        <div class="fw-actions">
+            <div class="fw-actions-title">5. 확장 — 다음 할 일</div>
+            ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
+        </div>
     </div>`;
 }
 
