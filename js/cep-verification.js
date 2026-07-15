@@ -1553,23 +1553,28 @@ function _fwRenderBoard() {
     // 제품 전체를 관통하는 마스터 Desired Outcome — 아래 CEP 검증 결과를 비교해 역추론한 가설.
     // 니즈를 먼저 가정하지 않으므로 CEP 결과 다음에 배치한다. 안 맞는(핵심 USP 키워드가 없는)
     // CEP는 억지로 합치지 않고 보조 상황으로 따로 표시.
+    // 읽는 순서 = 추론 순서: 근거(위 CEP 결과 비교) → 그래서 → 결론(Desired Outcome).
+    // 결론을 먼저 보여주고 근거를 나중에 붙이면 사후 합리화처럼 보인다 — 근거가 없는 제품은
+    // 결론에 "잠정 가설" 표시를 붙여, 검증된 결론처럼 보이지 않게 한다.
     const masterText = CEP_PRODUCT_MASTER_OUTCOME[pObj.product];
     const exceptions = masterText ? _fwMasterExceptions(rows, pObj.product) : [];
     const whyWon = CEP_PRODUCT_WHY_WON[pObj.product] || [];
     const masterHtml = masterText ? `
         <div class="fw-master">
             <div class="fw-master-lv">3. Desired Outcome <span class="fw-crit">위 CEP ${rows.length}개 결과를 비교해 역추론한 가설</span></div>
-            <div class="fw-master-text">${_fwHighlightUsp(masterText, pObj.product)}</div>
+            ${whyWon.length ? `
+            <div class="fw-master-evidence">
+                <div class="fw-master-evidence-lv">근거 <span class="fw-crit">위 CEP 검증 결과를 가로질러 비교</span></div>
+                <ul>${whyWon.map(w => `<li>${_cepEsc(w)}</li>`).join('')}</ul>
+            </div>
+            <div class="fw-master-therefore">그래서 ↓</div>
+            <div class="fw-master-text">${_fwHighlightUsp(masterText, pObj.product)}</div>` : `
+            <div class="fw-master-text">${_fwHighlightUsp(masterText, pObj.product)} <span class="fw-master-tentative">잠정 가설 · 근거 비교 전</span></div>
+            <p class="fw-master-evidence-empty">아직 CEP들을 대조 비교하지 않았습니다 — 근거 없이 이 결론만 보이면 사후 짐작으로 오해될 수 있으니, 비교 분석 후 근거를 채워 넣으세요.</p>`}
             ${exceptions.length ? `<div class="fw-master-exceptions">➕ 이 가설과 결이 다른 보조 상황 ${exceptions.length}개: ${exceptions.map(r => {
                 const m = CEP_VERDICT_META[r.tag] || {};
                 return `${m.emoji || ''} ${_cepEsc(_fwDesiredOutcome(r.info.title))}`;
             }).join(' · ')}</div>` : ''}
-            ${whyWon.length ? `
-            <div class="fw-master-why">
-                <div class="fw-master-why-lv">왜 이 가설을 세웠나 <span class="fw-crit">CEP를 가로질러 비교한 근거</span></div>
-                <ul>${whyWon.map(w => `<li>${_cepEsc(w)}</li>`).join('')}</ul>
-            </div>` : `
-            <div class="fw-master-why fw-master-why--empty">왜 이 가설을 세웠나 — 아직 비교 분석 전. CEP들을 대조해 근거를 채워 넣으세요.</div>`}
         </div>` : '';
 
     el.innerHTML = `
