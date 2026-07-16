@@ -353,6 +353,31 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
 }
 .fw-usp-hl { color: #7c3aed; background: #f3e8ff; border-radius: 3px; padding: 0 2px; }
 
+/* Level 4: Creative Angle — 마스터 Desired Outcome 바로 아래, 가설에 맞춰 정한 메시지·연출 방향 */
+.fw-angle {
+    background: #fdfaff; border: 1px solid #e9d5ff; border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 14px;
+}
+.fw-angle-lv { font-size: 10.5px; font-weight: 800; color: #7c3aed; letter-spacing: .3px; margin-bottom: 8px; }
+.fw-angle-list { margin: 0; padding-left: 17px; }
+.fw-angle-list li { font-size: 13px; font-weight: 600; color: #4c1d95; line-height: 1.7; margin-bottom: 4px; }
+.fw-angle-list li:last-child { margin-bottom: 0; }
+
+/* 5. 확장 — fw-actions 안에서 큐레이션된 신규 CEP 예측(있을 때만) + 자동 생성 다음 할 일 */
+.fw-expand-sub { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e0e7ff; }
+.fw-expand-sub-lv { font-size: 10.5px; font-weight: 800; color: #6366f1; letter-spacing: .3px; margin-bottom: 6px; }
+.fw-expand-sub-lv--next { margin-top: 2px; padding-top: 0; border: none; }
+.fw-expand-list { margin: 0 0 2px; padding-left: 17px; }
+.fw-expand-list li { font-size: 12px; color: #334155; line-height: 1.7; margin-bottom: 4px; }
+.fw-expand-list li:last-child { margin-bottom: 0; }
+
+/* 진행판 하단 루프 안내 — 설명 탭의 .fw-pyr-loop와 같은 톤(보라·점선) */
+.fw-board-loop {
+    margin-top: 4px; padding: 8px 14px; text-align: center; font-size: 11.5px; color: #7c3aed;
+    background: #faf5ff; border: 1px dashed #d8b4fe; border-radius: 10px;
+}
+.fw-board-loop b { color: #6b21a8; }
+
 /* 나머지 상황 접기 */
 .fw-rest { margin-top: 4px; }
 .fw-rest > summary {

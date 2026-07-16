@@ -1475,6 +1475,28 @@ const CEP_PRODUCT_WHY_WON = {
     ],
 };
 
+// Level 4: Creative Angle — 위 마스터 Desired Outcome에 맞춰 정한 메시지·연출 방향.
+// "잃어버린 걸 되찾자"가 아니라 마스터 문장이 말하는 상태(의식하지 않아도 유지됨)를 그대로 보여주는 톤으로 쓴다.
+// 아직 3D-Refill만 예시로 채움 — 나머지 제품은 마스터 문장이 확정된 뒤 같은 톤으로 채워 넣는다.
+const CEP_PRODUCT_CREATIVE_ANGLE = {
+    '3D-Refill': [
+        '「特に頑張ってないのに、キープできてる」',
+        '「気づいたら、まだハリがあった」',
+        '「何もしてないようで、毎晩コレしてた」',
+    ],
+};
+
+// 5. 확장 — 마스터 문장의 근거(WHY_WON)가 가리키는 근본 원인을 공유할 것으로 예측되는 신규 CEP.
+// 다음 라운드에 넣어 검증하고, 맞으면 가설 확인·틀리면 가설을 다시 다듬는다(1로 루프).
+// 아직 3D-Refill만 예시로 채움 — 나머지 제품은 WHY_WON 분석 후 같은 방식으로 채워 넣는다.
+const CEP_PRODUCT_EXPANSION = {
+    '3D-Refill': [
+        '여행 짐을 싸다가, 며칠간 스킨케어 루틴이 끊길까 걱정될 때',
+        '야근 후 화장을 지우며, 오늘 하루 버틴 피부가 괜찮을지 걱정될 때',
+        '환절기 첫 아침, 평소와 다른 피부 컨디션을 느낄 때',
+    ],
+};
+
 // 마스터 문장에 안 맞는(= USP 키워드가 없는) CEP만 골라 "보조 상황"으로 따로 반환
 function _fwMasterExceptions(rows, product) {
     const kw = CEP_PRODUCT_USP[product];
@@ -1643,6 +1665,8 @@ function _fwRenderBoard() {
     const masterText = CEP_PRODUCT_MASTER_OUTCOME[pObj.product];
     const exceptions = masterText ? _fwMasterExceptions(rows, pObj.product) : [];
     const whyWon = CEP_PRODUCT_WHY_WON[pObj.product] || [];
+    const angleList = CEP_PRODUCT_CREATIVE_ANGLE[pObj.product] || [];
+    const expansionList = CEP_PRODUCT_EXPANSION[pObj.product] || [];
     const masterHtml = masterText ? `
         <div class="fw-master">
             <div class="fw-master-lv">3. Desired Outcome <span class="fw-crit">위 CEP ${rows.length}개 결과를 비교해 역추론한 가설</span></div>
@@ -1661,6 +1685,25 @@ function _fwRenderBoard() {
             }).join(' · ')}</div>` : ''}
         </div>` : '';
 
+    // 4. Creative Angle — 위 가설(Desired Outcome)에 맞춰 정한 메시지·연출 방향. 큐레이션된 제품만 표시.
+    const angleHtml = angleList.length ? `
+        <div class="fw-angle">
+            <div class="fw-angle-lv">4. Creative Angle <span class="fw-crit">위 가설에 맞춰 정한 메시지·연출 방향</span></div>
+            <ul class="fw-angle-list">${angleList.map(a => `<li>${_cepEsc(a)}</li>`).join('')}</ul>
+        </div>` : '';
+
+    // 5. 확장 — WHY_WON 근거가 가리키는 근본 원인을 공유할 신규 CEP 예측. 큐레이션된 제품만 "예측" 서브섹션 추가.
+    const expansionHtml = expansionList.length ? `
+        <div class="fw-expand-sub">
+            <div class="fw-expand-sub-lv">예측 <span class="fw-crit">같은 근본 원인을 공유할 신규 CEP — 맞으면 가설 확인, 틀리면 가설 수정</span></div>
+            <ul class="fw-expand-list">${expansionList.map(e => `<li>${_cepEsc(e)}</li>`).join('')}</ul>
+        </div>
+        <div class="fw-expand-sub-lv fw-expand-sub-lv--next">다음 할 일</div>` : '';
+    const actionsTitle = expansionList.length ? '5. 확장' : '5. 확장 — 다음 할 일';
+    // 큐레이션된 제품(3D-Refill 등)만 "1로 루프" 안내를 붙인다 — 예측(4·5단계)이 있어야 되돌아갈 대상이 생긴다.
+    const loopHtml = (angleList.length || expansionList.length)
+        ? `<div class="fw-board-loop">↻ 다시 <b>1. CEP 검증</b>으로 — 위 예측이 맞는지 새 데이터로 확인</div>` : '';
+
     el.innerHTML = `
     <div class="fw-board">
         <div class="fw-board-head">
@@ -1678,10 +1721,13 @@ function _fwRenderBoard() {
             <div class="fw-rest-body">${rest.map(r => _fwCepBlockHtml(r, 0, pObj)).join('')}</div>
         </details>` : ''}
         ${masterHtml}
+        ${angleHtml}
         <div class="fw-actions">
-            <div class="fw-actions-title">5. 확장 — 다음 할 일</div>
+            <div class="fw-actions-title">${actionsTitle}</div>
+            ${expansionHtml}
             ${acts.map(a => `<div class="fw-action-row"><span>${a.ico}</span><span>${_cepEsc(a.text)}</span></div>`).join('')}
         </div>
+        ${loopHtml}
     </div>`;
 }
 
