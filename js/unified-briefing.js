@@ -158,6 +158,11 @@ const _UB_FUNNEL_URLS = {
     WM:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
     CG:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
 };
+// ⚠️ 2026-07: 게시 URL 401 차단 대응 — repo 로컬 스냅샷을 1순위로 읽는다(없으면 위 URL 폴백).
+// 갱신 = GMV 시트의 브랜드별 탭을 CSV로 받아 아래 파일에 덮어쓰고 push.
+const _UB_FUNNEL_LOCAL = {
+    BOH: 'data/gmv-boh.csv', WM: 'data/gmv-wm.csv', CG: 'data/gmv-cg.csv',
+};
 const _UB_F262 = { date:1, product:2, inflow:3, cart:4, buy:5 };
 let _ubFunnelCache = {};   // brand -> {inflow,cart,buy,cartRate,buyRate}
 let _ubFunnelLoading = false;
@@ -219,7 +224,10 @@ async function _ubFetchFunnel() {
     const brands = Object.keys(_UB_FUNNEL_URLS);
     // 브랜드별 개별 처리 — 하나 도착할 때마다 재렌더 (전체 대기 안 함)
     await Promise.allSettled(brands.map(async b => {
-        const text = await _ubFetchCsv(_UB_FUNNEL_URLS[b]);
+        // 1순위: 로컬 스냅샷(프록시 불필요) → 2순위: 게시 URL 프록시 체인
+        let text = null;
+        try { text = await _ubFetchTimeout(_UB_FUNNEL_LOCAL[b], 9000); } catch(e) {}
+        if (!text || text.length < 20) text = await _ubFetchCsv(_UB_FUNNEL_URLS[b]);
         if (text) { try { _ubFunnelCache[b] = _ubAggFunnel(_ubParseCSV(text)); } catch(e) {} }
         renderUnifiedBriefing(); // 부분 도착 즉시 반영
     }));

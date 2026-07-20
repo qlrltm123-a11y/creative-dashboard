@@ -5,7 +5,32 @@
 //  원인 분석 → Next Step] 상세를 우측에 보여준다.
 // ============================================================
 
+// ⚠️ 2026-07: 구글 시트 '웹에 게시' 권한이 조직 정책으로 차단(익명 접근 401)됨.
+// repo에 커밋한 로컬 스냅샷(data/cep-log.csv)을 1순위로 읽고, 없으면 게시 URL을 시도(폴백).
+// 스냅샷 갱신 = 시트 '검증 log' 탭을 CSV로 받아 data/cep-log.csv에 덮어쓰고 push.
+const CEP_SHEET_LOCAL = 'data/cep-log.csv';
 const CEP_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1751932102&single=true&output=csv';
+
+// 로컬 스냅샷 → 게시 URL 순으로 시도해 처음 성공한 CSV 텍스트를 반환
+async function _cepFetchCsv() {
+    const candidates = [CEP_SHEET_LOCAL, CEP_SHEET_URL];
+    let lastErr = null;
+    for (const url of candidates) {
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            if (text.includes('<HTML>') || text.includes('<!DOCTYPE')) {
+                throw new Error('CSV가 아닌 HTML이 반환됨(게시 링크 문제)');
+            }
+            return text;
+        } catch (e) {
+            lastErr = e;
+            console.warn(`[CEP] 로드 실패(${url.slice(0, 40)}…): ${e.message}`);
+        }
+    }
+    throw lastErr || new Error('CEP 데이터 로드 실패');
+}
 
 // 폴백용 고정 인덱스 (헤더 탐지 실패 시): 검증 완료,브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트,검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
 const CEP_COL = { brand: 1, name: 2, product: 3, url: 6, cep: 7, detail: 8, imp: 9, click: 10, ctr: 11, cost: 13, cv: 14, revenue: 17, roas: 18 };
@@ -1914,12 +1939,8 @@ let _cepLoadPromise = null;
 function _cepEnsureData() {
     if (_cepProducts) return Promise.resolve(_cepProducts);
     if (!_cepLoadPromise) {
-        _cepLoadPromise = fetch(CEP_SHEET_URL, { cache: 'no-store' })
-            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); })
+        _cepLoadPromise = _cepFetchCsv()
             .then(text => {
-                if (text.includes('<HTML>') || text.includes('<!DOCTYPE')) {
-                    throw new Error('시트가 웹에 게시되지 않았거나 게시 링크가 잘못되었습니다.');
-                }
                 _cepProducts = _cepBuildModel(_cepParseCSV(text));
                 _cepCreativeIdx = null; // 소재 인덱스 재구축
                 document.dispatchEvent(new CustomEvent('cep-data-ready'));

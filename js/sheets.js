@@ -6,6 +6,10 @@ const FX_RATE_KEY = 'jpy_to_krw_rate';
 
 // 🌟 기본 시트 URL (배포 사이트에서도 자동 로드)
 // LocalStorage에 저장된 URL이 없으면 이 URL을 사용
+// ⚠️ 2026-07: 구글 시트 '웹에 게시' 권한이 조직 정책으로 차단(익명 접근 401)되어
+//    아래 게시 URL은 더 이상 동작하지 않음. repo에 커밋한 로컬 스냅샷(data/creatives.csv)을
+//    1순위로 읽고, 실패 시에만 이 URL을 시도한다(폴백). 스냅샷 갱신 = 시트에서 CSV 받아 덮어쓰고 push.
+const LOCAL_SHEET_CSV = 'data/creatives.csv';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1561941261&single=true&output=csv';
 
 // 💴 → 💰 엔화→원화 환율 (기본값: 1엔 = 9.5원, 2025년 5월 기준 근사치)
@@ -577,21 +581,22 @@ function updateDataSourceLabel(connected) {
     }
 }
 
-// 초기 로드 시 저장된 시트 연결
+// 초기 로드 시 시트 연결
+// 순서: (1)사용자가 UI에서 저장한 URL → (2)로컬 스냅샷(data/creatives.csv) → (3)게시 URL
+// 게시 URL이 401로 막혀도 로컬 스냅샷이 있으면 정상 동작. 후보를 차례로 시도해 처음 성공한 걸 쓴다.
 async function tryLoadSavedSheet() {
-    // 1순위: LocalStorage에 저장된 URL
-    // 2순위: 코드에 박아둔 DEFAULT_SHEET_URL (배포 환경용)
-    const url = getSavedSheetUrl() || DEFAULT_SHEET_URL;
-    if (!url) return null;
-    try {
-        const data = await fetchGoogleSheet(url);
-        updateDataSourceLabel(true);
-        return data;
-    } catch (e) {
-        console.warn('[Sheets] ❌ 시트 로드 실패:', e.message);
-        updateDataSourceLabel(false);
-        return null;
+    const candidates = [getSavedSheetUrl(), LOCAL_SHEET_CSV, DEFAULT_SHEET_URL].filter(Boolean);
+    for (const url of candidates) {
+        try {
+            const data = await fetchGoogleSheet(url);
+            updateDataSourceLabel(true);
+            return data;
+        } catch (e) {
+            console.warn(`[Sheets] 로드 실패(${url.slice(0, 40)}…): ${e.message}`);
+        }
     }
+    updateDataSourceLabel(false);
+    return null;
 }
 
 // CSV 템플릿 다운로드
