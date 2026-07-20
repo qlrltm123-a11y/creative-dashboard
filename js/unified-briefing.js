@@ -151,90 +151,15 @@ function _ubCreativeForDate(date, brand) {
     };
 }
 
-/* ── 퍼널 데이터: 시트 직접 fetch (3개 브랜드 전체) ─────────────
-   iframe은 한 브랜드만 로드하므로, 브리핑은 시트를 직접 받아 캐시 */
-const _UB_FUNNEL_URLS = {
-    BOH: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
-    WM:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
-    CG:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
-};
-// ⚠️ 2026-07: 게시 URL 401 차단 대응 — repo 로컬 스냅샷을 1순위로 읽는다(없으면 위 URL 폴백).
-// 갱신 = GMV 시트의 브랜드별 탭을 CSV로 받아 아래 파일에 덮어쓰고 push.
-const _UB_FUNNEL_LOCAL = {
-    BOH: 'data/gmv-boh.csv', WM: 'data/gmv-wm.csv', CG: 'data/gmv-cg.csv',
-};
-const _UB_F262 = { date:1, product:2, inflow:3, cart:4, buy:5 };
-let _ubFunnelCache = {};   // brand -> {inflow,cart,buy,cartRate,buyRate}
+/* ── 퍼널 데이터 ─────────────────────────────────────────────
+   2026-07: GMV/퍼널 시트가 조직 정책으로 웹게시 차단(401)되고, 해당 데이터를
+   유지하지 않기로 하여 퍼널 데이터 연동을 제거함. 아래 stub은 렌더 코드가
+   기대하는 인터페이스만 유지(퍼널값은 항상 null) — 렌더는 fn 가드로 그냥 생략됨. */
+let _ubFunnelCache = {};   // 항상 비어 있음 (퍼널 연동 제거)
 let _ubFunnelLoading = false;
-let _ubFunnelDone = false;
+let _ubFunnelDone = true;  // 로딩 표시가 뜨지 않도록 완료로 둔다
 
-function _ubParseCSV(text) {
-    return text.split(/\r?\n/).filter(l => l.trim()).map(line => {
-        const cols = []; let cur = '', q = false;
-        for (let i=0;i<line.length;i++){ const ch=line[i];
-            if (ch==='"'){q=!q;continue;}
-            if (ch===','&&!q){cols.push(cur.trim());cur='';continue;}
-            cur+=ch; }
-        cols.push(cur.trim()); return cols;
-    });
-}
-function _ubNum(v){ if(!v||v==='-')return 0; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?0:n; }
-
-// 262Q 누적 합산 → 브랜드 전환율
-function _ubAggFunnel(rows) {
-    let inflow=0, cart=0, buy=0;
-    for (let i=1;i<rows.length;i++){
-        const r = rows[i]; if(!r||r.length<=_UB_F262.buy) continue;
-        const prod=(r[_UB_F262.product]||'').trim(), date=(r[_UB_F262.date]||'').trim();
-        if(!prod||!date||prod==='제품'||date==='date') continue;
-        inflow+=_ubNum(r[_UB_F262.inflow]); cart+=_ubNum(r[_UB_F262.cart]); buy+=_ubNum(r[_UB_F262.buy]);
-    }
-    if(inflow===0&&cart===0) return null;
-    return { inflow, cart, buy,
-        cartRate: inflow>0?cart/inflow*100:null,
-        buyRate:  cart>0?buy/cart*100:null };
-}
-
-// 타임아웃 fetch
-function _ubFetchTimeout(url, ms) {
-    return new Promise((resolve, reject) => {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => { ctrl.abort(); reject(new Error('timeout')); }, ms);
-        fetch(url, { cache:'no-store', signal: ctrl.signal })
-            .then(r => { clearTimeout(t); r.ok ? r.text().then(resolve) : reject(new Error('http '+r.status)); })
-            .catch(e => { clearTimeout(t); reject(e); });
-    });
-}
-// 프록시 폴백 체인으로 1개 URL 텍스트 가져오기
-async function _ubFetchCsv(url) {
-    const tries = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-        url, // 직접 (CORS 허용 시)
-    ];
-    for (const u of tries) {
-        try { const txt = await _ubFetchTimeout(u, 9000); if (txt && txt.length > 20) return txt; } catch(e) {}
-    }
-    return null;
-}
-
-async function _ubFetchFunnel() {
-    if (_ubFunnelLoading || _ubFunnelDone) return;
-    _ubFunnelLoading = true;
-    const brands = Object.keys(_UB_FUNNEL_URLS);
-    // 브랜드별 개별 처리 — 하나 도착할 때마다 재렌더 (전체 대기 안 함)
-    await Promise.allSettled(brands.map(async b => {
-        // 1순위: 로컬 스냅샷(프록시 불필요) → 2순위: 게시 URL 프록시 체인
-        let text = null;
-        try { text = await _ubFetchTimeout(_UB_FUNNEL_LOCAL[b], 9000); } catch(e) {}
-        if (!text || text.length < 20) text = await _ubFetchCsv(_UB_FUNNEL_URLS[b]);
-        if (text) { try { _ubFunnelCache[b] = _ubAggFunnel(_ubParseCSV(text)); } catch(e) {} }
-        renderUnifiedBriefing(); // 부분 도착 즉시 반영
-    }));
-    _ubFunnelLoading = false;
-    _ubFunnelDone = true;
-    renderUnifiedBriefing();
-}
+function _ubFetchFunnel() { /* 퍼널 연동 제거 — no-op */ }
 
 function _ubFunnelForBrand(brand) {
     return _ubFunnelCache[brand] || null;
@@ -604,16 +529,13 @@ function renderUnifiedBriefing() {
     ${_ubAdVsActualCard(brands)}
 
     <div class="ub-note">
-        💡 GMV 실적은 GMV 탭 입력값 기준 · 광고 성과는 시트 소재 데이터 · 퍼널은 자동 동기화됩니다.
+        💡 GMV 실적은 목표 입력값 기준 · 광고 성과는 시트 소재 데이터 기준.
     </div>`;
-
-    // 퍼널 데이터: 시트 직접 fetch (3개 브랜드) → 도착 시 자동 재렌더
-    if (!_ubFunnelDone) _ubFetchFunnel();
 }
 window.renderUnifiedBriefing = renderUnifiedBriefing;
 
 /* ── 날짜 변경 ── */
 window._ubSetDate = function(d) { _ubDate = d; renderUnifiedBriefing(); };
 
-/* ── 퍼널 수동 재동기화 ── */
-window._ubSyncFunnel = function() { _ubFunnelDone = false; _ubFunnelCache = {}; _ubFetchFunnel(); };
+/* ── 퍼널 연동 제거됨 — 호환용 no-op (재렌더만) ── */
+window._ubSyncFunnel = function() { renderUnifiedBriefing(); };

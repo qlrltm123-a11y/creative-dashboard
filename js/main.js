@@ -150,9 +150,9 @@ window.updateDashboard = function() {
     invalidatePerformancePoolCache();
     if (typeof window._invalidateWrCache === 'function') window._invalidateWrCache();
 
-    // 통합 iframe(퍼널/GMV)에 전역 브랜드 변경 전파 (이미 로드된 경우만)
+    // 통합 iframe(퍼널)에 전역 브랜드 변경 전파 (이미 로드된 경우만)
     const _brand = (typeof currentBrand !== 'undefined') ? currentBrand : 'ALL';
-    ['funnel-frame', 'gmv-frame'].forEach(id => {
+    ['funnel-frame'].forEach(id => {
         const fr = document.getElementById(id);
         if (fr && fr.src && fr.contentWindow) {
             try { fr.contentWindow.postMessage({ type: 'setBrand', brand: _brand }, '*'); } catch(e) {}
@@ -581,7 +581,7 @@ function bindEvents() {
 // Section Switching (Lazy Render)
 // ============================
 // ★ 속도 개선: 섹션 진입 시점에만 해당 섹션을 렌더 (탭이 비활성일 때는 스킵)
-let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, gmv: false, kr: false, cep: false };
+let _renderedSections = { performance: true, ai: false, weekly: false, funnel: false, kr: false, cep: false };
 let _currentSection = 'performance';   // 개요 탭 제거됨 → 기본 성과 분석
 
 function switchSection(sectionName) {
@@ -630,7 +630,7 @@ function switchSection(sectionName) {
                 if (typeof window.renderCepVerification === 'function') window.renderCepVerification();
             } else if (sectionName === 'framework') {
                 if (typeof window.renderFrameworkTab === 'function') window.renderFrameworkTab();
-            } else if (sectionName === 'funnel' || sectionName === 'gmv') {
+            } else if (sectionName === 'funnel') {
                 // iframe 통합 탭: 첫 진입 시에만 src 주입 (레이지 로드) + 전역 브랜드 전달
                 const frame = document.getElementById(sectionName + '-frame');
                 if (frame && !frame.src && frame.dataset.src) {
