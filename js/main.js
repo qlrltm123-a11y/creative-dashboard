@@ -205,6 +205,8 @@ window.updateDashboard = function() {
         if (typeof window.renderWeeklyReport === 'function') window.renderWeeklyReport();
     } else if (_currentSection === 'kr') {
         renderKRSection();
+    } else if (_currentSection === 'admetrics') {
+        if (typeof window.renderAdMetrics === 'function') window.renderAdMetrics();
     }
     // overview: updateKPIs + updateCharts 만으로 충분 (renderProductPerformance 불필요)
 
