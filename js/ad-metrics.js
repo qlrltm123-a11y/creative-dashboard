@@ -139,6 +139,7 @@ function _amEnsureData() {
                 _amRows.push({
                     date, brand: (r[col.brand] || '').trim(), retail,
                     media: _amMedia(r[col.media]),
+                    adname: (r[col.adname] || '').trim() || '(광고명 없음)',
                     product: _amProduct(r[col.adname]),
                     event: _amEventFor(date, retail),
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
@@ -276,19 +277,37 @@ function _amRender() {
 
     // 제품별
     const products = _amGroup(rows, r => r.product).filter(p => p.cost > 0).sort((a, b) => b.rev - a.rev);
+    // 기타(미분류) 상세 — 광고명별로 펼쳐보기
+    const etcRows = rows.filter(r => r.product === '기타');
+    const etcByName = _amGroup(etcRows, r => r.adname).filter(x => x.cost > 0).sort((a, b) => b.cost - a.cost);
+    const etcHtml = etcByName.length ? `
+        <details class="am-etc">
+            <summary><i class="fas fa-chevron-right am-etc-chev"></i> 기타(미분류) 광고명 ${etcByName.length}개 펼쳐보기 <span class="am-card-sub">광고비 큰 순</span></summary>
+            <table class="am-table am-etc-table">
+                <thead><tr><th>광고명</th><th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th></tr></thead>
+                <tbody>${etcByName.slice(0, 60).map(e => `<tr>
+                    <td class="am-t-name am-etc-name" title="${_amEsc(e.key)}">${_amEsc(e.key)}</td>
+                    <td>${_amKRWshort(e.cost)}</td>
+                    <td>${_amKRWshort(e.rev)}</td>
+                    <td class="am-t-roas ${e.roas >= 200 ? 'am-good' : e.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(e.roas)}</td>
+                    <td>${_amInt(e.cv)}</td></tr>`).join('')}</tbody>
+            </table>
+            ${etcByName.length > 60 ? `<div class="am-etc-more">상위 60개만 표시 (전체 ${etcByName.length}개)</div>` : ''}
+        </details>` : '';
     const prodHtml = `
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-boxes-stacked"></i> 제품별 <span class="am-card-sub">매출 큰 순 · 광고명 키워드 기반 추정</span></div>
             <table class="am-table">
                 <thead><tr><th>제품</th><th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th>CPA</th></tr></thead>
-                <tbody>${products.map(p => `<tr>
-                    <td class="am-t-name">${_amEsc(p.key)}</td>
+                <tbody>${products.map(p => `<tr${p.key === '기타' ? ' class="am-t-etc"' : ''}>
+                    <td class="am-t-name">${_amEsc(p.key)}${p.key === '기타' ? ' <span class="am-etc-tag">↓ 아래 상세</span>' : ''}</td>
                     <td>${_amKRWshort(p.cost)}</td>
                     <td>${_amKRWshort(p.rev)}</td>
                     <td class="am-t-roas ${p.roas >= 200 ? 'am-good' : p.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(p.roas)}</td>
                     <td>${_amInt(p.cv)}</td>
                     <td>${p.cv > 0 ? _amKRWshort(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="6" class="am-empty">데이터 없음</td></tr>`}</tbody>
             </table>
+            ${etcHtml}
         </div>`;
 
     root.innerHTML = `<div class="am-wrap">${selHtml}${kpiHtml}${mediaHtml}${dailyHtml}${prodHtml}</div>`;

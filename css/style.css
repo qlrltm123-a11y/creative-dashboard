@@ -33,6 +33,16 @@
 .am-mid { color: #d97706; }
 .am-low { color: #dc2626; }
 .am-empty { text-align: center !important; color: #cbd5e1; padding: 20px !important; }
+.am-t-etc td { color: #94a3b8; }
+.am-etc-tag { font-size: 10px; font-weight: 600; color: #94a3b8; }
+.am-etc { margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+.am-etc > summary { cursor: pointer; list-style: none; font-size: 12px; font-weight: 700; color: #64748b; padding: 6px 2px; }
+.am-etc > summary::-webkit-details-marker { display: none; }
+.am-etc-chev { font-size: 10px; margin-right: 5px; transition: transform .2s; }
+.am-etc[open] .am-etc-chev { transform: rotate(90deg); }
+.am-etc-table { margin-top: 8px; }
+.am-etc-name { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400 !important; color: #475569 !important; }
+.am-etc-more { font-size: 11px; color: #cbd5e1; text-align: center; padding: 8px; }
 
 /* ── BEST TOP 20 썸네일 카드 ── */
 .best-thumb-card {
