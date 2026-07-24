@@ -48,6 +48,10 @@
                 <i class="fas fa-chart-simple sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">성과 분석</span><span class="sb-sub">어떤 광고가 잘됐나</span></span>
             </button>
+            <button class="section-tab" data-section="admetrics" title="광고 지표">
+                <i class="fas fa-chart-column sb-ico"></i>
+                <span class="sb-txt"><span class="sb-label">광고 지표</span><span class="sb-sub">이벤트별 매체·제품</span></span>
+            </button>
             <button class="section-tab" data-section="funnel" title="퍼널">
                 <i class="fas fa-filter sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">퍼널</span><span class="sb-sub">유입→구매 전환</span></span>
@@ -690,6 +694,12 @@
         </div>
         <!-- ============ /SECTION: 주간 업무 보고서 ============ -->
 
+        <!-- ============ SECTION: 광고 지표 (이벤트별 매체·제품) ============ -->
+        <div class="section-panel" data-panel="admetrics">
+            <div id="admetrics-root"></div>
+        </div>
+        <!-- ============ /SECTION: 광고 지표 ============ -->
+
         <!-- ============ SECTION: 퍼널 (iframe 통합) ============ -->
         <div class="section-panel" data-panel="funnel">
             <iframe id="funnel-frame" class="embed-frame" title="퍼널 전환율 대시보드"
@@ -966,6 +976,7 @@
     <script defer src="js/unified-briefing.js?v=260720"></script>
     <script defer src="js/market-research.js"></script>
     <script defer src="js/cep-verification.js?v=260720"></script>
+    <script defer src="js/ad-metrics.js?v=260724"></script>
     <script defer src="js/ai-chat.js?v=260703"></script>
     <script defer src="js/main.js?v=260720"></script>
 </body>

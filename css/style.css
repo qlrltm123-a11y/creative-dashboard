@@ -2,6 +2,38 @@
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
+/* ── 광고 지표 탭 (이벤트별 매체·제품) ── */
+.am-wrap { display: flex; flex-direction: column; gap: 16px; }
+.am-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff; border: 1px solid #e8ecf3; border-radius: 12px; padding: 12px 16px; }
+.am-tl-lbl { font-size: 13px; font-weight: 700; color: #4f46e5; }
+.am-tl-lbl i { margin-right: 4px; }
+.am-select { font-size: 13px; font-weight: 600; color: #1e293b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; min-width: 260px; cursor: pointer; }
+.am-ev-meta { font-size: 11.5px; color: #94a3b8; margin-left: auto; }
+.am-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (min-width: 900px) { .am-kpis { grid-template-columns: repeat(8, 1fr); } }
+.am-kpi { background: #fff; border: 1px solid #e8ecf3; border-radius: 10px; padding: 10px 12px; }
+.am-kpi--hi { background: #eef2ff; border-color: #c7d2fe; }
+.am-kpi-l { font-size: 11px; color: #64748b; margin-bottom: 3px; }
+.am-kpi-v { font-size: 16px; font-weight: 800; color: #1e293b; }
+.am-kpi--hi .am-kpi-v { color: #4f46e5; }
+.am-card { background: #fff; border: 1px solid #e8ecf3; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+.am-card-h { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 12px; }
+.am-card-h i { color: #6366f1; margin-right: 6px; }
+.am-card-sub { font-size: 11px; font-weight: 400; color: #94a3b8; margin-left: 6px; }
+.am-chart-wrap { position: relative; height: 200px; margin-bottom: 12px; }
+.am-chart-wrap--tall { height: 300px; margin-bottom: 0; }
+.am-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.am-table th { text-align: right; color: #94a3b8; font-weight: 600; font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #eef2f7; }
+.am-table th:first-child { text-align: left; }
+.am-table td { text-align: right; padding: 7px 8px; color: #334155; border-bottom: 1px solid #f4f6fa; white-space: nowrap; }
+.am-table tr:last-child td { border-bottom: none; }
+.am-t-name { text-align: left !important; font-weight: 700; color: #1e293b; }
+.am-t-roas { font-weight: 800; }
+.am-good { color: #059669; }
+.am-mid { color: #d97706; }
+.am-low { color: #dc2626; }
+.am-empty { text-align: center !important; color: #cbd5e1; padding: 20px !important; }
+
 /* ── BEST TOP 20 썸네일 카드 ── */
 .best-thumb-card {
     cursor: pointer;
