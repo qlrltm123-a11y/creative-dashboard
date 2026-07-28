@@ -40,6 +40,8 @@ function _amPct(v) { return (v || 0).toFixed(0) + '%'; }
 function _amShiftDays(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
 function _amShiftYears(d, n) { const x = new Date(d + 'T00:00:00'); x.setFullYear(x.getFullYear() + n); return x.toISOString().slice(0, 10); }
 function _amDaysInclusive(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
+// 이벤트명에서 회차 접두(2607 / 262Q 등) 제거 → 이벤트 '유형' (예: '2607 메가포' → '메가포')
+function _amEventType(name) { return (name || '').replace(/^\s*\d{3,4}[QqＱ]?\s+/, '').trim(); }
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
 function _amDeltaCell(cur, prev, goodUp) {
     if (!prev) return '<td class="am-d-na">-</td>';
@@ -273,16 +275,28 @@ function _amRender() {
             : (_amSelectedEvent === '상시광고' ? `<span class="am-ev-meta">이벤트 기간에 걸리지 않는 상시 운영 광고</span>` : `<span class="am-ev-meta">${brand || '전체 브랜드'} · 전 기간 합산</span>`)}
         </div>`;
 
-    // 합계 요약 표 (+ 직전 동기간 · 전년 동기간 증감) — 이벤트 선택 시에만 비교 열 표시
+    // 합계 요약 표 (+ 직전 행사 · 전년 동행사 증감)
+    // 직전/전년은 '같은 이벤트 유형'의 이전 회차·1년 전 회차와 비교
+    // (예: 7월 메가포 → 직전=직전 메가포(5월), 전년=작년 7월 메가포). 같은 리테일끼리만 매칭.
     let prevAgg = null, yoyAgg = null, cmpLabel = '';
     if (evMeta) {
-        const len = _amDaysInclusive(evMeta.start, evMeta.end);
-        const prevEnd = _amShiftDays(evMeta.start, -1);
-        const prevStart = _amShiftDays(prevEnd, -(len - 1));
-        prevAgg = _amAgg(brandRows.filter(r => r.date >= prevStart && r.date <= prevEnd));
-        const yStart = _amShiftYears(evMeta.start, -1), yEnd = _amShiftYears(evMeta.end, -1);
-        yoyAgg = _amAgg(brandRows.filter(r => r.date >= yStart && r.date <= yEnd));
-        cmpLabel = `직전 ${prevStart}~${prevEnd} · 전년 ${yStart}~${yEnd} (같은 길이 날짜창)`;
+        const curType = _amEventType(evMeta.name);
+        const sameType = _amEvents
+            .filter(e => e.retail === evMeta.retail && _amEventType(e.name) === curType)
+            .sort((a, b) => a.start.localeCompare(b.start));
+        const idx = sameType.findIndex(e => e.name === evMeta.name);
+        const prevEv = idx > 0 ? sameType[idx - 1] : null;
+        // 전년 동행사: 같은 유형 중 시작일이 (올해 시작 -1년)에 가장 가까운 회차 (90일 이내)
+        const yTarget = _amShiftYears(evMeta.start, -1);
+        let yoyEv = null, best = Infinity;
+        sameType.forEach(e => {
+            if (e.name === evMeta.name) return;
+            const diff = Math.abs((new Date(e.start) - new Date(yTarget)) / 86400000);
+            if (diff <= 90 && diff < best) { best = diff; yoyEv = e; }
+        });
+        if (prevEv) prevAgg = _amAgg(brandRows.filter(r => r.event === prevEv.name));
+        if (yoyEv) yoyAgg = _amAgg(brandRows.filter(r => r.event === yoyEv.name));
+        cmpLabel = `직전: ${prevEv ? _amEsc(prevEv.name) : '없음'} · 전년: ${yoyEv ? _amEsc(yoyEv.name) : '없음'}`;
     }
     const metricDefs = [
         { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
@@ -292,21 +306,24 @@ function _amRender() {
         { l: '구매수', f: v => _amInt(v.cv), g: true, k: 'cv' },
         { l: '매출', f: v => _amKRWshort(v.rev), g: true, k: 'rev' },
         { l: 'ROAS', f: v => _amPct(v.roas), g: true, k: 'roas' },
-        { l: 'CPA', f: v => v.cv > 0 ? _amKRWshort(v.cpa) : '-', g: false, k: 'cpa' },
+        { l: 'CPA', f: v => v.cv > 0 ? _amKRW(v.cpa) : '-', g: false, k: 'cpa' },
     ];
     const hasCmp = !!evMeta;
+    const cmpPair = (m, agg) => agg
+        ? `<td>${m.f(agg)}</td>${_amDeltaCell(total[m.k], agg[m.k], m.g)}`
+        : `<td class="am-d-na">-</td><td class="am-d-na">-</td>`;
     const kpiHtml = `
         <div class="am-card am-sum-card">
             <div class="am-card-h"><i class="fas fa-calculator"></i> 합계 ${hasCmp ? `<span class="am-card-sub">${cmpLabel}</span>` : `<span class="am-card-sub">${_amEsc(brand || '전체 브랜드')} · ${_amEsc(_amSelectedEvent)}</span>`}</div>
             <table class="am-table am-sum-table">
-                <thead><tr><th>지표</th><th>현재</th>${hasCmp ? '<th>직전 동기간</th><th>직전비</th><th>전년 동기간</th><th>YoY</th>' : ''}</tr></thead>
+                <thead><tr><th>지표</th><th>현재</th>${hasCmp ? '<th>직전 행사</th><th>직전비</th><th>전년 동행사</th><th>YoY</th>' : ''}</tr></thead>
                 <tbody>${metricDefs.map(m => `<tr>
                     <td class="am-t-name">${m.l}</td>
                     <td class="am-sum-cur">${m.f(total)}</td>
-                    ${hasCmp ? `<td>${m.f(prevAgg)}</td>${_amDeltaCell(total[m.k], prevAgg[m.k], m.g)}<td>${m.f(yoyAgg)}</td>${_amDeltaCell(total[m.k], yoyAgg[m.k], m.g)}` : ''}
+                    ${hasCmp ? cmpPair(m, prevAgg) + cmpPair(m, yoyAgg) : ''}
                 </tr>`).join('')}</tbody>
             </table>
-            ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 동기간·전년 동기간 증감이 표시됩니다.</p>` : ''}
+            ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 행사·전년 동행사 증감이 표시됩니다.</p>` : `<p class="am-sum-note">직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 기준.</p>`}
         </div>`;
 
     // 매체별 ROAS
@@ -345,7 +362,7 @@ function _amRender() {
                     <td>${_amInt(d.cv)}</td>
                     <td>${_amKRWshort(d.rev)}</td>
                     <td class="am-t-roas ${d.roas >= 200 ? 'am-good' : d.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(d.roas)}</td>
-                    <td>${d.cv > 0 ? _amKRWshort(d.cpa) : '-'}</td></tr>`).join('')}</tbody>
+                    <td>${d.cv > 0 ? _amKRW(d.cpa) : '-'}</td></tr>`).join('')}</tbody>
             </table></div>
         </details>` : '';
     const dailyHtml = `
@@ -385,7 +402,7 @@ function _amRender() {
                     <td>${_amKRWshort(p.rev)}</td>
                     <td class="am-t-roas ${p.roas >= 200 ? 'am-good' : p.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(p.roas)}</td>
                     <td>${_amInt(p.cv)}</td>
-                    <td>${p.cv > 0 ? _amKRWshort(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="6" class="am-empty">데이터 없음</td></tr>`}</tbody>
+                    <td>${p.cv > 0 ? _amKRW(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="6" class="am-empty">데이터 없음</td></tr>`}</tbody>
             </table>
             ${etcHtml}
         </div>`;
