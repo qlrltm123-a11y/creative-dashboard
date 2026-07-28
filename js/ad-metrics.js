@@ -69,40 +69,43 @@ function _amMedia(raw) {
 // brand를 지정하면 그 브랜드 행에서만 매칭 → WM 광고에 섞인 BOH 제품명(크림더블 등)이
 // WM 제품으로 잘못 잡히는 것을 방지. 같은 브랜드 안에서는 구체적 변형을 앞에 둔다.
 const AM_PRODUCTS = [
-    // ── CG (색조: 틴트·팔레트) ──
+    // ── CG (색조: 틴트·팔레트) ── 구체 변형을 앞에
     { name: 'タンフルミルク', brand: 'CG', kw: ['タンフルグラスティントミルク', 'タンフルーティント ミルク', 'タンフルミルク', 'T-Milk'] },
     { name: 'タンフルディープグレーズ', brand: 'CG', kw: ['タンフルグラスティントディープグレーズ', 'タンフルディープグレーズ', 'T-DeepGlaze', 'DeepGlaze', 'ディープグレーズ'] },
-    { name: 'タンフルグラスティント', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル'] },
+    { name: 'タンフルグラスティント', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル', 'Tanghuru', 'Tanfru', 'Tanful'] },
     { name: 'カラーカバーティント', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー'] },
-    { name: 'ヌーディーブラーティント', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', '누디블러'] },
+    { name: 'ヌーディーブラーティント', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', 'NudyBlur', 'Noody', '누디블러'] },
     { name: 'ジューシージャムブラーティント', brand: 'CG', kw: ['ジューシージャム', 'JuicyJam'] },
     { name: 'シェーディングスティック', brand: 'CG', kw: ['ShadingStick', 'シェーディングスティック', '쉐딩스틱'] },
     { name: 'ジェリービームスティック', brand: 'CG', kw: ['ジェリービーム', 'JellyBeam'] },
-    { name: '目元チュートリアルアイパレット', brand: 'CG', kw: ['目元チュートリアル', 'チュートリアルアイパレット'] },
+    { name: '目元チュートリアルアイパレット', brand: 'CG', kw: ['目元チュートリアル', 'チュートリアルアイパレット', 'AegyoMaker', '애교메이커'] },
     { name: 'クレヨンしんちゃんコラボ', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
     // ── WM (색조: 아이·베이스·립) ──
     { name: '소프트블러링 아이팔레트', brand: 'WM', kw: ['소블아', '소프트블러', 'ソフトブラー', 'SoftBlurEye', 'SoftBlur'] },
-    { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless'] },
+    { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless', 'SeamlessFd'] },
     { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
     { name: '소프트시어 멀티팔레트', brand: 'WM', kw: ['ソフトシアーマルチパレット', 'シアーマルチパレット', 'SoftSheer', 'SheerMulti'] },
-    { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur'] },
+    { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur', 'Shebulchi'] },
     { name: '스테이픽서 파우더', brand: 'WM', kw: ['ステイフィクサー', 'StayFixer'] },
-    { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ'] },
-    { name: '파운데이션 브러쉬', brand: 'WM', kw: ['FdBrush', 'ファンデーションブラシ'] },
-    { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', 'スパチュラ', '스파츌라', '스파출라', 'SilverCrush'] },
+    { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ', 'GyaruKittySET'] },
+    { name: '파운데이션 브러쉬', brand: 'WM', kw: ['FdBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド'] },
+    { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', '스파츌라', '스파출라', 'SilverCrush'] },
     { name: '베이스락 세트', brand: 'WM', kw: ['BaseLockSET', 'BaseLock'] },
     { name: '하이글로우밤', brand: 'WM', kw: ['H-GlowBalm', 'GlowBalm', '글로우밤'] },
     { name: '6색 팔레트', brand: 'WM', kw: ['6色パレット', '6색팔레트'] },
     // ── BOH (스킨케어: 탄탄크림 라인) ──
     { name: '아사츄르', brand: 'BOH', kw: ['아사츄르', '요루탄', '朝ちゅる', '夜タン', 'アサチュル', 'Asachuru'] },
     { name: '크림더블', brand: 'BOH', kw: ['크림더블', 'クリームダブル', 'CreamDouble'] },
-    { name: '3D크림(탄탄)', brand: 'BOH', kw: ['3D', '本格的ハリ', 'ハリケア', 'タンタン弾力', '弾力ケア', '3Dクリーム'] },
-    { name: '겔미스트', brand: 'BOH', kw: ['겔미스트', '세럼미스트', 'ゲルミスト', 'GelMist', 'コラーゲンミスト'] },
+    { name: '겔미스트', brand: 'BOH', kw: ['겔미스트', '세럼미스트', 'ゲルミスト', 'GelMist', 'コラーゲンミスト', 'CollagenMist'] },
+    { name: '3D크림(탄탄)', brand: 'BOH', kw: ['3D', '本格的ハリ', 'ハリケア', 'タンタン弾力', '弾力ケア', '3Dクリーム', '3D-refill', '3DCream', 'Refill', 'タンタン'] },
     { name: '콜라겐', brand: 'BOH', kw: ['콜라겐', 'コラーゲン', 'Collagen'] },
     { name: 'NAD크림', brand: 'BOH', kw: ['NAD'] },
     { name: '슈링크', brand: 'BOH', kw: ['슈링크', 'シュリンク', 'Shurink', 'PDRN'] },
-    { name: '클렌징밤', brand: 'BOH', kw: ['클렌징밤', 'クレンジングバーム'] },
+    { name: '스킨버스터', brand: 'BOH', kw: ['스킨버스터', 'SkinBuster'] },
     { name: '아이크림', brand: 'BOH', kw: ['아이크림', 'アイクリーム', 'EyeCream'] },
+    { name: '3스텝세트', brand: 'BOH', kw: ['3StepSet', '3스텝'] },
+    { name: '클렌징밤', brand: 'BOH', kw: ['클렌징밤', 'クレンジングバーム'] },
+    { name: '기획박스(세트)', brand: 'BOH', kw: ['GiftBox', '기획박스'] },
 ];
 function _amProduct(adName, brand) {
     const s = adName || '';
