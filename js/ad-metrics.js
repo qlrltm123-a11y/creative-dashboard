@@ -36,6 +36,19 @@ function _amKRWshort(v) {
 function _amInt(v) { return Math.round(v).toLocaleString(); }
 function _amPct(v) { return (v || 0).toFixed(0) + '%'; }
 
+// ── 기간 비교용 날짜 헬퍼 ──
+function _amShiftDays(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
+function _amShiftYears(d, n) { const x = new Date(d + 'T00:00:00'); x.setFullYear(x.getFullYear() + n); return x.toISOString().slice(0, 10); }
+function _amDaysInclusive(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
+// 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
+function _amDeltaCell(cur, prev, goodUp) {
+    if (!prev) return '<td class="am-d-na">-</td>';
+    const d = (cur - prev) / prev * 100;
+    const up = d >= 0;
+    const good = goodUp ? up : !up;
+    return `<td class="am-delta ${good ? 'am-good' : 'am-low'}">${up ? '▲' : '▼'} ${Math.abs(d).toFixed(0)}%</td>`;
+}
+
 // ── 매체 정규화: SingleOne_ 접두 제거 → 플랫폼 단위 ──
 function _amMedia(raw) {
     let s = (raw || '').trim();
@@ -52,27 +65,49 @@ function _amMedia(raw) {
     return s || '기타';
 }
 
-// ── 제품 추정: 광고명 키워드 사전 (앞쪽 = 우선순위 높음) ──
+// ── 제품 추정: 광고명 키워드 사전 (브랜드별 + 앞쪽 = 우선순위 높음) ──
+// brand를 지정하면 그 브랜드 행에서만 매칭 → WM 광고에 섞인 BOH 제품명(크림더블 등)이
+// WM 제품으로 잘못 잡히는 것을 방지. 같은 브랜드 안에서는 구체적 변형을 앞에 둔다.
 const AM_PRODUCTS = [
-    { name: '크림더블', kw: ['크림더블', 'クリームダブル', 'CreamDouble'] },
-    { name: '아사츄르', kw: ['아사츄르', '요루탄', 'アサチュル', 'ヨルタン', 'Asachuru'] },
-    { name: '소프트블러링 아이팔레트', kw: ['소블아', '소프트블러', 'ソフトブラー', 'SoftBlur'] },
-    { name: '심리스 파운데이션', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless'] },
-    { name: '겔미스트', kw: ['겔미스트', '세럼미스트', 'ゲルミスト', 'GelMist', 'コラーゲンミスト'] },
-    { name: '3D크림', kw: ['3D', '本格的ハリ', 'ハリケア', 'ハリケアセット'] },
-    { name: '슈링크(PDRN)', kw: ['슈링크', 'シュリンク', 'Shurink', 'PDRN'] },
-    { name: '워터풀글로우틴트', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
-    { name: '누디블러틴트', kw: ['누디블러', 'ヌーディーブラー', 'NudeBlur', 'NudieBlur'] },
-    { name: '실버크러쉬 브러쉬', kw: ['실버크러쉬', '스파츌라', '스파출라', 'シルバー', 'SilverCrush'] },
-    { name: 'NAD크림', kw: ['NAD'] },
-    { name: '아이크림', kw: ['아이크림', 'アイクリーム', 'EyeCream'] },
-    { name: '스킨버스터', kw: ['스킨버스터', 'SkinBuster'] },
-    { name: '갸루키티세트', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ'] },
-    { name: '콜라겐(기획)', kw: ['콜라겐', 'コラーゲン', 'Collagen'] },
+    // ── CG (색조: 틴트·팔레트) ──
+    { name: 'タンフルミルク', brand: 'CG', kw: ['タンフルグラスティントミルク', 'タンフルーティント ミルク', 'タンフルミルク', 'T-Milk'] },
+    { name: 'タンフルディープグレーズ', brand: 'CG', kw: ['タンフルグラスティントディープグレーズ', 'タンフルディープグレーズ', 'T-DeepGlaze', 'DeepGlaze', 'ディープグレーズ'] },
+    { name: 'タンフルグラスティント', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル'] },
+    { name: 'カラーカバーティント', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー'] },
+    { name: 'ヌーディーブラーティント', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', '누디블러'] },
+    { name: 'ジューシージャムブラーティント', brand: 'CG', kw: ['ジューシージャム', 'JuicyJam'] },
+    { name: 'シェーディングスティック', brand: 'CG', kw: ['ShadingStick', 'シェーディングスティック', '쉐딩스틱'] },
+    { name: 'ジェリービームスティック', brand: 'CG', kw: ['ジェリービーム', 'JellyBeam'] },
+    { name: '目元チュートリアルアイパレット', brand: 'CG', kw: ['目元チュートリアル', 'チュートリアルアイパレット'] },
+    { name: 'クレヨンしんちゃんコラボ', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
+    // ── WM (색조: 아이·베이스·립) ──
+    { name: '소프트블러링 아이팔레트', brand: 'WM', kw: ['소블아', '소프트블러', 'ソフトブラー', 'SoftBlurEye', 'SoftBlur'] },
+    { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless'] },
+    { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
+    { name: '소프트시어 멀티팔레트', brand: 'WM', kw: ['ソフトシアーマルチパレット', 'シアーマルチパレット', 'SoftSheer', 'SheerMulti'] },
+    { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur'] },
+    { name: '스테이픽서 파우더', brand: 'WM', kw: ['ステイフィクサー', 'StayFixer'] },
+    { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ'] },
+    { name: '파운데이션 브러쉬', brand: 'WM', kw: ['FdBrush', 'ファンデーションブラシ'] },
+    { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', 'スパチュラ', '스파츌라', '스파출라', 'SilverCrush'] },
+    { name: '베이스락 세트', brand: 'WM', kw: ['BaseLockSET', 'BaseLock'] },
+    { name: '하이글로우밤', brand: 'WM', kw: ['H-GlowBalm', 'GlowBalm', '글로우밤'] },
+    { name: '6색 팔레트', brand: 'WM', kw: ['6色パレット', '6색팔레트'] },
+    // ── BOH (스킨케어: 탄탄크림 라인) ──
+    { name: '아사츄르', brand: 'BOH', kw: ['아사츄르', '요루탄', '朝ちゅる', '夜タン', 'アサチュル', 'Asachuru'] },
+    { name: '크림더블', brand: 'BOH', kw: ['크림더블', 'クリームダブル', 'CreamDouble'] },
+    { name: '3D크림(탄탄)', brand: 'BOH', kw: ['3D', '本格的ハリ', 'ハリケア', 'タンタン弾力', '弾力ケア', '3Dクリーム'] },
+    { name: '겔미스트', brand: 'BOH', kw: ['겔미스트', '세럼미스트', 'ゲルミスト', 'GelMist', 'コラーゲンミスト'] },
+    { name: '콜라겐', brand: 'BOH', kw: ['콜라겐', 'コラーゲン', 'Collagen'] },
+    { name: 'NAD크림', brand: 'BOH', kw: ['NAD'] },
+    { name: '슈링크', brand: 'BOH', kw: ['슈링크', 'シュリンク', 'Shurink', 'PDRN'] },
+    { name: '클렌징밤', brand: 'BOH', kw: ['클렌징밤', 'クレンジングバーム'] },
+    { name: '아이크림', brand: 'BOH', kw: ['아이크림', 'アイクリーム', 'EyeCream'] },
 ];
-function _amProduct(adName) {
+function _amProduct(adName, brand) {
     const s = adName || '';
     for (const p of AM_PRODUCTS) {
+        if (p.brand && p.brand !== brand) continue;   // 같은 브랜드에서만 매칭
         if (p.kw.some(k => s.includes(k))) return p.name;
     }
     return '기타';
@@ -140,7 +175,7 @@ function _amEnsureData() {
                     date, brand: (r[col.brand] || '').trim(), retail,
                     media: _amMedia(r[col.media]),
                     adname: (r[col.adname] || '').trim() || '(광고명 없음)',
-                    product: _amProduct(r[col.adname]),
+                    product: _amProduct(r[col.adname], (r[col.brand] || '').trim()),
                     event: _amEventFor(date, retail),
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
@@ -235,19 +270,41 @@ function _amRender() {
             : (_amSelectedEvent === '상시광고' ? `<span class="am-ev-meta">이벤트 기간에 걸리지 않는 상시 운영 광고</span>` : `<span class="am-ev-meta">${brand || '전체 브랜드'} · 전 기간 합산</span>`)}
         </div>`;
 
-    // KPI
-    const kpis = [
-        { l: '광고비', v: _amKRWshort(total.cost) },
-        { l: '노출', v: _amInt(total.imp) },
-        { l: '클릭', v: _amInt(total.click) },
-        { l: 'CTR', v: total.ctr.toFixed(2) + '%' },
-        { l: '구매수', v: _amInt(total.cv) },
-        { l: '매출', v: _amKRWshort(total.rev) },
-        { l: 'ROAS', v: _amPct(total.roas), hi: true },
-        { l: 'CPA', v: total.cv > 0 ? _amKRWshort(total.cpa) : '-' },
+    // 합계 요약 표 (+ 직전 동기간 · 전년 동기간 증감) — 이벤트 선택 시에만 비교 열 표시
+    let prevAgg = null, yoyAgg = null, cmpLabel = '';
+    if (evMeta) {
+        const len = _amDaysInclusive(evMeta.start, evMeta.end);
+        const prevEnd = _amShiftDays(evMeta.start, -1);
+        const prevStart = _amShiftDays(prevEnd, -(len - 1));
+        prevAgg = _amAgg(brandRows.filter(r => r.date >= prevStart && r.date <= prevEnd));
+        const yStart = _amShiftYears(evMeta.start, -1), yEnd = _amShiftYears(evMeta.end, -1);
+        yoyAgg = _amAgg(brandRows.filter(r => r.date >= yStart && r.date <= yEnd));
+        cmpLabel = `직전 ${prevStart}~${prevEnd} · 전년 ${yStart}~${yEnd} (같은 길이 날짜창)`;
+    }
+    const metricDefs = [
+        { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
+        { l: '노출', f: v => _amInt(v.imp), g: true, k: 'imp' },
+        { l: '클릭', f: v => _amInt(v.click), g: true, k: 'click' },
+        { l: 'CTR', f: v => v.ctr.toFixed(2) + '%', g: true, k: 'ctr' },
+        { l: '구매수', f: v => _amInt(v.cv), g: true, k: 'cv' },
+        { l: '매출', f: v => _amKRWshort(v.rev), g: true, k: 'rev' },
+        { l: 'ROAS', f: v => _amPct(v.roas), g: true, k: 'roas' },
+        { l: 'CPA', f: v => v.cv > 0 ? _amKRWshort(v.cpa) : '-', g: false, k: 'cpa' },
     ];
-    const kpiHtml = `<div class="am-kpis">${kpis.map(k => `
-        <div class="am-kpi${k.hi ? ' am-kpi--hi' : ''}"><div class="am-kpi-l">${k.l}</div><div class="am-kpi-v">${k.v}</div></div>`).join('')}</div>`;
+    const hasCmp = !!evMeta;
+    const kpiHtml = `
+        <div class="am-card am-sum-card">
+            <div class="am-card-h"><i class="fas fa-calculator"></i> 합계 ${hasCmp ? `<span class="am-card-sub">${cmpLabel}</span>` : `<span class="am-card-sub">${_amEsc(brand || '전체 브랜드')} · ${_amEsc(_amSelectedEvent)}</span>`}</div>
+            <table class="am-table am-sum-table">
+                <thead><tr><th>지표</th><th>현재</th>${hasCmp ? '<th>직전 동기간</th><th>직전비</th><th>전년 동기간</th><th>YoY</th>' : ''}</tr></thead>
+                <tbody>${metricDefs.map(m => `<tr>
+                    <td class="am-t-name">${m.l}</td>
+                    <td class="am-sum-cur">${m.f(total)}</td>
+                    ${hasCmp ? `<td>${m.f(prevAgg)}</td>${_amDeltaCell(total[m.k], prevAgg[m.k], m.g)}<td>${m.f(yoyAgg)}</td>${_amDeltaCell(total[m.k], yoyAgg[m.k], m.g)}` : ''}
+                </tr>`).join('')}</tbody>
+            </table>
+            ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 동기간·전년 동기간 증감이 표시됩니다.</p>` : ''}
+        </div>`;
 
     // 매체별 ROAS
     const media = _amGroup(rows, r => r.media).filter(m => m.cost > 0).sort((a, b) => b.cost - a.cost);
@@ -268,11 +325,31 @@ function _amRender() {
             </table>
         </div>`;
 
-    // 일자별 추이
+    // 일자별 추이 (그래프 + 접이식 상세표)
+    const byDayDetail = _amGroup(rows, r => r.date).sort((a, b) => a.key.localeCompare(b.key));
+    const dailyDetailHtml = byDayDetail.length ? `
+        <details class="am-daily-detail">
+            <summary><i class="fas fa-chevron-right am-etc-chev"></i> 일자별 상세 지표 ${byDayDetail.length}일 펼쳐보기</summary>
+            <div class="am-daily-scroll">
+            <table class="am-table am-daily-table">
+                <thead><tr><th>날짜</th><th>광고비</th><th>노출</th><th>클릭</th><th>CTR</th><th>구매</th><th>매출</th><th>ROAS</th><th>CPA</th></tr></thead>
+                <tbody>${byDayDetail.map(d => `<tr>
+                    <td class="am-t-name">${d.key}</td>
+                    <td>${_amKRWshort(d.cost)}</td>
+                    <td>${_amInt(d.imp)}</td>
+                    <td>${_amInt(d.click)}</td>
+                    <td>${d.ctr.toFixed(2)}%</td>
+                    <td>${_amInt(d.cv)}</td>
+                    <td>${_amKRWshort(d.rev)}</td>
+                    <td class="am-t-roas ${d.roas >= 200 ? 'am-good' : d.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(d.roas)}</td>
+                    <td>${d.cv > 0 ? _amKRWshort(d.cpa) : '-'}</td></tr>`).join('')}</tbody>
+            </table></div>
+        </details>` : '';
     const dailyHtml = `
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-chart-line"></i> 일자별 추이 <span class="am-card-sub">광고비(막대) · ROAS(선)</span></div>
             <div class="am-chart-wrap am-chart-wrap--tall"><canvas id="am-daily-chart"></canvas></div>
+            ${dailyDetailHtml}
         </div>`;
 
     // 제품별

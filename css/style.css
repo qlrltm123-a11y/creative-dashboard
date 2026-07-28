@@ -43,6 +43,21 @@
 .am-etc-table { margin-top: 8px; }
 .am-etc-name { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400 !important; color: #475569 !important; }
 .am-etc-more { font-size: 11px; color: #cbd5e1; text-align: center; padding: 8px; }
+/* 합계 요약 표 (직전비·YoY) */
+.am-sum-table th, .am-sum-table td { text-align: right; }
+.am-sum-table th:first-child, .am-sum-table td:first-child { text-align: left; }
+.am-sum-cur { font-weight: 800; color: #1e293b; }
+.am-delta { font-weight: 700; font-size: 11.5px; white-space: nowrap; }
+.am-d-na { color: #cbd5e1; }
+.am-sum-note { font-size: 11px; color: #94a3b8; margin: 8px 2px 0; }
+/* 일자별 상세 접이식 표 */
+.am-daily-detail { margin-top: 12px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+.am-daily-detail > summary { cursor: pointer; list-style: none; font-size: 12px; font-weight: 700; color: #64748b; padding: 6px 2px; }
+.am-daily-detail > summary::-webkit-details-marker { display: none; }
+.am-daily-detail[open] .am-etc-chev { transform: rotate(90deg); }
+.am-daily-scroll { max-height: 420px; overflow-y: auto; margin-top: 8px; border: 1px solid #f1f5f9; border-radius: 8px; }
+.am-daily-table { font-size: 11.5px; }
+.am-daily-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
 
 /* ── BEST TOP 20 썸네일 카드 ── */
 .best-thumb-card {
