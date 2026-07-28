@@ -9,6 +9,8 @@
 .am-tl-lbl i { margin-right: 4px; }
 .am-select { font-size: 13px; font-weight: 600; color: #1e293b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; min-width: 260px; cursor: pointer; }
 .am-ev-meta { font-size: 11.5px; color: #94a3b8; margin-left: auto; }
+.am-date-chip { font-size: 11.5px; font-weight: 700; color: #0369a1; background: #e0f2fe; border-radius: 8px; padding: 4px 10px; }
+.am-date-chip i { font-size: 10px; margin-right: 3px; }
 .am-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 @media (min-width: 900px) { .am-kpis { grid-template-columns: repeat(8, 1fr); } }
 .am-kpi { background: #fff; border: 1px solid #e8ecf3; border-radius: 10px; padding: 10px 12px; }

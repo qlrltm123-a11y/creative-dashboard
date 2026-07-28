@@ -255,7 +255,13 @@ function _amRender() {
     const root = document.getElementById('admetrics-root');
     if (!root) return;
     const brand = _amBrand();
-    const brandRows = brand ? _amRows.filter(r => r.brand === brand) : _amRows;
+    const brandAll = brand ? _amRows.filter(r => r.brand === brand) : _amRows; // 직전/전년 비교용(날짜필터 무관)
+    // 우측 상단 전역 날짜 필터 반영 (dateFrom/dateTo는 main.js 전역)
+    const _df = (typeof dateFrom !== 'undefined' && dateFrom) ? dateFrom : '';
+    const _dt = (typeof dateTo !== 'undefined' && dateTo) ? dateTo : '';
+    let brandRows = brandAll;
+    if (_df) brandRows = brandRows.filter(r => r.date >= _df);
+    if (_dt) brandRows = brandRows.filter(r => r.date <= _dt);
 
     const options = _amEventOptions(brandRows);
     if (!options.includes(_amSelectedEvent)) _amSelectedEvent = '전체';
@@ -271,8 +277,9 @@ function _amRender() {
             <select id="am-event-sel" class="am-select">
                 ${options.map(o => `<option value="${_amEsc(o)}"${o === _amSelectedEvent ? ' selected' : ''}>${_amEsc(o)}${o === '전체' ? ` (전체 기간)` : ''}</option>`).join('')}
             </select>
+            ${(_df || _dt) ? `<span class="am-date-chip"><i class="fas fa-calendar-day"></i> ${_df || '처음'} ~ ${_dt || '끝'}</span>` : ''}
             ${evMeta ? `<span class="am-ev-meta">${evMeta.start} ~ ${evMeta.end} · ${_amEsc(evMeta.retail)}${evMeta.grade ? ` · ${evMeta.grade}급` : ''}</span>`
-            : (_amSelectedEvent === '상시광고' ? `<span class="am-ev-meta">이벤트 기간에 걸리지 않는 상시 운영 광고</span>` : `<span class="am-ev-meta">${brand || '전체 브랜드'} · 전 기간 합산</span>`)}
+            : (_amSelectedEvent === '상시광고' ? `<span class="am-ev-meta">이벤트 기간에 걸리지 않는 상시 운영 광고</span>` : `<span class="am-ev-meta">${brand || '전체 브랜드'} · ${(_df || _dt) ? '선택 기간' : '전 기간'} 합산</span>`)}
         </div>`;
 
     // 합계 요약 표 (+ 직전 행사 · 전년 동행사 증감)
@@ -294,8 +301,8 @@ function _amRender() {
             const diff = Math.abs((new Date(e.start) - new Date(yTarget)) / 86400000);
             if (diff <= 90 && diff < best) { best = diff; yoyEv = e; }
         });
-        if (prevEv) prevAgg = _amAgg(brandRows.filter(r => r.event === prevEv.name));
-        if (yoyEv) yoyAgg = _amAgg(brandRows.filter(r => r.event === yoyEv.name));
+        if (prevEv) prevAgg = _amAgg(brandAll.filter(r => r.event === prevEv.name));
+        if (yoyEv) yoyAgg = _amAgg(brandAll.filter(r => r.event === yoyEv.name));
         cmpLabel = `직전: ${prevEv ? _amEsc(prevEv.name) : '없음'} · 전년: ${yoyEv ? _amEsc(yoyEv.name) : '없음'}`;
     }
     const metricDefs = [
