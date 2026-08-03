@@ -104,6 +104,25 @@ function _wrSum(list) {
     };
 }
 
+/* ── 제품별 집계 (매체별과 동일한 형식의 단순 합계표) ── */
+function _wrByProduct(list) {
+    const m = {};
+    list.forEach(c => {
+        const p = (c.product || '기타').trim() || '기타';
+        if (!m[p]) m[p] = {spend:0,impr:0,clicks:0,rev:0,conv:0};
+        m[p].spend  += c.spend       || 0;
+        m[p].impr   += c.impressions || 0;
+        m[p].clicks += c.clicks      || 0;
+        m[p].rev    += c.revenue     || 0;
+        m[p].conv   += c.conversions || 0;
+    });
+    return Object.entries(m).map(([p, d]) => ({
+        product: p, ...d,
+        ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
+        roas: d.spend > 0 ? d.rev    / d.spend  : 0,
+    })).sort((a, b) => b.spend - a.spend);
+}
+
 /* ── 매체별 집계 ── */
 function _wrByPlatform(list) {
     const m = {};
@@ -344,6 +363,50 @@ function _wrPlatformSectionHtml(byPlatform) {
             <table class="wr-table">
                 <thead><tr>
                     <th class="wr-th wr-th-left">매체</th>
+                    <th class="wr-th">광고비</th>
+                    <th class="wr-th">노출 수</th>
+                    <th class="wr-th">클릭 수</th>
+                    <th class="wr-th">클릭률</th>
+                    <th class="wr-th">매출</th>
+                    <th class="wr-th">광고효율</th>
+                    <th class="wr-th">구매</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+/* ── 제품별 성과 섹션 HTML (매체별과 동일한 형식) ── */
+function _wrProductAggSectionHtml(byProductAgg) {
+    if (!byProductAgg.length) return '';
+    const total = byProductAgg.reduce((s, p) => s + p.spend, 0);
+    const rows = byProductAgg.map(p => {
+        const pct = total > 0 ? (p.spend / total * 100).toFixed(1) : '0';
+        return `
+        <tr class="wr-tr">
+            <td class="wr-td"><strong>${p.product}</strong></td>
+            <td class="wr-td wr-td-num">${_wrW(p.spend)}<span class="wr-pct-badge">${pct}%</span></td>
+            <td class="wr-td wr-td-num">${_wrN(p.impr)}</td>
+            <td class="wr-td wr-td-num">${_wrN(p.clicks)}</td>
+            <td class="wr-td wr-td-num">${_wrP(p.ctr)}</td>
+            <td class="wr-td wr-td-num">${_wrW(p.rev)}</td>
+            <td class="wr-td wr-td-num wr-roas-cell">${_wrR(p.roas)}</td>
+            <td class="wr-td wr-td-num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
+        </tr>`;
+    }).join('');
+    return `
+    <div class="wr-section" id="wr-productagg-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-boxes-stacked mr-1.5" style="color:#10b981"></i>제품별 성과</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('productagg', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-table-wrap">
+            <table class="wr-table">
+                <thead><tr>
+                    <th class="wr-th wr-th-left">제품</th>
                     <th class="wr-th">광고비</th>
                     <th class="wr-th">노출 수</th>
                     <th class="wr-th">클릭 수</th>
@@ -690,12 +753,13 @@ function renderWeeklyReport() {
 
     const list        = _wrGetList();
     const kpi         = _wrSum(list);
-    const byPlatform  = _wrByPlatform(list);
-    const byCreative  = _wrByCreative(list);
-    const byProduct   = _wrByProductInsight(list);
+    const byPlatform    = _wrByPlatform(list);
+    const byProductAgg  = _wrByProduct(list);
+    const byCreative    = _wrByCreative(list);
+    const byProduct     = _wrByProductInsight(list);
 
     // 복사 시 재계산 방지용 캐시
-    _wrRenderCache = { list, kpi, byPlatform, byCreative, byProduct };
+    _wrRenderCache = { list, kpi, byPlatform, byProductAgg, byCreative, byProduct };
     _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
@@ -729,6 +793,7 @@ function renderWeeklyReport() {
     body.innerHTML =
         _wrKpiSectionHtml(kpi, list.length) +
         _wrPlatformSectionHtml(byPlatform) +
+        _wrProductAggSectionHtml(byProductAgg) +
         _wrProductInsightSectionHtml(byProduct) +
         _wrCreativeSectionHtml(byCreative) +
         `<div class="wr-copy-all-row">
@@ -775,9 +840,10 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     const cache      = _wrRenderCache;
     const list       = cache ? cache.list       : _wrGetList();
     const kpi        = cache ? cache.kpi        : _wrSum(list);
-    const byPlatform = cache ? cache.byPlatform : _wrByPlatform(list);
-    const byCreative = cache ? cache.byCreative : _wrByCreative(list);
-    const byProduct  = cache ? cache.byProduct  : _wrByProductInsight(list);
+    const byPlatform   = cache ? cache.byPlatform   : _wrByPlatform(list);
+    const byProductAgg = cache ? cache.byProductAgg : _wrByProduct(list);
+    const byCreative   = cache ? cache.byCreative   : _wrByCreative(list);
+    const byProduct    = cache ? cache.byProduct    : _wrByProductInsight(list);
 
     const rangeText  = (_wr.dateFrom || _wr.dateTo)
         ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'}`
@@ -869,6 +935,29 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
             const pct = total > 0 ? (p.spend / total * 100).toFixed(1) + '%' : '-';
             html += `<tr>
                 <td class="left"><strong>${p.platform}</strong></td>
+                <td class="num">${_wrW(p.spend)}</td>
+                <td class="num">${pct}</td>
+                <td class="num">${_wrN(p.impr)}</td>
+                <td class="num">${_wrN(p.clicks)}</td>
+                <td class="num">${_wrP(p.ctr)}</td>
+                <td class="num">${_wrW(p.rev)}</td>
+                <td class="roas">${_wrR(p.roas)}</td>
+                <td class="num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    /* 제품별 성과 (단순 합계표, 매체별과 동일 형식) */
+    if (!sections || sections.includes('productagg')) {
+        const totalP = byProductAgg.reduce((s, p) => s + p.spend, 0);
+        html += `<h3>📦 제품별 성과</h3><table><thead><tr>
+            <th style="text-align:left">제품</th><th>광고비</th><th>비중</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+        </tr></thead><tbody>`;
+        byProductAgg.forEach(p => {
+            const pct = totalP > 0 ? (p.spend / totalP * 100).toFixed(1) + '%' : '-';
+            html += `<tr>
+                <td class="left"><strong>${p.product}</strong></td>
                 <td class="num">${_wrW(p.spend)}</td>
                 <td class="num">${pct}</td>
                 <td class="num">${_wrN(p.impr)}</td>
