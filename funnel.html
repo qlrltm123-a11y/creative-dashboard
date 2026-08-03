@@ -367,20 +367,32 @@ const DEFAULT_URLS = {
   WM: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
   CG: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
 };
-// 메가포 탭 (2607 MEGAPO 시트, 콜겔 미스트/NAD/아이크림 등 = BOH 제품)
+// 메가포 탭 — 브랜드별 별도 스프레드시트(Megapo_BOH/WM/CG), 로컬 스냅샷을 기본으로 읽는다.
+// 시트 자체의 event 컬럼(예: '2608MEGAPO')이 실제 시즌을 담고 있으므로, 여기 URL은
+// 시즌에 상관없이 고정 — 시트 내용이 바뀌면(7월→8월) 별도 코드 수정 없이 자동 반영된다.
 const DEFAULT_MEGAPO_URLS = {
-  BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=28035682&single=true&output=csv',
+  BOH:'data/megapo-boh.csv',
+  WM: 'data/megapo-wm.csv',
+  CG: 'data/megapo-cg.csv',
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
 const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
-// v2 키: 예전에 저장된 (구조 개선 전) 메가포 URL 무시하고 기본 URL 사용
-const getMegapoUrl = b => localStorage.getItem(`furl_megapo2_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
-const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo2_${b}`,u);
+// v3 키: 2026-07 게시URL 401 차단으로 로컬 스냅샷 기본값 도입 — 이전에 저장된
+// (막힌 게시 URL) 커스텀 값을 무시하고 새 기본값(로컬 파일)을 쓰도록 키 자체를 교체
+const getMegapoUrl = b => localStorage.getItem(`furl_megapo3_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
+const saveMegapoUrl = (b,u) => localStorage.setItem(`furl_megapo3_${b}`,u);
 
 // ── CSV fetch helper ──────────────────────────────────────────────────────────
+// 2026-07: 구글 시트 '웹에 게시' 권한이 조직 정책으로 차단(익명 접근 401)됨.
+// 로컬 스냅샷(data/*.csv, 상대경로)은 프록시 없이 바로 fetch — 외부(http) URL만
+// 기존처럼 프록시→직접 순으로 시도(대부분 여전히 401이라 최종 실패할 수 있음).
 async function fetchCsv(url) {
+  if (!/^https?:\/\//i.test(url)) {
+    try { const r = await fetch(url, {cache:'no-store'}); if (r.ok) return await r.text(); } catch {}
+    return null;
+  }
   try {
     const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,{cache:'no-store'});
     if (r.ok) return await r.text();
@@ -417,7 +429,7 @@ function applyMegapoUrl(brand) {
 
 // ── 캐시 (localStorage) — 새로고침 시 재fetch 없이 즉시 로드, '시트 갱신'만 재fetch ──
 // v2: 메가포 컬럼 매핑 변경으로 옛 캐시 무효화
-const fcacheKey = b => `fdata_v2_${b}`;
+const fcacheKey = b => `fdata_v3_${b}`; // v3: 메가포 로컬 스냅샷 전환으로 이전 캐시 무효화
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
@@ -460,9 +472,11 @@ async function loadBrand(brand, force=false) {
     fetchCsv(url),
     megapoUrl ? fetchCsv(megapoUrl) : Promise.resolve(null),
   ]);
-  if (!text) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
+  // 베이스 탭(게시 URL, 여전히 401 차단)이 실패해도 메가포 탭(로컬 스냅샷)만으로 렌더 가능하게 —
+  // 둘 다 실패했을 때만 에러 처리
+  if (!text && !megapoText) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
-  const regularData = parseSheet(parseCSV(text), COL_262, COL_261);
+  const regularData = text ? parseSheet(parseCSV(text), COL_262, COL_261) : {'262Q':{}, '261Q':{}};
   const megapoData  = megapoText ? parseSheet(parseCSV(megapoText), COL_MEGAPO_262, COL_MEGAPO_261, true) : null;
   brandData[brand]  = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
   _fSaveCache(brand);
