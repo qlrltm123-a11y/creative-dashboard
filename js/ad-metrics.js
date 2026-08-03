@@ -55,6 +55,28 @@ function _amDaysInclusive(a, b) { return Math.round((new Date(b) - new Date(a)) 
 // 이벤트명에서 회차 접두(2607 / 262Q / 8월 등) 제거 → 이벤트 '유형'
 // (예: '2607 메가포' → '메가포', '8월 MEGAPO' → 'MEGAPO')
 function _amEventType(name) { return (name || '').replace(/^\s*(\d{3,4}[QqＱ]?|\d{1,2}월)\s+/, '').trim(); }
+// 과거(한국어 프로모션명 "메가포")와 미래(creatives 영문 코드 "MEGAPO")는 같은 행사인데 표기 언어가
+// 달라 _amEventType만으로는 '다른 유형'으로 갈린다 → 캐노니컬 키로 묶어 직전/전년 비교가
+// 과거·미래 데이터 경계를 넘어 매칭되게 한다. (본행사/애프터/티저 등 세부 접미는 뭉뚱그림 —
+// creatives의 미래 이벤트가 그 세부 구분 없이 들어오기 때문)
+const AM_EVENT_CANON = [
+    { canon: 'MEGAWARI(QOO10LIVE)', kw: ['MEGAWARI(QOO10LIVE)', '메가와리(QOO10LIVE)'] },
+    { canon: 'MEGAWARI', kw: ['메가와리', 'MEGAWARI'] },
+    { canon: 'MEGAPO', kw: ['메가포', 'MEGAPO'] },
+    { canon: 'SUPERSALE', kw: ['슈퍼세일', 'SUPERSALE'] },
+    { canon: 'MARATHON', kw: ['마라톤', 'MARATHON'] },
+    { canon: 'KAMITOKU', kw: ['카미토쿠', 'KAMITOKU'] },
+    { canon: 'KANKOS', kw: ['칸코스', 'KANKOS'] },
+    { canon: 'HATSUURI', kw: ['하츠우리', 'HATSUURI'] },
+];
+function _amCanonicalType(name) {
+    const stripped = _amEventType(name);
+    const up = stripped.toUpperCase();
+    for (const c of AM_EVENT_CANON) {
+        if (c.kw.some(k => stripped.includes(k) || up.includes(k.toUpperCase()))) return c.canon;
+    }
+    return up; // 매핑 안 된 유형은 기존처럼 이름 그대로 비교(정확히 같은 이름끼리만 매칭)
+}
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
 function _amDeltaCell(cur, prev, goodUp) {
     if (!prev) return '<td class="am-d-na">-</td>';
@@ -357,9 +379,9 @@ function _amRender() {
     // (예: 7월 메가포 → 직전=직전 메가포(5월), 전년=작년 7월 메가포). 같은 리테일끼리만 매칭.
     let prevAgg = null, yoyAgg = null, cmpLabel = '';
     if (evMeta) {
-        const curType = _amEventType(evMeta.name);
+        const curType = _amCanonicalType(evMeta.name);
         const sameType = _amEvents
-            .filter(e => e.retail === evMeta.retail && _amEventType(e.name) === curType)
+            .filter(e => e.retail === evMeta.retail && _amCanonicalType(e.name) === curType)
             .sort((a, b) => a.start.localeCompare(b.start));
         const idx = sameType.findIndex(e => e.name === evMeta.name);
         const prevEv = idx > 0 ? sameType[idx - 1] : null;
