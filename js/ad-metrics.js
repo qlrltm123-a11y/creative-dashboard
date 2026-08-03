@@ -12,12 +12,15 @@ const AM_PROMO_URL = 'data/promotions.csv';
 const AM_CREATIVES_URL = 'data/creatives.csv';
 // 이 날짜 이후는 creatives 탭(event 컬럼) 기반으로 이벤트 라벨링 (과거=ad-performance+promotions)
 const AM_FUTURE_CUTOFF = '2026-08-01';
-// creatives event 컬럼값 중 실제 행사가 아닌 것(상시/타겟팅)
+// creatives event 컬럼값 중 실제 행사가 아닌 것(상시/타겟팅) — 이 행들은 자기 태그를 그대로
+//믿지 않고, 과거 데이터와 똑같이 "날짜가 그 기간의 행사와 겹치면 그 행사로 편입"한다.
+// (예: 8월에 도는 AO 소재는 그 기간의 '8월 MEGAPO'가 있으면 같이 잡힘, 없으면 상시광고)
 const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '']);
 // creatives event(반복 행사) → 'N월 EVENT' 라벨 (예: 8월 Megapo → '8월 MEGAPO')
+// AO/RT/UA 등은 null 반환 — 호출측에서 날짜 겹침으로 나중에 재판정한다.
 function _amCreativeEvent(code, date) {
     const c = (code || '').trim();
-    if (AM_NON_EVENTS.has(c)) return '상시광고';
+    if (AM_NON_EVENTS.has(c)) return null;
     const m = parseInt((date || '').slice(5, 7), 10);
     return (m ? m + '월 ' : '') + c.toUpperCase();
 }
@@ -231,6 +234,8 @@ function _amEnsureData() {
             if (crText) _amAddCreativeRows(parse(crText));
             // 3) creatives 기반 미래 이벤트를 캘린더에 합성 추가 (직전/전년 비교 가능하도록)
             _amAddFutureEvents();
+            // 4) AO/RT/UA 행을 날짜 겹침으로 재판정 (같은 기간 행사에 편입, 없으면 상시광고)
+            _amResolveOpenEvents();
             return _amRows;
         }).finally(() => { _amLoadPromise = null; });
     }
@@ -267,10 +272,11 @@ function _amAddCreativeRows(crows) {
 }
 
 // creatives 기반 미래 이벤트(예: '8월 MEGAPO')를 날짜범위·리테일과 함께 _amEvents에 합성 추가
+// (event=null인 AO/RT/UA 행은 아직 특정 행사가 아니므로 제외 — 캘린더가 완성된 뒤 재판정)
 function _amAddFutureEvents() {
     const fut = new Map();
     _amRows.forEach(r => {
-        if (r.date < AM_FUTURE_CUTOFF || r.event === '상시광고') return;
+        if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
         if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {} });
         const f = fut.get(r.event);
         if (r.date < f.min) f.min = r.date;
@@ -281,6 +287,16 @@ function _amAddFutureEvents() {
         if (_amEvents.some(e => e.name === name)) return;
         const retail = (Object.entries(f.retail).sort((a, b) => b[1] - a[1])[0] || [''])[0];
         _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail });
+    });
+}
+
+// AO/RT/UA(event=null) 행 재판정 — 과거 데이터와 동일하게 날짜+리테일이 겹치는 행사가 있으면
+// 그 행사로 편입하고, 없으면 '상시광고'. 미래 이벤트 캘린더가 완성된 뒤(=_amAddFutureEvents 이후)
+// 호출해야 그 기간에 도는 AO 소재도 '8월 MEGAPO' 등으로 같이 잡힌다.
+function _amResolveOpenEvents() {
+    _amRows.forEach(r => {
+        if (r.date < AM_FUTURE_CUTOFF || r.event) return;
+        r.event = _amEventFor(r.date, r.retail);
     });
 }
 
