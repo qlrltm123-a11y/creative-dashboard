@@ -257,9 +257,11 @@ const BRANDS = ['BOH','WM','CG'];
 // 기존 탭 (BOH/WM/CG): A열=제품코드 (무시), event 없음
 const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
 const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
-// 메가포 탭: A열=event, B열=code, C열=제품, D열=date, E~G=유입/장바구니/구매 | K열~=261Q(event,date,유입,장바구니,구매)
-const COL_MEGAPO_262 = {event:0,  date:3,  product:2, inflow:4,  cart:5,  buy:6};
-const COL_MEGAPO_261 = {event:10, date:11, product:2, inflow:12, cart:13, buy:14};
+// 메가포 탭: 한 행에 최신→과거 순으로 스냅샷 블록이 옆으로 반복 나열됨(D열/L열/T열…에 date).
+// 블록 자체엔 회차명이 없음(event열 항상 공란) — 각 블록의 date는 "다음 메가포 시작 2일 전(D-2)"
+// 시점이라, date+2일 → 그 달을 이벤트 라벨("N월 메가포")로 계산해 자동으로 월별 분리한다.
+// (새 회차가 생기면 시트에 블록이 하나 더 추가되는 구조 — 헤더의 'date' 컬럼을 스캔해
+// 몇 개든 자동으로 인식하므로 블록 수가 늘어도 코드 수정이 필요 없다.)
 const C262 = {cart:'#6366f1',buy:'#a78bfa'};
 const C261 = {cart:'#f97316',buy:'#fb923c'};
 
@@ -477,7 +479,7 @@ async function loadBrand(brand, force=false) {
   if (!text && !megapoText) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
   const regularData = text ? parseSheet(parseCSV(text), COL_262, COL_261) : {'262Q':{}, '261Q':{}};
-  const megapoData  = megapoText ? parseSheet(parseCSV(megapoText), COL_MEGAPO_262, COL_MEGAPO_261, true) : null;
+  const megapoData  = megapoText ? parseMegapoBlocks(parseCSV(megapoText)) : null;
   brandData[brand]  = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
   _fSaveCache(brand);
   render(brand);
@@ -529,6 +531,62 @@ function parseSheet(rows, cm262=COL_262, cm261=COL_261, fillDate=false) {
     return d;
   }
   return {'262Q':ext(cm262),'261Q':ext(cm261)};
+}
+
+// ── 메가포 탭 전용 파서 ──────────────────────────────────────────────────────
+// 헤더 행에서 'date' 셀을 스캔해 블록을 몇 개든 자동 인식(블록 = date,유입,장바구니,구매
+// 4칸 연속). 각 블록의 date는 "다음 메가포 시작 2일 전(D-2)" 시점이므로, +2일 한 달을
+// 이벤트 라벨("N월 메가포")로 계산 — 시트에 새 회차 블록이 늘어나도 코드 수정 불필요.
+const _DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31];
+function _addDaysKoreanDate(dateStr, days) {
+  const m = (dateStr || '').match(/(\d+)\s*월\s*(\d+)\s*일/);
+  if (!m) return null;
+  let month = parseInt(m[1], 10), day = parseInt(m[2], 10) + days;
+  while (day > _DAYS_IN_MONTH[(month - 1 + 12) % 12]) {
+    day -= _DAYS_IN_MONTH[(month - 1 + 12) % 12];
+    month = month === 12 ? 1 : month + 1;
+  }
+  return { month, day };
+}
+function _megapoEventLabel(dateStr) {
+  const d = _addDaysKoreanDate(dateStr, 2);
+  return d ? `${d.month}월 메가포` : (dateStr || '메가포');
+}
+function _detectMegapoBlocks(headerRow) {
+  const blocks = [];
+  (headerRow || []).forEach((h, i) => {
+    if ((h || '').trim().toLowerCase() === 'date') blocks.push({ date:i, inflow:i+1, cart:i+2, buy:i+3 });
+  });
+  return blocks;
+}
+function parseMegapoBlocks(rows) {
+  if (!rows || rows.length < 2) return {'262Q':{}, '261Q':{}};
+  const header = rows[1] && rows[1].includes('date') ? rows[1] : rows[0];
+  let productCol = header.findIndex(h => (h || '').trim() === '제품');
+  if (productCol < 0) productCol = 2; // 폴백(관측된 고정 위치)
+  const blocks = _detectMegapoBlocks(header);
+  const merged = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const prod = (r[productCol] || '').trim();
+    if (!prod || prod === '제품') continue;
+    blocks.forEach(b => {
+      const date = (r[b.date] || '').trim();
+      if (!date || date === 'date') return;
+      const inflow = parseNum(r[b.inflow]), cart = parseNum(r[b.cart]), buy = parseNum(r[b.buy]);
+      if (inflow == null && cart == null && buy == null) return; // 아직 데이터 없는 블록
+      if (!merged[prod]) merged[prod] = [];
+      merged[prod].push({
+        date, inflow, cart, buy, event: _megapoEventLabel(date),
+        cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
+        buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
+      });
+    });
+  }
+  const sk = d => { const [m, rest] = d.split('월'); return parseInt(m) * 100 + parseInt((rest || '').replace('일', '') || 0); };
+  Object.values(merged).forEach(a => a.sort((x, y) => sk(x.date) - sk(y.date)));
+  return {'262Q': merged, '261Q': {}};
 }
 
 // 기본 탭 + 메가포 탭 데이터 병합 (제품별로 행 합치고 날짜순 정렬)
