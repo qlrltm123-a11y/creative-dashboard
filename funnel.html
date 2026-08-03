@@ -323,6 +323,18 @@ let _funnelEvent = 'all';
 function _normFunnelEvent(ev) { return ev.replace(/^\d{4}\s*/, ''); }
 // 이벤트 없는 행(기존 퍼널 데이터)은 'MEGAWARI'로 취급 — 표시 라벨은 '262Q 메가와리'
 const _evLabel = ev => ev === 'MEGAWARI' ? '262Q 메가와리' : ev;
+// 'N월 메가포' 이벤트의 '직전' 이벤트 = 존재하는 메가포 이벤트 중 월이 더 작은 것 중 가장 가까운 것
+// (예: 8월 메가포 → 7월 메가포, 7월 메가포 → 5월 메가포, 5월 메가포 → 없음)
+function _megapoPrevEvent(ev, allEvents) {
+  const m = (ev || '').match(/^(\d+)월\s*메가포$/);
+  if (!m) return null;
+  const cur = parseInt(m[1], 10);
+  const months = allEvents
+    .map(e => { const mm = e.match(/^(\d+)월\s*메가포$/); return mm ? parseInt(mm[1], 10) : null; })
+    .filter(v => v != null && v < cur)
+    .sort((a, b) => b - a);
+  return months.length ? `${months[0]}월 메가포` : null;
+}
 function _getEventList(rawData) {
   const evs = new Set(); let hasBlank = false;
   ['262Q','261Q'].forEach(q => Object.values(rawData[q]).forEach(rows =>
@@ -334,11 +346,22 @@ function _getEventList(rawData) {
 }
 function _filterDataByEvent(rawData, event) {
   if (event === 'all') return rawData;
-  const filterRows = rows => rows.filter(r =>
-    event === 'MEGAWARI' ? (!r.event || r.event === 'MEGAWARI') : r.event === event);
-  const filtered262 = {}, filtered261 = {};
-  Object.entries(rawData['262Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered262[p]=f; });
-  Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows); if(f.length) filtered261[p]=f; });
+  const filterRows = (rows, ev) => rows.filter(r =>
+    ev === 'MEGAWARI' ? (!r.event || r.event === 'MEGAWARI') : r.event === ev);
+  const filtered262 = {};
+  Object.entries(rawData['262Q']).forEach(([p, rows]) => { const f=filterRows(rows, event); if(f.length) filtered262[p]=f; });
+
+  // 261Q(직전 비교) = 원래 있던 별도 버킷(레거시 베이스탭) + 메가포 이벤트라면 같은 262Q
+  // 버킷에서 뽑은 '직전' 이벤트(예: 8월 메가포 선택 시 → 7월 메가포 행들)
+  const filtered261 = {};
+  Object.entries(rawData['261Q']).forEach(([p, rows]) => { const f=filterRows(rows, event); if(f.length) filtered261[p]=f; });
+  const prevEv = _megapoPrevEvent(event, _getEventList(rawData));
+  if (prevEv) {
+    Object.entries(rawData['262Q']).forEach(([p, rows]) => {
+      const f = filterRows(rows, prevEv);
+      if (f.length) filtered261[p] = [...(filtered261[p]||[]), ...f];
+    });
+  }
   return { '262Q': filtered262, '261Q': filtered261 };
 }
 // 기본 선택 이벤트: 이번 시즌(262Q) 데이터가 가장 최근 날짜까지 있는 이벤트.
