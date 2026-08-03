@@ -9,6 +9,18 @@
 
 const AM_AD_URL = 'data/ad-performance.csv';
 const AM_PROMO_URL = 'data/promotions.csv';
+const AM_CREATIVES_URL = 'data/creatives.csv';
+// 이 날짜 이후는 creatives 탭(event 컬럼) 기반으로 이벤트 라벨링 (과거=ad-performance+promotions)
+const AM_FUTURE_CUTOFF = '2026-08-01';
+// creatives event 컬럼값 중 실제 행사가 아닌 것(상시/타겟팅)
+const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '']);
+// creatives event(반복 행사) → 'N월 EVENT' 라벨 (예: 8월 Megapo → '8월 MEGAPO')
+function _amCreativeEvent(code, date) {
+    const c = (code || '').trim();
+    if (AM_NON_EVENTS.has(c)) return '상시광고';
+    const m = parseInt((date || '').slice(5, 7), 10);
+    return (m ? m + '월 ' : '') + c.toUpperCase();
+}
 
 let _amRows = null;          // [{date, brand, retail, media, product, event, imp, click, cost, cv, rev}]
 let _amEvents = null;        // [{start, end, name, grade, retail}]
@@ -40,8 +52,9 @@ function _amPct(v) { return (v || 0).toFixed(0) + '%'; }
 function _amShiftDays(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
 function _amShiftYears(d, n) { const x = new Date(d + 'T00:00:00'); x.setFullYear(x.getFullYear() + n); return x.toISOString().slice(0, 10); }
 function _amDaysInclusive(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
-// 이벤트명에서 회차 접두(2607 / 262Q 등) 제거 → 이벤트 '유형' (예: '2607 메가포' → '메가포')
-function _amEventType(name) { return (name || '').replace(/^\s*\d{3,4}[QqＱ]?\s+/, '').trim(); }
+// 이벤트명에서 회차 접두(2607 / 262Q / 8월 등) 제거 → 이벤트 '유형'
+// (예: '2607 메가포' → '메가포', '8월 MEGAPO' → 'MEGAPO')
+function _amEventType(name) { return (name || '').replace(/^\s*(\d{3,4}[QqＱ]?|\d{1,2}월)\s+/, '').trim(); }
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
 function _amDeltaCell(cur, prev, goodUp) {
     if (!prev) return '<td class="am-d-na">-</td>';
@@ -71,18 +84,20 @@ function _amMedia(raw) {
 // brand를 지정하면 그 브랜드 행에서만 매칭 → WM 광고에 섞인 BOH 제품명(크림더블 등)이
 // WM 제품으로 잘못 잡히는 것을 방지. 같은 브랜드 안에서는 구체적 변형을 앞에 둔다.
 const AM_PRODUCTS = [
-    // ── CG (색조: 틴트·팔레트) ── 구체 변형을 앞에
-    { name: 'タンフルミルク', brand: 'CG', kw: ['タンフルグラスティントミルク', 'タンフルーティント ミルク', 'タンフルミルク', 'T-Milk'] },
-    { name: 'タンフルディープグレーズ', brand: 'CG', kw: ['タンフルグラスティントディープグレーズ', 'タンフルディープグレーズ', 'T-DeepGlaze', 'DeepGlaze', 'ディープグレーズ'] },
-    { name: 'タンフルグラスティント', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル', 'Tanghuru', 'Tanfru', 'Tanful'] },
-    { name: 'カラーカバーティント', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー'] },
-    { name: 'ヌーディーブラーティント', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', 'NudyBlur', 'Noody', '누디블러'] },
-    { name: 'ジューシージャムブラーティント', brand: 'CG', kw: ['ジューシージャム', 'JuicyJam'] },
-    { name: 'シェーディングスティック', brand: 'CG', kw: ['ShadingStick', 'シェーディングスティック', '쉐딩스틱'] },
-    { name: 'ジェリービームスティック', brand: 'CG', kw: ['ジェリービーム', 'JellyBeam'] },
-    { name: '目元チュートリアルアイパレット', brand: 'CG', kw: ['目元チュートリアル', 'チュートリアルアイパレット', 'AegyoMaker', '애교메이커'] },
-    { name: 'クレヨンしんちゃんコラボ', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
-    // ── WM (색조: 아이·베이스·립) ──
+    // ── CG (컬러그램) — 한국어 제품명, 구체 변형을 앞에 ──
+    { name: '탕후루 밀크', brand: 'CG', kw: ['タンフルグラスティントミルク', 'タンフルーティント ミルク', 'タンフルミルク', 'T-Milk'] },
+    { name: '탕후루 딥글레이즈', brand: 'CG', kw: ['タンフルグラスティントディープグレーズ', 'タンフルディープグレーズ', 'T-DeepGlaze', 'DeepGlaze', 'ディープグレーズ'] },
+    { name: '탕후루 틴트', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル', 'Tanghuru', 'Tanfru', 'Tanful'] },
+    { name: '컬러커버틴트', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー'] },
+    { name: '누디블러 틴트', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', 'NudyBlur', 'Noody', '누디블러'] },
+    { name: '쥬시잼 블러틴트', brand: 'CG', kw: ['ジューシージャム', 'JuicyJam'] },
+    { name: '입체창조 쉐딩스틱', brand: 'CG', kw: ['ShadingStick', 'シェーディングスティック', '쉐딩스틱'] },
+    { name: '젤리빔 스틱', brand: 'CG', kw: ['ジェリービーム', 'JellyBeam'] },
+    { name: '애교살 메이커', brand: 'CG', kw: ['AegyoMaker', '애교살', '애교메이커', '目元チュートリアル', 'チュートリアルアイパレット'] },
+    { name: '립듀오 세트', brand: 'CG', kw: ['LipDuoSet', 'LipDuo', '립듀오', 'リップデュオ'] },
+    { name: '래스팅 글로우 스틱', brand: 'CG', kw: ['LastingGlowStick', 'LastingGlow', '래스팅글로우', 'ラスティンググロウ'] },
+    { name: '짱구 콜라보', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
+    // ── WM (웨이크메이크) ──
     { name: '소프트블러링 아이팔레트', brand: 'WM', kw: ['소블아', '소프트블러', 'ソフトブラー', 'SoftBlurEye', 'SoftBlur'] },
     { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless', 'SeamlessFd'] },
     { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
@@ -90,10 +105,12 @@ const AM_PRODUCTS = [
     { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur', 'Shebulchi'] },
     { name: '스테이픽서 파우더', brand: 'WM', kw: ['ステイフィクサー', 'StayFixer'] },
     { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ', 'GyaruKittySET'] },
-    { name: '파운데이션 브러쉬', brand: 'WM', kw: ['FdBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド'] },
+    { name: '파데 브러시', brand: 'WM', kw: ['FdBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド'] },
     { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', '스파츌라', '스파출라', 'SilverCrush'] },
     { name: '베이스락 세트', brand: 'WM', kw: ['BaseLockSET', 'BaseLock'] },
     { name: '하이글로우밤', brand: 'WM', kw: ['H-GlowBalm', 'GlowBalm', '글로우밤'] },
+    { name: '래스팅 글로우 스틱', brand: 'WM', kw: ['LastingGlowStick', 'LastingGlow', '래스팅글로우'] },
+    { name: '립듀오 세트', brand: 'WM', kw: ['LipDuoSet', 'LipDuo', '립듀오'] },
     { name: '6색 팔레트', brand: 'WM', kw: ['6色パレット', '6색팔레트'] },
     // ── BOH (스킨케어: 탄탄크림 라인) ──
     { name: '아사츄르', brand: 'BOH', kw: ['아사츄르', '요루탄', '朝ちゅる', '夜タン', 'アサチュル', 'Asachuru'] },
@@ -154,7 +171,8 @@ function _amEnsureData() {
         _amLoadPromise = Promise.all([
             fetch(AM_AD_URL, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('ad ' + r.status); return r.text(); }),
             fetch(AM_PROMO_URL, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('promo ' + r.status); return r.text(); }),
-        ]).then(([adText, promoText]) => {
+            fetch(AM_CREATIVES_URL, { cache: 'no-store' }).then(r => r.ok ? r.text() : '').catch(() => ''),
+        ]).then(([adText, promoText, crText]) => {
             const parse = (typeof parseCSV === 'function') ? parseCSV : _amParseCSVFallback;
             _amEvents = _amBuildEvents(parse(promoText));
 
@@ -170,11 +188,12 @@ function _amEnsureData() {
                 cv: idx['구매수'], rev: idx['구매전환값(₩)'],
             };
             _amRows = [];
+            // 1) 과거(CUTOFF 이전): ad-performance — 이벤트는 promotions 날짜+리테일 대조
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
                 if (!r || r.length < 5) continue;
                 const date = (r[col.date] || '').trim();
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= AM_FUTURE_CUTOFF) continue;
                 const retail = (r[col.retail] || '').trim();
                 _amRows.push({
                     date, brand: (r[col.brand] || '').trim(), retail,
@@ -186,10 +205,61 @@ function _amEnsureData() {
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
                 });
             }
+            // 2) 미래(CUTOFF 이후): creatives 탭 — 이벤트는 event 컬럼(N월 라벨). cost/sales 이미 원화.
+            if (crText) _amAddCreativeRows(parse(crText));
+            // 3) creatives 기반 미래 이벤트를 캘린더에 합성 추가 (직전/전년 비교 가능하도록)
+            _amAddFutureEvents();
             return _amRows;
         }).finally(() => { _amLoadPromise = null; });
     }
     return _amLoadPromise;
+}
+
+// creatives.csv(미래 CUTOFF 이후)를 _amRows에 추가 — event 컬럼으로 이벤트 라벨링
+function _amAddCreativeRows(crows) {
+    if (!crows || crows.length < 2) return;
+    const h = crows[0] || [];
+    const ci = {};
+    h.forEach((c, i) => { ci[(c || '').trim().toLowerCase()] = i; });
+    const cc = {
+        date: ci['date'], brand: ci['brand'], retail: ci['retail'], media: ci['media'],
+        adname: ci['ad_name'], imp: ci['impressions'], click: ci['clicks'],
+        cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'],
+    };
+    if (cc.date == null) return;
+    for (let i = 1; i < crows.length; i++) {
+        const r = crows[i]; if (!r) continue;
+        const date = (r[cc.date] || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < AM_FUTURE_CUTOFF) continue;
+        const brand = (r[cc.brand] || '').trim();
+        _amRows.push({
+            date, brand, retail: (r[cc.retail] || '').trim(),
+            media: _amMedia(r[cc.media]),
+            adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
+            product: _amProduct(r[cc.adname], brand),
+            event: _amCreativeEvent(r[cc.event], date),
+            imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
+            cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]),
+        });
+    }
+}
+
+// creatives 기반 미래 이벤트(예: '8월 MEGAPO')를 날짜범위·리테일과 함께 _amEvents에 합성 추가
+function _amAddFutureEvents() {
+    const fut = new Map();
+    _amRows.forEach(r => {
+        if (r.date < AM_FUTURE_CUTOFF || r.event === '상시광고') return;
+        if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {} });
+        const f = fut.get(r.event);
+        if (r.date < f.min) f.min = r.date;
+        if (r.date > f.max) f.max = r.date;
+        f.retail[r.retail] = (f.retail[r.retail] || 0) + 1;
+    });
+    fut.forEach((f, name) => {
+        if (_amEvents.some(e => e.name === name)) return;
+        const retail = (Object.entries(f.retail).sort((a, b) => b[1] - a[1])[0] || [''])[0];
+        _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail });
+    });
 }
 
 function _amParseCSVFallback(text) {
