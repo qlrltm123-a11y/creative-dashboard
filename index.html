@@ -17,12 +17,10 @@
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"></noscript>
     <!-- FontAwesome: 동기 로딩 (아이콘 즉시 렌더) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-    <!-- Tabler Icons: 좌측 사이드바 라인 아이콘용 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
     <!-- Tailwind: async로 파싱 블로킹 제거 -->
     <script async src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=260805b">
+    <link rel="stylesheet" href="css/style.css?v=260805c">
     <link rel="stylesheet" href="css/apple.css?v=260805">
     <!-- Vercel Web Analytics -->
     <script type="module">
@@ -41,50 +39,50 @@
     <!-- ===== 좌측 사이드바 네비게이션 (nugoona 스타일) ===== -->
     <aside id="app-sidebar">
         <div class="sb-logo">
-            <span class="sb-logo-icon"><i class="ti ti-chart-dots-2"></i></span>
+            <span class="sb-logo-icon"><i class="fas fa-chart-line"></i></span>
             <span class="sb-logo-text">Creative</span>
         </div>
         <nav class="sb-nav">
             <div class="sb-group-label">분석</div>
             <button class="section-tab active" data-section="performance" title="성과 분석">
-                <i class="ti ti-chart-histogram sb-ico"></i>
+                <i class="fas fa-chart-simple sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">성과 분석</span><span class="sb-sub">어떤 광고가 잘됐나</span></span>
             </button>
             <button class="section-tab" data-section="admetrics" title="광고 지표">
-                <i class="ti ti-report-analytics sb-ico"></i>
+                <i class="fas fa-chart-column sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">광고 지표</span><span class="sb-sub">이벤트별 매체·제품</span></span>
             </button>
             <button class="section-tab" data-section="funnel" title="퍼널">
-                <i class="ti ti-filter sb-ico"></i>
+                <i class="fas fa-filter sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">퍼널</span><span class="sb-sub">유입→구매 전환</span></span>
             </button>
             <button class="section-tab" data-section="kr" title="인플루언서">
-                <i class="ti ti-users sb-ico"></i>
+                <i class="fas fa-user sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">인플루언서</span><span class="sb-sub">인물 등장 소재</span></span>
             </button>
             <div class="sb-group-label">제작</div>
             <button class="section-tab" data-section="ai" title="AI 인사이트">
-                <i class="ti ti-sparkles sb-ico"></i>
+                <i class="fas fa-wand-magic-sparkles sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">AI 인사이트</span><span class="sb-sub">잘 먹힌 강조·표현</span></span>
             </button>
             <div class="sb-group-label">검증</div>
             <button class="section-tab" data-section="cep" title="CEP 검증">
-                <i class="ti ti-flask sb-ico"></i>
+                <i class="fas fa-flask sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">CEP 검증</span><span class="sb-sub">가설→소재→결과</span></span>
             </button>
             <button class="section-tab" data-section="framework" title="검증 프레임워크">
-                <i class="ti ti-route sb-ico"></i>
+                <i class="fas fa-route sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">검증 프레임워크</span><span class="sb-sub">상황→메시지→표현</span></span>
             </button>
             <div class="sb-group-label">운영 · 보고</div>
             <button class="section-tab" data-section="weekly" title="주간 업무">
-                <i class="ti ti-clipboard-check sb-ico"></i>
+                <i class="fas fa-calendar-check sb-ico"></i>
                 <span class="sb-txt"><span class="sb-label">주간 업무</span><span class="sb-sub">보고서 · 공유</span></span>
             </button>
         </nav>
         <div class="sb-footer">
             <button class="sb-foot-btn" onclick="window._glOpen && window._glOpen()" title="마케팅 용어 설명">
-                <i class="ti ti-book"></i><span>용어 가이드</span>
+                <i class="fas fa-book"></i><span>용어 가이드</span>
             </button>
         </div>
     </aside>
