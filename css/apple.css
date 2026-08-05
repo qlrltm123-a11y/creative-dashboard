@@ -223,7 +223,7 @@ header button[title="마케팅 용어 쉬운 설명"] {
   letter-spacing: 0.3px !important;
 }
 
-.section-tab {
+.section-tabs .section-tab {
   border-radius: 11px !important;
   padding: 10px 14px !important;
   transition: background 0.15s !important;
@@ -234,35 +234,35 @@ header button[title="마케팅 용어 쉬운 설명"] {
   font-size: 15px !important;
 }
 
-.section-tab .label {
+.section-tabs .section-tab .label {
   font-size: 13px !important;
   font-weight: 600 !important;
   color: #1d1d1f !important;
   letter-spacing: -0.12px !important;
 }
 
-.section-tab .sub {
+.section-tabs .section-tab .sub {
   font-size: 11px !important;
   color: #6e6e73 !important;
   font-weight: 400 !important;
 }
 
-.section-tab:hover {
+.section-tabs .section-tab:hover {
   background: #f5f5f7 !important;
 }
 
-.section-tab.active {
+.section-tabs .section-tab.active {
   background: #f5f5f7 !important;
   background-image: none !important;
   border-color: #d2d2d7 !important;
   box-shadow: none !important;
 }
 
-.section-tab.active i { color: #0066cc !important; }
-.section-tab.active .label { color: #0066cc !important; }
-.section-tab.active .sub { color: #6e6e73 !important; }
+.section-tabs .section-tab.active i { color: #0066cc !important; }
+.section-tabs .section-tab.active .label { color: #0066cc !important; }
+.section-tabs .section-tab.active .sub { color: #6e6e73 !important; }
 
-.section-tab.active::after {
+.section-tabs .section-tab.active::after {
   background: #0066cc !important;
   background-image: none !important;
   height: 2px !important;
@@ -1161,7 +1161,7 @@ main {
   background: #ffffff !important;
 }
 
-.section-tab {
+.section-tabs .section-tab {
   background: transparent !important;
   border: none !important;
   border-bottom: 2px solid transparent !important;
@@ -1173,21 +1173,21 @@ main {
 /* 아이콘 숨김 — Apple은 텍스트 내비 (구 가로 탭 전용 — 사이드바 .sb-ico는 표시) */
 .section-tabs .section-tab > i { display: none !important; }
 
-.section-tab:hover {
+.section-tabs .section-tab:hover {
   background: #f5f5f7 !important;
 }
 
-.section-tab.active {
+.section-tabs .section-tab.active {
   background: transparent !important;
   background-image: none !important;
   border-bottom: 2px solid #0066cc !important;
   box-shadow: none !important;
 }
 
-.section-tab.active::after { display: none !important; }
-.section-tab.active .label { color: #0066cc !important; }
-.section-tab.active i { color: #0066cc !important; }
-.section-tab.active .sub { color: #6e6e73 !important; }
+.section-tabs .section-tab.active::after { display: none !important; }
+.section-tabs .section-tab.active .label { color: #0066cc !important; }
+.section-tabs .section-tab.active i { color: #0066cc !important; }
+.section-tabs .section-tab.active .sub { color: #6e6e73 !important; }
 
 /* ── 35. 브랜드 탭 컨테이너 개선 ── */
 #brand-tabs {
@@ -1358,8 +1358,8 @@ button:active { transform: scale(0.95) !important; }
 ══════════════════════════════════════════════ */
 
 /* 사이드바 아이콘: 구 가로탭 규칙(18px 회색) 대신 nugoona 디자인 유지 */
-.sb-nav .section-tab > i.sb-ico { font-size: 14px !important; color: #71717a !important; }
-.sb-nav .section-tab.active > i.sb-ico { color: #6366f1 !important; }
+.sb-nav .section-tab > i.sb-ico { font-size: 19px !important; color: #a1a1aa !important; }
+.sb-nav .section-tab.active > i.sb-ico { color: #2563eb !important; }
 
 /* 태블릿 이하: 헤더 간소화 — 환율·필터칩·업데이트시각 숨김 (줄바꿈 방지) */
 @media (max-width: 768px) {
