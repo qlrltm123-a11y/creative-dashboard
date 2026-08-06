@@ -468,6 +468,55 @@ async function fetchGoogleSheet(url) {
     return csvToObjects(text);
 }
 
+// ── EC_rawdata(data/ad-performance.csv) 백필 — Criteo 한정 ────────────────
+// creatives_template "creatives" 탭에 Criteo 소재 단위 입력이 누락된 달이 있음
+// (5·6·7월 SingleOne_Criteo가 EC_rawdata에는 있는데 creatives 탭엔 8월치만 있음).
+// 두 시트의 매체명 표기 체계가 서로 달라(예: creatives 탭은 다른 명명 규칙을 씀)
+// 전체 매체를 대상으로 갭을 찾으면 오탐이 매우 커서(수만 행), 확인된 갭인
+// Criteo 계열로만 한정해서 EC_rawdata의 집계 행으로 채워 넣는다. creatives 탭에
+// 이미 있는 (플랫폼×브랜드×월) 조합은 절대 건드리지 않음(중복 집계 방지).
+// EC_rawdata는 헤더가 한국어+단위표기(광고비(₩) 등)라 csvToObjects의 별칭
+// 테이블과 안 맞는 것만 리네임해서, 기존 파싱/정규화 로직을 그대로 재사용한다.
+const AD_PERF_LOCAL_CSV = 'data/ad-performance.csv';
+const AD_PERF_BACKFILL_PLATFORMS = ['criteo']; // 확인된 갭만 — 필요시 여기에 추가
+const AD_PERF_HEADER_RENAME = {
+    '캠페인': '캠페인명', '광고세트': '광고그룹', 'ctr(%)': 'ctr',
+    '광고비(₩)': '광고비', '구매수': '전환수', '구매전환값(₩)': '매출', 'cpa(₩)': 'cpa',
+};
+async function _backfillFromAdPerformance(baseData) {
+    let text;
+    try {
+        const res = await fetch(AD_PERF_LOCAL_CSV, { cache: 'no-store' });
+        if (!res.ok) return baseData;
+        text = await res.text();
+    } catch { return baseData; }
+
+    // 헤더 행만 별칭 테이블에 맞게 리네임 후 나머지는 그대로 csvToObjects에 위임
+    const nl = text.indexOf('\n');
+    if (nl < 0) return baseData;
+    const headerLine = text.slice(0, nl).replace(/\r$/, '');
+    const renamedHeader = headerLine.split(',').map(h => {
+        const key = h.trim().toLowerCase();
+        return AD_PERF_HEADER_RENAME[key] || h;
+    }).join(',');
+    const adPerfObjs = csvToObjects(renamedHeader + '\n' + text.slice(nl + 1))
+        .filter(c => AD_PERF_BACKFILL_PLATFORMS.some(p => (c.platform || '').toLowerCase().includes(p)));
+
+    // creatives 탭에 이미 존재하는 (매체×브랜드×월) 조합 집합 — Criteo 관련만 비교
+    const existingKeys = new Set(baseData
+        .filter(c => AD_PERF_BACKFILL_PLATFORMS.some(p => (c.platform || '').toLowerCase().includes(p)))
+        .map(c => `${(c.platform || '').toLowerCase()}||${(c.brand || '').toLowerCase()}||${(c.start_date || '').slice(0, 7)}`)
+    );
+    const backfill = adPerfObjs.filter(c => {
+        const key = `${(c.platform || '').toLowerCase()}||${(c.brand || '').toLowerCase()}||${(c.start_date || '').slice(0, 7)}`;
+        return !existingKeys.has(key);
+    });
+    if (backfill.length) {
+        console.warn(`[Sheets] EC_rawdata 백필(Criteo): creatives 탭에 없는 ${backfill.length}행을 EC_rawdata에서 보충`);
+    }
+    return baseData.concat(backfill);
+}
+
 // 저장된 URL 가져오기
 function getSavedSheetUrl() {
     try {
@@ -588,7 +637,8 @@ async function tryLoadSavedSheet() {
     const candidates = [getSavedSheetUrl(), LOCAL_SHEET_CSV, DEFAULT_SHEET_URL].filter(Boolean);
     for (const url of candidates) {
         try {
-            const data = await fetchGoogleSheet(url);
+            let data = await fetchGoogleSheet(url);
+            data = await _backfillFromAdPerformance(data);
             updateDataSourceLabel(true);
             return data;
         } catch (e) {
