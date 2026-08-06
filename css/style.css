@@ -7532,7 +7532,7 @@ img.mw-cr-thumb {
 .wr-creative-thumb-wrap {
     position: relative;
     width: 100%;
-    padding-top: 60%;
+    padding-top: 125%;
     background: #e2e8f0;
     overflow: hidden;
 }
@@ -7541,7 +7541,7 @@ img.mw-cr-thumb {
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 .wr-no-thumb {
     position: absolute;
