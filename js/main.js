@@ -5212,11 +5212,13 @@ function renderKRSection() {
             </div>`).join('');
     }
 
-    // 빈 상태
+    // 빈 상태 — 이전 브랜드/필터의 요약 카드·인사이트가 남아있지 않도록 함께 초기화
     if (!sorted.length) {
         grid.innerHTML = '';
         grid.classList.add('hidden');
         empty?.classList.remove('hidden');
+        if (summary) summary.innerHTML = '';
+        renderKRInsights([]);
         return;
     }
     grid.classList.remove('hidden');
