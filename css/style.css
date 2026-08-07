@@ -542,6 +542,10 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
 .cep-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-right: auto; }
 .cep-head-metric { font-size: 11px; color: #64748b; white-space: nowrap; }
 .cep-head-metric b { color: #4f46e5; font-size: 13px; margin-left: 2px; }
+.cep-date-range {
+    font-size: 10px; color: #94a3b8; white-space: nowrap;
+}
+.cep-date-range i { margin-right: 3px; }
 .cep-status-badge {
     font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
 }
@@ -588,6 +592,8 @@ details[open] > summary > .fw-chev { transform: rotate(180deg); }
 .cep-creative-metrics { display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 9.5px; color: #94a3b8; }
 .cep-creative-metrics b { color: #1e293b; font-size: 11px; margin-right: 2px; }
 .cep-creative-roas b { color: #4f46e5; }
+.cep-creative-date { font-size: 9px; color: #cbd5e1; margin-top: 4px; }
+.cep-creative-date i { margin-right: 3px; }
 
 .cep-pending-note {
     font-size: 12px; color: #94a3b8; background: #f8fafc; border: 1px dashed #e2e8f0;

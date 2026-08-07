@@ -33,11 +33,11 @@ async function _cepFetchCsv() {
 }
 
 // 폴백용 고정 인덱스 (헤더 탐지 실패 시): 검증 완료,브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트,검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
-const CEP_COL = { brand: 1, name: 2, product: 3, url: 6, cep: 7, detail: 8, imp: 9, click: 10, ctr: 11, cost: 13, cv: 14, revenue: 17, roas: 18 };
+const CEP_COL = { brand: 1, name: 2, product: 3, start: 4, end: 5, url: 6, cep: 7, detail: 8, imp: 9, click: 10, ctr: 11, cost: 13, cv: 14, revenue: 17, roas: 18 };
 
 // 헤더명 → 필드 자동 매핑: 시트에 컬럼이 추가/이동돼도 헤더 텍스트로 위치를 찾는다
 const CEP_HEADER_NAMES = {
-    brand: '브랜드', name: '소재명', product: '제품', url: 'media urls',
+    brand: '브랜드', name: '소재명', product: '제품', start: '운영 시작일', end: '운영 종료일', url: 'media urls',
     cep: '소구포인트', detail: '검증 상세', message: '메시지',
     imp: 'IMP', click: 'Click', ctr: 'CTR', cost: 'COST', cv: 'CV', revenue: 'Revenue', roas: 'ROAS',
 };
@@ -322,6 +322,8 @@ function _cepBuildModel(rows) {
             if (hasResult && i === 0) {
                 cepObj.creatives.push({
                     name: mediaName, url: mediaUrl, detail: hypoText,
+                    // 검증 일정 = 소재 운영 시작일~종료일(검증 log에 별도 '검증일' 컬럼이 없어 이를 대용)
+                    startDate: (r[COL.start] || '').trim(), endDate: (r[COL.end] || '').trim(),
                     // 메시지 컬럼(CEP=언제, 메시지=무슨 말): 없던 시트 버전도 있으므로 옵셔널
                     message: COL.message != null ? (r[COL.message] || '').trim() : '',
                     imp: _cepNum(r[COL.imp]), click: _cepNum(r[COL.click]),
@@ -334,6 +336,17 @@ function _cepBuildModel(rows) {
         }
     });
     return products;
+}
+
+// 검증 일정 표시용: 시트에 별도 '검증일' 컬럼이 없어 소재 운영 시작일~종료일 범위로 대신 표기
+function _cepDateRangeLabel(creatives) {
+    const starts = creatives.map(c => c.startDate).filter(Boolean).sort();
+    const ends = creatives.map(c => c.endDate).filter(Boolean).sort();
+    if (!starts.length && !ends.length) return '';
+    const start = starts[0] || '';
+    const end = ends[ends.length - 1] || '';
+    if (start && end && start !== end) return `${start} ~ ${end}`;
+    return start || end;
 }
 
 function _cepAggregate(cepObj) {
@@ -517,11 +530,16 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
     const headMetricHtml = hasResult
         ? `<span class="cep-head-metric">ROAS <b>${agg.roas.toFixed(0)}%</b></span>`
         : '';
+    const dateRangeLabel = hasResult ? _cepDateRangeLabel(cepObj.creatives) : '';
+    const dateRangeHtml = dateRangeLabel
+        ? `<span class="cep-date-range" title="검증 일정(소재 운영 기간)"><i class="fas fa-calendar-days"></i> ${_cepEsc(dateRangeLabel)}</span>`
+        : '';
     const headHtml = `
         <div class="cep-card-head">
             ${cepNo ? `<span class="cep-tag">${_cepEsc(cepNo)}</span>` : ''}
             <span class="cep-name">${_cepEsc(cepTitle)}</span>
             ${headMetricHtml}
+            ${dateRangeHtml}
             <span class="cep-status-badge ${hasResult ? 'done' : 'pending'}">${hasResult ? '검증 완료' : '검증 대기'}</span>
             <i class="fas fa-chevron-down cep-collapse-icon"></i>
         </div>`;
@@ -570,6 +588,7 @@ function _cepRenderCepBlock(cepObj, productName, isOpen, benchmark) {
                             <span><b>${_cepFmtInt(c.cv)}</b>CV</span>
                             <span class="cep-creative-roas"><b>${c.cost > 0 ? _cepFmtPct(c.roasSheet) : '-'}</b>ROAS</span>
                         </div>
+                        ${(c.startDate || c.endDate) ? `<div class="cep-creative-date"><i class="fas fa-calendar-days"></i> ${_cepEsc(_cepDateRangeLabel([c]))}</div>` : ''}
                     </div>
                 </div>`;
             }).join('')}
