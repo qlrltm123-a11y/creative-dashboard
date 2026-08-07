@@ -128,23 +128,33 @@ function createMediaElement(creative, forModal = false) {
                 const driveId = extractDriveFileId(videoUrl);
                 const openUrl = driveId ? `https://drive.google.com/file/d/${driveId}/view` : videoUrl;
                 const uid = 'drv_' + (driveId || Date.now());
-                // iframe 로드 후 로딩 오버레이 제거, 8초 내 미로드 시 폴백 표시
+                // iframe 로드 성공 시: 로딩 오버레이 제거 + 로드됨 표시만 (onload는 embed 차단 시에도
+                // 발생할 수 있어 신뢰하되, 내용 접근은 불가능한 cross-origin이라 성공 여부 자체는 판단하지 않음)
                 const onloadScript = `
                     (function(){
                         var w = document.getElementById('${uid}');
                         if (!w) return;
+                        w.setAttribute('data-loaded', '1');
                         w.querySelector('.dv-loading') && w.querySelector('.dv-loading').remove();
-                        // 8초 타임아웃: iframe content가 비어있으면 폴백 표시
-                        var t = setTimeout(function(){
-                            var fr = w.querySelector('iframe');
-                            if (!fr) return;
-                            try { if (!fr.contentDocument || !fr.contentDocument.body || fr.contentDocument.body.innerHTML === '') { w.querySelector('.dv-fallback') && (w.querySelector('.dv-fallback').style.display='flex'); } } catch(e) { w.querySelector('.dv-fallback') && (w.querySelector('.dv-fallback').style.display='flex'); }
+                    })()
+                `.replace(/\s+/g, ' ');
+                // ★ 워치독: iframe onload 이벤트 자체가 발생하지 않는 경우(임베드 차단·네트워크 문제 등)에도
+                // 무한 로딩에 빠지지 않도록, onload와 무관하게 삽입 즉시 독립적으로 8초 타이머를 건다.
+                // innerHTML로 삽입되는 <script>는 실행되지 않으므로 즉시 onerror가 발생하는 img를 이용해 트리거.
+                const watchdogScript = `
+                    (function(){
+                        setTimeout(function(){
+                            var w = document.getElementById('${uid}');
+                            if (!w || w.getAttribute('data-loaded') === '1') return;
+                            w.querySelector('.dv-loading') && w.querySelector('.dv-loading').remove();
+                            w.querySelector('.dv-fallback') && (w.querySelector('.dv-fallback').style.display = 'flex');
                         }, 8000);
                     })()
                 `.replace(/\s+/g, ' ');
                 return `
                     <div id="${uid}" class="drive-video-wrap">
                         <iframe src="${embedUrl}" allow="autoplay" allowfullscreen frameborder="0" class="dv-iframe" onload="${onloadScript.trim()}"></iframe>
+                        <img src="x" alt="" style="display:none" onerror="${watchdogScript.trim()}">
                         <div class="dv-loading">
                             <i class="fas fa-spinner fa-spin"></i>
                             <span>영상 로딩 중...</span>
