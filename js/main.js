@@ -5078,11 +5078,11 @@ function renderKRSection() {
     const summary = document.getElementById('kr-summary-cards');
     if (!grid) return;
 
-    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴 또는 UGC 표기)
+    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴, UGC 표기, 또는 WM식 _inf_ 표기)
     const allData = window.allCreatives || [];
     let krData = allData.filter(c => {
         const name = (c.ad_name || c.creative_name || c.id || '').toString();
-        return /-EDIT/i.test(name) || /UGC/i.test(name);
+        return /-EDIT/i.test(name) || /UGC/i.test(name) || /_inf_/i.test(name);
     });
 
     // 브랜드 필터 적용 (currentBrand 전역 변수 직접 참조 — 탭 전환 시 항상 최신값)
@@ -5145,6 +5145,13 @@ function renderKRSection() {
             return name
                 .replace(/_\d{3,4}x\d{3,4}.*/i, '')
                 .replace(/_(JP|KR|EN)$/i, '')
+                .toLowerCase();
+        }
+        if (/_inf_/i.test(name)) {
+            // WM식 표기: <제품>_<테마>_inf_<인플루언서명>_..._VID_1x1|9x16_날짜
+            // 사이즈(1x1/9x16)·날짜 접미사만 제거해 동일 소재의 화면비 변형끼리만 묶는다
+            return name
+                .replace(/_(IMG|VID)_\d{1,2}x\d{1,2}_\d{6}.*/i, '')
                 .toLowerCase();
         }
         return name.toLowerCase();
