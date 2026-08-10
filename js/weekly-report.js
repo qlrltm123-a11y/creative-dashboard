@@ -142,6 +142,58 @@ function _wrByPlatform(list) {
     })).sort((a, b) => b.spend - a.spend);
 }
 
+/* ── 타게팅 유형/최적화 목표 분류 (캠페인명 토큰 기반) ──
+   예: WM_QT_JP_Promo_Megapo_UA_Meta_DA_Click_260428 → UA(신규)
+       BOH_QT_JP_Promo_Megapo_RT_SingleOne_Conversions_Purchase_260428 → RT(기존)·Purchase
+       CG_QT_JP_Promo_Megapo_ALL_Meta_Traffic_LPV_260507 → ALL(전체)·LPV        */
+function _wrTargetingType(campaignName) {
+    const n = campaignName || '';
+    if (/(^|_)UA(_|$)/i.test(n)) return 'UA';
+    if (/(^|_)RT(_|$)/i.test(n)) return 'RT';
+    if (/(^|_)ALL(_|$)/i.test(n)) return 'ALL';
+    return '기타';
+}
+function _wrOptimizationGoal(campaignName) {
+    const n = campaignName || '';
+    if (/A2C/i.test(n)) return 'A2C';
+    if (/Purchase/i.test(n)) return 'Purchase';
+    if (/LPV/i.test(n)) return 'LPV';
+    return '기타';
+}
+const _WR_TARGET_LABEL = { UA: '신규(UA)', RT: '기존(RT)', ALL: '전체(ALL)', '기타': '기타' };
+const _WR_GOAL_LABEL   = { A2C: '장바구니(A2C)', Purchase: '구매(Purchase)', LPV: '방문(LPV)', '기타': '기타' };
+
+/* ── 타게팅별 집계: UA/RT(/ALL) → 최적화 목표(A2C/Purchase/LPV)별 하위 집계 ── */
+function _wrByTargeting(list) {
+    const groups = {};
+    list.forEach(c => {
+        const type = _wrTargetingType(c.campaign_name);
+        const goal = _wrOptimizationGoal(c.campaign_name);
+        if (!groups[type]) groups[type] = { spend:0,impr:0,clicks:0,rev:0,conv:0, goals:{} };
+        const g = groups[type];
+        g.spend += c.spend || 0; g.impr += c.impressions || 0; g.clicks += c.clicks || 0;
+        g.rev += c.revenue || 0; g.conv += c.conversions || 0;
+        if (!g.goals[goal]) g.goals[goal] = { spend:0,impr:0,clicks:0,rev:0,conv:0 };
+        const gg = g.goals[goal];
+        gg.spend += c.spend || 0; gg.impr += c.impressions || 0; gg.clicks += c.clicks || 0;
+        gg.rev += c.revenue || 0; gg.conv += c.conversions || 0;
+    });
+    const order = ['UA', 'RT', 'ALL', '기타'];
+    return order.filter(t => groups[t]).map(t => {
+        const g = groups[t];
+        return {
+            type: t, ...g,
+            ctr:  g.impr  > 0 ? g.clicks / g.impr  : 0,
+            roas: g.spend > 0 ? g.rev    / g.spend  : 0,
+            goals: Object.entries(g.goals).map(([goal, gd]) => ({
+                goal, ...gd,
+                ctr:  gd.impr  > 0 ? gd.clicks / gd.impr  : 0,
+                roas: gd.spend > 0 ? gd.rev    / gd.spend  : 0,
+            })).sort((a, b) => b.spend - a.spend),
+        };
+    });
+}
+
 /* ── Drive URL → img HTML 헬퍼 (fallback 체인 포함) ── */
 function _wrThumbHtml(url, className, fallbackHtml) {
     const fb = fallbackHtml || `<div class="${className}-fallback" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:18px"><i class="fas fa-image"></i></div>`;
@@ -363,6 +415,63 @@ function _wrPlatformSectionHtml(byPlatform) {
             <table class="wr-table">
                 <thead><tr>
                     <th class="wr-th wr-th-left">매체</th>
+                    <th class="wr-th">광고비</th>
+                    <th class="wr-th">노출 수</th>
+                    <th class="wr-th">클릭 수</th>
+                    <th class="wr-th">클릭률</th>
+                    <th class="wr-th">매출</th>
+                    <th class="wr-th">광고효율</th>
+                    <th class="wr-th">구매</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+/* ── 타게팅별 섹션 HTML (UA/RT/ALL → 최적화 목표별 하위 행) ── */
+function _wrTargetingSectionHtml(byTargeting) {
+    if (!byTargeting.length) return '';
+    const total = byTargeting.reduce((s, t) => s + t.spend, 0);
+    const rows = byTargeting.map(t => {
+        const pct = total > 0 ? (t.spend / total * 100).toFixed(1) : '0';
+        const groupRow = `
+        <tr class="wr-tr wr-tr-group">
+            <td class="wr-td" colspan="2"><strong>${_WR_TARGET_LABEL[t.type] || t.type}</strong></td>
+            <td class="wr-td wr-td-num">${_wrW(t.spend)}<span class="wr-pct-badge">${pct}%</span></td>
+            <td class="wr-td wr-td-num">${_wrN(t.impr)}</td>
+            <td class="wr-td wr-td-num">${_wrN(t.clicks)}</td>
+            <td class="wr-td wr-td-num">${_wrP(t.ctr)}</td>
+            <td class="wr-td wr-td-num">${_wrW(t.rev)}</td>
+            <td class="wr-td wr-td-num wr-roas-cell">${_wrR(t.roas)}</td>
+            <td class="wr-td wr-td-num">${t.conv > 0 ? _wrN(t.conv) : '-'}</td>
+        </tr>`;
+        const goalRows = t.goals.map(g => `
+        <tr class="wr-tr wr-tr-sub">
+            <td class="wr-td"></td>
+            <td class="wr-td">${_WR_GOAL_LABEL[g.goal] || g.goal}</td>
+            <td class="wr-td wr-td-num">${_wrW(g.spend)}</td>
+            <td class="wr-td wr-td-num">${_wrN(g.impr)}</td>
+            <td class="wr-td wr-td-num">${_wrN(g.clicks)}</td>
+            <td class="wr-td wr-td-num">${_wrP(g.ctr)}</td>
+            <td class="wr-td wr-td-num">${_wrW(g.rev)}</td>
+            <td class="wr-td wr-td-num wr-roas-cell">${_wrR(g.roas)}</td>
+            <td class="wr-td wr-td-num">${g.conv > 0 ? _wrN(g.conv) : '-'}</td>
+        </tr>`).join('');
+        return groupRow + goalRows;
+    }).join('');
+    return `
+    <div class="wr-section" id="wr-targeting-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-bullseye mr-1.5" style="color:#8b5cf6"></i>타게팅별 성과</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('targeting', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-table-wrap">
+            <table class="wr-table">
+                <thead><tr>
+                    <th class="wr-th wr-th-left" colspan="2">타게팅 · 최적화 목표</th>
                     <th class="wr-th">광고비</th>
                     <th class="wr-th">노출 수</th>
                     <th class="wr-th">클릭 수</th>
@@ -754,12 +863,13 @@ function renderWeeklyReport() {
     const list        = _wrGetList();
     const kpi         = _wrSum(list);
     const byPlatform    = _wrByPlatform(list);
+    const byTargeting   = _wrByTargeting(list);
     const byProductAgg  = _wrByProduct(list);
     const byCreative    = _wrByCreative(list);
     const byProduct     = _wrByProductInsight(list);
 
     // 복사 시 재계산 방지용 캐시
-    _wrRenderCache = { list, kpi, byPlatform, byProductAgg, byCreative, byProduct };
+    _wrRenderCache = { list, kpi, byPlatform, byTargeting, byProductAgg, byCreative, byProduct };
     _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
@@ -793,6 +903,7 @@ function renderWeeklyReport() {
     body.innerHTML =
         _wrKpiSectionHtml(kpi, list.length) +
         _wrPlatformSectionHtml(byPlatform) +
+        _wrTargetingSectionHtml(byTargeting) +
         _wrProductAggSectionHtml(byProductAgg) +
         _wrProductInsightSectionHtml(byProduct) +
         _wrCreativeSectionHtml(byCreative) +
@@ -841,6 +952,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     const list       = cache ? cache.list       : _wrGetList();
     const kpi        = cache ? cache.kpi        : _wrSum(list);
     const byPlatform   = cache ? cache.byPlatform   : _wrByPlatform(list);
+    const byTargeting  = cache ? cache.byTargeting  : _wrByTargeting(list);
     const byProductAgg = cache ? cache.byProductAgg : _wrByProduct(list);
     const byCreative   = cache ? cache.byCreative   : _wrByCreative(list);
     const byProduct    = cache ? cache.byProduct    : _wrByProductInsight(list);
@@ -944,6 +1056,43 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 <td class="roas">${_wrR(p.roas)}</td>
                 <td class="num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
             </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    /* 타게팅별 (UA/RT/ALL → 최적화 목표별 하위 행) */
+    if (!sections || sections.includes('targeting')) {
+        const totalT = byTargeting.reduce((s, t) => s + t.spend, 0);
+        html += `<h3>🎯 타게팅별 성과</h3><table><thead><tr>
+            <th style="text-align:left" colspan="2">타게팅 · 최적화 목표</th><th>광고비</th><th>비중</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+        </tr></thead><tbody>`;
+        byTargeting.forEach(t => {
+            const pct = totalT > 0 ? (t.spend / totalT * 100).toFixed(1) + '%' : '-';
+            html += `<tr>
+                <td class="left" colspan="2"><strong>${_WR_TARGET_LABEL[t.type] || t.type}</strong></td>
+                <td class="num">${_wrW(t.spend)}</td>
+                <td class="num">${pct}</td>
+                <td class="num">${_wrN(t.impr)}</td>
+                <td class="num">${_wrN(t.clicks)}</td>
+                <td class="num">${_wrP(t.ctr)}</td>
+                <td class="num">${_wrW(t.rev)}</td>
+                <td class="roas">${_wrR(t.roas)}</td>
+                <td class="num">${t.conv > 0 ? _wrN(t.conv) : '-'}</td>
+            </tr>`;
+            t.goals.forEach(g => {
+                html += `<tr>
+                    <td class="left"></td>
+                    <td class="left">${_WR_GOAL_LABEL[g.goal] || g.goal}</td>
+                    <td class="num">${_wrW(g.spend)}</td>
+                    <td class="num">-</td>
+                    <td class="num">${_wrN(g.impr)}</td>
+                    <td class="num">${_wrN(g.clicks)}</td>
+                    <td class="num">${_wrP(g.ctr)}</td>
+                    <td class="num">${_wrW(g.rev)}</td>
+                    <td class="roas">${_wrR(g.roas)}</td>
+                    <td class="num">${g.conv > 0 ? _wrN(g.conv) : '-'}</td>
+                </tr>`;
+            });
         });
         html += `</tbody></table>`;
     }

@@ -7503,6 +7503,11 @@ img.mw-cr-thumb {
 }
 .wr-td-num { text-align: right; font-variant-numeric: tabular-nums; }
 .wr-roas-cell { font-weight: 700; color: #7c3aed; }
+.wr-tr-group { background: #f8fafc; }
+.wr-tr-group .wr-td { font-size: 13px; }
+.wr-tr-sub .wr-td { color: #64748b; font-size: 11.5px; }
+.wr-tr-sub .wr-td:nth-child(2) { padding-left: 22px; }
+.wr-tr-sub .wr-roas-cell { color: #a78bfa; font-weight: 600; }
 .wr-plat-dot {
     display: inline-block;
     width: 8px; height: 8px;
