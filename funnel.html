@@ -386,11 +386,12 @@ function setFunnelEvent(v) {
   render(currentBrand); _restoreInner(currentBrand);
 }
 
-// ── 기본 시트 URL (링크 공유 시 자동 로드) ──────────────────────────────────────
+// ── 기본(메가와리) 탭 — 2026-07 '웹에 게시' 조직 정책 차단(401) 이후 로컬 스냅샷을 기본으로 읽는다.
+// (Megawari_BOH/WM/CG 탭, 메가포와 같은 스프레드시트 내 별도 탭 — data/megawari-*.csv로 자동 동기화)
 const DEFAULT_URLS = {
-  BOH:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=0&single=true&output=csv',
-  WM: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1580512303&single=true&output=csv',
-  CG: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSxHghkM9L-_feMHIjG2ki5I1bvVYONcCQ6HST0nprxSc32Z2oe_4MrMb8jMqJyPZBiAExfIp6xEoOs/pub?gid=1712106452&single=true&output=csv',
+  BOH:'data/megawari-boh.csv',
+  WM: 'data/megawari-wm.csv',
+  CG: 'data/megawari-cg.csv',
 };
 // 메가포 탭 — 브랜드별 별도 스프레드시트(Megapo_BOH/WM/CG), 로컬 스냅샷을 기본으로 읽는다.
 // 시트 자체의 event 컬럼(예: '2608MEGAPO')이 실제 시즌을 담고 있으므로, 여기 URL은
@@ -402,8 +403,9 @@ const DEFAULT_MEGAPO_URLS = {
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────────
-const getUrl = b => localStorage.getItem(`furl_${b}`) || DEFAULT_URLS[b] || '';
-const saveUrl = (b,u) => localStorage.setItem(`furl_${b}`,u);
+// v2 키: 막힌 게시 URL 기본값 시절에 저장된 커스텀 값을 무시하고 새 기본값(로컬 스냅샷)을 쓰도록 키 교체
+const getUrl = b => localStorage.getItem(`furl2_${b}`) || DEFAULT_URLS[b] || '';
+const saveUrl = (b,u) => localStorage.setItem(`furl2_${b}`,u);
 // v3 키: 2026-07 게시URL 401 차단으로 로컬 스냅샷 기본값 도입 — 이전에 저장된
 // (막힌 게시 URL) 커스텀 값을 무시하고 새 기본값(로컬 파일)을 쓰도록 키 자체를 교체
 const getMegapoUrl = b => localStorage.getItem(`furl_megapo3_${b}`) || DEFAULT_MEGAPO_URLS[b] || '';
@@ -454,7 +456,8 @@ function applyMegapoUrl(brand) {
 
 // ── 캐시 (localStorage) — 새로고침 시 재fetch 없이 즉시 로드, '시트 갱신'만 재fetch ──
 // v2: 메가포 컬럼 매핑 변경으로 옛 캐시 무효화
-const fcacheKey = b => `fdata_v3_${b}`; // v3: 메가포 로컬 스냅샷 전환으로 이전 캐시 무효화
+// v4: 메가와리(기본 탭)도 로컬 스냅샷 전환 — 이전에 캐시된 빈 262Q/261Q 데이터 무효화
+const fcacheKey = b => `fdata_v4_${b}`;
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
