@@ -7503,6 +7503,36 @@ img.mw-cr-thumb {
 }
 .wr-td-num { text-align: right; font-variant-numeric: tabular-nums; }
 .wr-roas-cell { font-weight: 700; color: #7c3aed; }
+.wr-budget-ctrl {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding: 10px 12px; margin-bottom: 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    font-size: 12px; color: #475569;
+}
+.wr-budget-ctrl label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.wr-budget-ctrl select,
+.wr-budget-ctrl input {
+    font-size: 12px; padding: 4px 8px; border: 1px solid #cbd5e1;
+    border-radius: 6px; background: #fff; color: #1e293b; font-weight: 500;
+}
+.wr-budget-ctrl input { width: 58px; text-align: right; }
+.wr-budget-note { margin-left: auto; font-size: 11px; color: #94a3b8; }
+.wr-verdict {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.wr-vd-inc  { background: #dcfce7; color: #15803d; }
+.wr-vd-ok   { background: #f1f5f9; color: #475569; }
+.wr-vd-cond { background: #fef3c7; color: #a16207; }
+.wr-vd-stop { background: #fee2e2; color: #b91c1c; }
+.wr-adj-up   { color: #15803d; font-weight: 700; }
+.wr-adj-down { color: #b91c1c; font-weight: 700; }
+.wr-adj-flat { color: #cbd5e1; }
+.wr-budget-legend {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-top: 9px;
+    font-size: 11px; color: #94a3b8;
+}
+.wr-budget-legend i { font-size: 7px; margin-right: 4px; vertical-align: middle; }
 .wr-tr-group { background: #f8fafc; }
 .wr-tr-group .wr-td { font-size: 13px; }
 .wr-tr-sub .wr-td { color: #64748b; font-size: 11.5px; }

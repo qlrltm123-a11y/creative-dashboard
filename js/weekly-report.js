@@ -3,8 +3,20 @@
 // ============================================================
 
 /* ── 필터 상태 (window 노출 — HTML onchange에서 접근) ── */
-window._wr = { product: '', event: '', dateFrom: '', dateTo: '' };
+window._wr = { product: '', event: '', dateFrom: '', dateTo: '', eventType: 'megapo', margin: 40 };
 let _wr = window._wr;
+
+/* ── 예산 조정 판정 기준 ──────────────────────────────────────
+   CPA 상한 = 기준 객단가 ÷ 목표 ROAS
+   · 효율 상한: 이벤트별 목표 ROAS 기준 — "예정한 효율을 지키고 있나"
+   · 손실 상한: 손익분기 ROAS(=1÷공헌이익률) 기준 — "집행할수록 손해인가"
+   기준 객단가는 최근 90일 롤링으로 제품별 자동 산출(하드코딩 아님).      */
+const WR_EVENT_TYPES = {
+    megawari: { label: '메가와리', roas: 7.10 },
+    megapo:   { label: '메가포',   roas: 3.25 },
+    always:   { label: '상시',     roas: 2.80 },
+};
+const WR_BASELINE_DAYS = 90;
 
 /* ── 필터 localStorage 저장/복원 ── */
 const _WR_LS_KEY = 'wr_filter_v1';
@@ -15,6 +27,8 @@ function _wrSaveFilter() {
         event:    _wr.event,
         dateFrom: _wr.dateFrom,
         dateTo:   _wr.dateTo,
+        eventType: _wr.eventType,
+        margin:    _wr.margin,
     })); } catch(e) {}
 }
 
@@ -26,8 +40,19 @@ function _wrLoadFilter() {
         _wr.event    = saved.event    || '';
         _wr.dateFrom = saved.dateFrom || '';
         _wr.dateTo   = saved.dateTo   || '';
+        if (WR_EVENT_TYPES[saved.eventType]) _wr.eventType = saved.eventType;
+        if (saved.margin > 0 && saved.margin < 100) _wr.margin = saved.margin;
     } catch(e) {}
 }
+
+/* ── 판정 기준 변경 핸들러 ── */
+window._wrSetEventType = function(v) {
+    if (WR_EVENT_TYPES[v]) { _wr.eventType = v; renderWeeklyReport(); }
+};
+window._wrSetMargin = function(v) {
+    const n = parseFloat(v);
+    if (n > 0 && n < 100) { _wr.margin = n; renderWeeklyReport(); }
+};
 
 // 초기 로드 시 저장된 필터 복원 (없으면 전체 기간)
 _wrLoadFilter();
@@ -121,6 +146,70 @@ function _wrByProduct(list) {
         ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
         roas: d.spend > 0 ? d.rev    / d.spend  : 0,
     })).sort((a, b) => b.spend - a.spend);
+}
+
+/* ── 기준 객단가: 제품별 최근 90일 롤링 (날짜 필터와 무관하게 전체 데이터 기준) ──
+   현재 구간 객단가로 상한을 잡으면 그 구간이 유독 높거나 낮을 때 판정이 뒤집히므로,
+   상한의 기준값은 항상 롤링 평균을 쓴다.                                        */
+function _wrBaselineAov() {
+    const list = _wrBrandList();
+    const dates = list.map(c => (c.start_date || '').slice(0, 10)).filter(Boolean).sort();
+    if (!dates.length) return {};
+    const maxD = new Date(dates[dates.length - 1]);
+    const from = new Date(maxD);
+    from.setDate(from.getDate() - WR_BASELINE_DAYS);
+    const fromS = from.toISOString().slice(0, 10);
+
+    const m = {};
+    list.forEach(c => {
+        const d = (c.start_date || '').slice(0, 10);
+        if (!d || d < fromS) return;
+        const p = (c.product || '기타').trim() || '기타';
+        if (!m[p]) m[p] = { rev: 0, conv: 0 };
+        m[p].rev  += c.revenue     || 0;
+        m[p].conv += c.conversions || 0;
+    });
+    const out = {};
+    Object.entries(m).forEach(([p, v]) => { if (v.conv > 0) out[p] = v.rev / v.conv; });
+    return out;
+}
+
+/* ── 예산 조정 판정: 제품별 현재 CPA vs 효율/손실 상한 ── */
+function _wrBudgetJudgment(list) {
+    const base = _wrBaselineAov();
+    const ev   = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
+    const beRoas = 100 / _wr.margin;   // 손익분기 ROAS = 1 ÷ 공헌이익률
+
+    const m = {};
+    list.forEach(c => {
+        const p = (c.product || '기타').trim() || '기타';
+        if (!m[p]) m[p] = { spend: 0, conv: 0, rev: 0 };
+        m[p].spend += c.spend       || 0;
+        m[p].conv  += c.conversions || 0;
+        m[p].rev   += c.revenue     || 0;
+    });
+
+    return Object.entries(m).map(([product, d]) => {
+        const aov = base[product];
+        const cpa = d.conv > 0 ? d.spend / d.conv : 0;
+        if (!aov || !cpa) return { product, ...d, cpa, skip: true };
+        const effLimit  = aov / ev.roas;
+        const lossLimit = aov / beRoas;
+        const useRate   = cpa / effLimit * 100;
+        let verdict, action;
+        if (cpa <= effLimit) {
+            if (useRate < 85) { verdict = 'increase'; action = '증액 여력'; }
+            else              { verdict = 'ok';       action = '현행 유지'; }
+        } else if (cpa <= lossLimit) {
+            verdict = 'conditional'; action = '매출 목표 확인 후 결정';
+        } else {
+            verdict = 'stop'; action = '즉시 감액·중단';
+        }
+        // 상한 내로 되돌리는 데 필요한 예산 조정폭(현 CPA 유지 가정)
+        const overSpend = cpa > effLimit ? d.spend * (1 - effLimit / cpa) : 0;
+        const roomSpend = cpa < effLimit && cpa > 0 ? d.spend * (effLimit / cpa - 1) : 0;
+        return { product, ...d, aov, cpa, effLimit, lossLimit, useRate, verdict, action, overSpend, roomSpend };
+    }).filter(x => !x.skip).sort((a, b) => b.spend - a.spend);
 }
 
 /* ── 매체별 집계 ── */
@@ -425,6 +514,89 @@ function _wrPlatformSectionHtml(byPlatform) {
                 </tr></thead>
                 <tbody>${rows}</tbody>
             </table>
+        </div>
+    </div>`;
+}
+
+/* ── 예산 조정 판정 섹션 HTML ── */
+const _WR_VERDICT_META = {
+    increase:    { label: '증액 여력', cls: 'wr-vd-inc' },
+    ok:          { label: '현행 유지', cls: 'wr-vd-ok' },
+    conditional: { label: '조건부',    cls: 'wr-vd-cond' },
+    stop:        { label: '중단',      cls: 'wr-vd-stop' },
+};
+function _wrBudgetSectionHtml(rows) {
+    const ev = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
+    const beRoas = 100 / _wr.margin;
+    const opts = Object.entries(WR_EVENT_TYPES).map(([k, v]) =>
+        `<option value="${k}"${k === _wr.eventType ? ' selected' : ''}>${v.label} (${Math.round(v.roas * 100)}%)</option>`).join('');
+
+    const ctrl = `
+        <div class="wr-budget-ctrl">
+            <label>이벤트 유형
+                <select onchange="window._wrSetEventType(this.value)">${opts}</select>
+            </label>
+            <label>공헌이익률
+                <input type="number" min="1" max="99" step="1" value="${_wr.margin}"
+                       onchange="window._wrSetMargin(this.value)"><span>%</span>
+            </label>
+            <span class="wr-budget-note">효율 상한 ROAS ${Math.round(ev.roas * 100)}% · 손실 상한 ROAS ${Math.round(beRoas * 100)}%</span>
+        </div>`;
+
+    if (!rows.length) {
+        return `<div class="wr-section" id="wr-budget-section">
+            <div class="wr-section-hd"><span><i class="fas fa-scale-balanced mr-1.5" style="color:#8b5cf6"></i>예산 조정 판정</span></div>
+            ${ctrl}
+            <div class="wr-no-data" style="padding:16px 0">전환 데이터가 있는 제품이 없어 판정할 수 없습니다.</div>
+        </div>`;
+    }
+
+    const body = rows.map(r => {
+        const meta = _WR_VERDICT_META[r.verdict];
+        const adj = r.verdict === 'stop' || r.verdict === 'conditional'
+            ? `<span class="wr-adj-down">−${_wrW(r.overSpend)}</span>`
+            : (r.verdict === 'increase' ? `<span class="wr-adj-up">+${_wrW(r.roomSpend)}</span>` : '<span class="wr-adj-flat">-</span>');
+        return `
+        <tr class="wr-tr">
+            <td class="wr-td"><strong>${r.product}</strong></td>
+            <td class="wr-td wr-td-num">${_wrW(r.spend)}</td>
+            <td class="wr-td wr-td-num">${_wrW(r.cpa)}</td>
+            <td class="wr-td wr-td-num">${_wrW(r.effLimit)}</td>
+            <td class="wr-td wr-td-num">${_wrW(r.lossLimit)}</td>
+            <td class="wr-td wr-td-num"><strong>${r.useRate.toFixed(0)}%</strong></td>
+            <td class="wr-td"><span class="wr-verdict ${meta.cls}">${meta.label}</span></td>
+            <td class="wr-td wr-td-num">${adj}</td>
+        </tr>`;
+    }).join('');
+
+    return `
+    <div class="wr-section" id="wr-budget-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-scale-balanced mr-1.5" style="color:#8b5cf6"></i>예산 조정 판정</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('budget', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        ${ctrl}
+        <div class="wr-table-wrap">
+            <table class="wr-table">
+                <thead><tr>
+                    <th class="wr-th wr-th-left">제품</th>
+                    <th class="wr-th">광고비</th>
+                    <th class="wr-th">현재 CPA</th>
+                    <th class="wr-th">효율 상한</th>
+                    <th class="wr-th">손실 상한</th>
+                    <th class="wr-th">소진율</th>
+                    <th class="wr-th">판정</th>
+                    <th class="wr-th">조정폭</th>
+                </tr></thead>
+                <tbody>${body}</tbody>
+            </table>
+        </div>
+        <div class="wr-budget-legend">
+            <span><i class="fas fa-circle" style="color:#0ca30c"></i> 효율 상한 이하 — 집행 유지</span>
+            <span><i class="fas fa-circle" style="color:#fab219"></i> 효율~손실 사이 — 매출 목표 미달 시에만 허용</span>
+            <span><i class="fas fa-circle" style="color:#d03b3b"></i> 손실 상한 초과 — 매출 목표 무관 즉시 중단</span>
         </div>
     </div>`;
 }
@@ -865,11 +1037,12 @@ function renderWeeklyReport() {
     const byPlatform    = _wrByPlatform(list);
     const byTargeting   = _wrByTargeting(list);
     const byProductAgg  = _wrByProduct(list);
+    const byBudget      = _wrBudgetJudgment(list);
     const byCreative    = _wrByCreative(list);
     const byProduct     = _wrByProductInsight(list);
 
     // 복사 시 재계산 방지용 캐시
-    _wrRenderCache = { list, kpi, byPlatform, byTargeting, byProductAgg, byCreative, byProduct };
+    _wrRenderCache = { list, kpi, byPlatform, byTargeting, byProductAgg, byBudget, byCreative, byProduct };
     _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
@@ -905,6 +1078,7 @@ function renderWeeklyReport() {
         _wrPlatformSectionHtml(byPlatform) +
         _wrTargetingSectionHtml(byTargeting) +
         _wrProductAggSectionHtml(byProductAgg) +
+        _wrBudgetSectionHtml(byBudget) +
         _wrProductInsightSectionHtml(byProduct) +
         _wrCreativeSectionHtml(byCreative) +
         `<div class="wr-copy-all-row">
@@ -954,6 +1128,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     const byPlatform   = cache ? cache.byPlatform   : _wrByPlatform(list);
     const byTargeting  = cache ? cache.byTargeting  : _wrByTargeting(list);
     const byProductAgg = cache ? cache.byProductAgg : _wrByProduct(list);
+    const byBudget     = cache ? cache.byBudget     : _wrBudgetJudgment(list);
     const byCreative   = cache ? cache.byCreative   : _wrByCreative(list);
     const byProduct    = cache ? cache.byProduct    : _wrByProductInsight(list);
 
@@ -1115,6 +1290,34 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 <td class="num">${_wrW(p.rev)}</td>
                 <td class="roas">${_wrR(p.roas)}</td>
                 <td class="num">${p.conv > 0 ? _wrN(p.conv) : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+
+    /* 예산 조정 판정 */
+    if ((!sections || sections.includes('budget')) && byBudget.length) {
+        const ev = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
+        const beRoas = 100 / _wr.margin;
+        html += `<h3>⚖️ 예산 조정 판정</h3>`;
+        html += `<p style="font-size:11px;color:#64748b;margin:0 0 6px">${ev.label} 기준 · 효율 상한 ROAS ${Math.round(ev.roas*100)}% · 손실 상한 ROAS ${Math.round(beRoas*100)}%(공헌이익률 ${_wr.margin}%) · 기준 객단가 최근 ${WR_BASELINE_DAYS}일 롤링</p>`;
+        html += `<table><thead><tr>
+            <th style="text-align:left">제품</th><th>광고비</th><th>현재 CPA</th><th>효율 상한</th><th>손실 상한</th><th>소진율</th><th>판정</th><th>조정폭</th>
+        </tr></thead><tbody>`;
+        byBudget.forEach(r => {
+            const meta = _WR_VERDICT_META[r.verdict];
+            const adj = (r.verdict === 'stop' || r.verdict === 'conditional')
+                ? '−' + _wrW(r.overSpend)
+                : (r.verdict === 'increase' ? '+' + _wrW(r.roomSpend) : '-');
+            html += `<tr>
+                <td class="left"><strong>${r.product}</strong></td>
+                <td class="num">${_wrW(r.spend)}</td>
+                <td class="num">${_wrW(r.cpa)}</td>
+                <td class="num">${_wrW(r.effLimit)}</td>
+                <td class="num">${_wrW(r.lossLimit)}</td>
+                <td class="num"><strong>${r.useRate.toFixed(0)}%</strong></td>
+                <td class="left">${meta.label}</td>
+                <td class="num">${adj}</td>
             </tr>`;
         });
         html += `</tbody></table>`;
