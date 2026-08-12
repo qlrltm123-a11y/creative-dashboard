@@ -160,17 +160,30 @@ function _wrBaselineAov() {
     from.setDate(from.getDate() - WR_BASELINE_DAYS);
     const fromS = from.toISOString().slice(0, 10);
 
-    const m = {};
+    // 제품별로 행 단위 객단가를 모은 뒤 중앙값 기준 이상치를 제거한다.
+    // (시트 매출 오류가 섞이면 평균이 수 배로 튀어 상한이 무의미해지므로 필수)
+    const rows = {};
     list.forEach(c => {
         const d = (c.start_date || '').slice(0, 10);
         if (!d || d < fromS) return;
+        const conv = c.conversions || 0;
+        const rev  = c.revenue     || 0;
+        if (conv <= 0 || rev <= 0) return;
         const p = (c.product || '기타').trim() || '기타';
-        if (!m[p]) m[p] = { rev: 0, conv: 0 };
-        m[p].rev  += c.revenue     || 0;
-        m[p].conv += c.conversions || 0;
+        (rows[p] = rows[p] || []).push({ conv, rev, aov: rev / conv });
     });
+
     const out = {};
-    Object.entries(m).forEach(([p, v]) => { if (v.conv > 0) out[p] = v.rev / v.conv; });
+    Object.entries(rows).forEach(([p, arr]) => {
+        if (!arr.length) return;
+        const sorted = arr.map(r => r.aov).sort((a, b) => a - b);
+        const med = sorted[Math.floor(sorted.length / 2)];
+        const kept = med > 0 ? arr.filter(r => r.aov <= med * 3 && r.aov >= med / 3) : arr;
+        const use = kept.length ? kept : arr;
+        let rev = 0, conv = 0;
+        use.forEach(r => { rev += r.rev; conv += r.conv; });
+        if (conv > 0) out[p] = rev / conv;
+    });
     return out;
 }
 
