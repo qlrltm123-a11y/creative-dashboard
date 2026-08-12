@@ -218,10 +218,10 @@ function _wrBudgetJudgment(list) {
         } else {
             verdict = 'stop'; action = '즉시 감액·중단';
         }
-        // 상한 내로 되돌리는 데 필요한 예산 조정폭(현 CPA 유지 가정)
-        const overSpend = cpa > effLimit ? d.spend * (1 - effLimit / cpa) : 0;
-        const roomSpend = cpa < effLimit && cpa > 0 ? d.spend * (effLimit / cpa - 1) : 0;
-        return { product, ...d, aov, cpa, effLimit, lossLimit, useRate, verdict, action, overSpend, roomSpend };
+        // 예산 조정률: 현 CPA 유지 가정 시 효율 상한까지의 증감 비율(%)
+        // 절대금액이 아닌 비율로 두면 이벤트마다 예산 규모가 달라져도 그대로 쓸 수 있다.
+        const adjPct = (effLimit / cpa - 1) * 100;
+        return { product, ...d, aov, cpa, effLimit, lossLimit, useRate, verdict, action, adjPct };
     }).filter(x => !x.skip).sort((a, b) => b.spend - a.spend);
 }
 
@@ -566,9 +566,11 @@ function _wrBudgetSectionHtml(rows) {
 
     const body = rows.map(r => {
         const meta = _WR_VERDICT_META[r.verdict];
-        const adj = r.verdict === 'stop' || r.verdict === 'conditional'
-            ? `<span class="wr-adj-down">−${_wrW(r.overSpend)}</span>`
-            : (r.verdict === 'increase' ? `<span class="wr-adj-up">+${_wrW(r.roomSpend)}</span>` : '<span class="wr-adj-flat">-</span>');
+        const adj = Math.abs(r.adjPct) < 1
+            ? '<span class="wr-adj-flat">-</span>'
+            : (r.adjPct < 0
+                ? `<span class="wr-adj-down">${Math.round(r.adjPct)}%</span>`
+                : `<span class="wr-adj-up">+${Math.round(r.adjPct)}%</span>`);
         return `
         <tr class="wr-tr">
             <td class="wr-td"><strong>${r.product}</strong></td>
@@ -601,7 +603,7 @@ function _wrBudgetSectionHtml(rows) {
                     <th class="wr-th">손실 상한</th>
                     <th class="wr-th">소진율</th>
                     <th class="wr-th">판정</th>
-                    <th class="wr-th">조정폭</th>
+                    <th class="wr-th">예산 조정</th>
                 </tr></thead>
                 <tbody>${body}</tbody>
             </table>
@@ -1315,13 +1317,12 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
         html += `<h3>⚖️ 예산 조정 판정</h3>`;
         html += `<p style="font-size:11px;color:#64748b;margin:0 0 6px">${ev.label} 기준 · 효율 상한 ROAS ${Math.round(ev.roas*100)}% · 손실 상한 ROAS ${Math.round(beRoas*100)}%(공헌이익률 ${_wr.margin}%) · 기준 객단가 최근 ${WR_BASELINE_DAYS}일 롤링</p>`;
         html += `<table><thead><tr>
-            <th style="text-align:left">제품</th><th>광고비</th><th>현재 CPA</th><th>효율 상한</th><th>손실 상한</th><th>소진율</th><th>판정</th><th>조정폭</th>
+            <th style="text-align:left">제품</th><th>광고비</th><th>현재 CPA</th><th>효율 상한</th><th>손실 상한</th><th>소진율</th><th>판정</th><th>예산 조정</th>
         </tr></thead><tbody>`;
         byBudget.forEach(r => {
             const meta = _WR_VERDICT_META[r.verdict];
-            const adj = (r.verdict === 'stop' || r.verdict === 'conditional')
-                ? '−' + _wrW(r.overSpend)
-                : (r.verdict === 'increase' ? '+' + _wrW(r.roomSpend) : '-');
+            const adj = Math.abs(r.adjPct) < 1 ? '-'
+                : (r.adjPct < 0 ? Math.round(r.adjPct) + '%' : '+' + Math.round(r.adjPct) + '%');
             html += `<tr>
                 <td class="left"><strong>${r.product}</strong></td>
                 <td class="num">${_wrW(r.spend)}</td>
