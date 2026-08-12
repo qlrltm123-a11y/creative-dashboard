@@ -3,23 +3,38 @@
 // ============================================================
 
 /* ── 필터 상태 (window 노출 — HTML onchange에서 접근) ── */
-window._wr = { product: '', event: '', dateFrom: '', dateTo: '', eventType: 'megapo', margin: 40 };
+window._wr = { product: '', event: '', dateFrom: '', dateTo: '' };
 let _wr = window._wr;
 
 /* ── 예산 조정 판정 기준 ──────────────────────────────────────
    CPA 상한 = 기준 객단가 ÷ 목표 ROAS
    · 효율 상한: 이벤트별 목표 ROAS 기준 — "예정한 효율을 지키고 있나"
    · 손실 상한: 손익분기 ROAS(=1÷공헌이익률) 기준 — "집행할수록 손해인가"
-   기준 객단가는 최근 90일 롤링으로 제품별 자동 산출(하드코딩 아님).      */
+   기준 객단가는 최근 90일 롤링으로 제품별 자동 산출(하드코딩 아님).
+   BOH/WM/CG는 제품 구성·마진 구조가 서로 달라 목표 ROAS·공헌이익률을
+   공유하면 안 된다 — 브랜드별로 따로 설정하고 따로 저장한다.        */
 const WR_EVENT_TYPES = {
     megawari: { label: '메가와리', roas: 7.10 },
     megapo:   { label: '메가포',   roas: 3.25 },
     always:   { label: '상시',     roas: 2.80 },
 };
 const WR_BASELINE_DAYS = 90;
+const WR_DEFAULT_MARGIN = 40;
+
+// 브랜드별 판정 기준 (localStorage에 브랜드 코드로 분리 저장)
+let _wrBudgetCfg = {};   // { [brand]: { eventType, margin } }
+function _wrCurrentBrand() {
+    return (typeof window.getCurrentBrand === 'function' ? window.getCurrentBrand() : null) || 'ALL';
+}
+function _wrBrandCfg() {
+    const b = _wrCurrentBrand();
+    if (!_wrBudgetCfg[b]) _wrBudgetCfg[b] = { eventType: 'megapo', margin: WR_DEFAULT_MARGIN };
+    return _wrBudgetCfg[b];
+}
 
 /* ── 필터 localStorage 저장/복원 ── */
 const _WR_LS_KEY = 'wr_filter_v1';
+const _WR_BUDGET_LS_KEY = 'wr_budget_cfg_v1';
 
 function _wrSaveFilter() {
     try { localStorage.setItem(_WR_LS_KEY, JSON.stringify({
@@ -27,31 +42,40 @@ function _wrSaveFilter() {
         event:    _wr.event,
         dateFrom: _wr.dateFrom,
         dateTo:   _wr.dateTo,
-        eventType: _wr.eventType,
-        margin:    _wr.margin,
     })); } catch(e) {}
+    try { localStorage.setItem(_WR_BUDGET_LS_KEY, JSON.stringify(_wrBudgetCfg)); } catch(e) {}
 }
 
 function _wrLoadFilter() {
     try {
         const saved = JSON.parse(localStorage.getItem(_WR_LS_KEY) || 'null');
-        if (!saved) return;
-        _wr.product  = saved.product  || '';
-        _wr.event    = saved.event    || '';
-        _wr.dateFrom = saved.dateFrom || '';
-        _wr.dateTo   = saved.dateTo   || '';
-        if (WR_EVENT_TYPES[saved.eventType]) _wr.eventType = saved.eventType;
-        if (saved.margin > 0 && saved.margin < 100) _wr.margin = saved.margin;
+        if (saved) {
+            _wr.product  = saved.product  || '';
+            _wr.event    = saved.event    || '';
+            _wr.dateFrom = saved.dateFrom || '';
+            _wr.dateTo   = saved.dateTo   || '';
+        }
+    } catch(e) {}
+    try {
+        const savedCfg = JSON.parse(localStorage.getItem(_WR_BUDGET_LS_KEY) || 'null');
+        if (savedCfg && typeof savedCfg === 'object') {
+            Object.entries(savedCfg).forEach(([brand, cfg]) => {
+                if (!cfg) return;
+                const eventType = WR_EVENT_TYPES[cfg.eventType] ? cfg.eventType : 'megapo';
+                const margin = (cfg.margin > 0 && cfg.margin < 100) ? cfg.margin : WR_DEFAULT_MARGIN;
+                _wrBudgetCfg[brand] = { eventType, margin };
+            });
+        }
     } catch(e) {}
 }
 
-/* ── 판정 기준 변경 핸들러 ── */
+/* ── 판정 기준 변경 핸들러 (현재 브랜드에만 적용) ── */
 window._wrSetEventType = function(v) {
-    if (WR_EVENT_TYPES[v]) { _wr.eventType = v; renderWeeklyReport(); }
+    if (WR_EVENT_TYPES[v]) { _wrBrandCfg().eventType = v; renderWeeklyReport(); }
 };
 window._wrSetMargin = function(v) {
     const n = parseFloat(v);
-    if (n > 0 && n < 100) { _wr.margin = n; renderWeeklyReport(); }
+    if (n > 0 && n < 100) { _wrBrandCfg().margin = n; renderWeeklyReport(); }
 };
 
 // 초기 로드 시 저장된 필터 복원 (없으면 전체 기간)
@@ -190,8 +214,9 @@ function _wrBaselineAov() {
 /* ── 예산 조정 판정: 제품별 현재 CPA vs 효율/손실 상한 ── */
 function _wrBudgetJudgment(list) {
     const base = _wrBaselineAov();
-    const ev   = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
-    const beRoas = 100 / _wr.margin;   // 손익분기 ROAS = 1 ÷ 공헌이익률
+    const cfg  = _wrBrandCfg();
+    const ev   = WR_EVENT_TYPES[cfg.eventType] || WR_EVENT_TYPES.megapo;
+    const beRoas = 100 / cfg.margin;   // 손익분기 ROAS = 1 ÷ 공헌이익률
 
     const m = {};
     list.forEach(c => {
@@ -539,18 +564,21 @@ const _WR_VERDICT_META = {
     stop:        { label: '중단',      cls: 'wr-vd-stop' },
 };
 function _wrBudgetSectionHtml(rows) {
-    const ev = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
-    const beRoas = 100 / _wr.margin;
+    const brand = _wrCurrentBrand();
+    const cfg = _wrBrandCfg();
+    const ev = WR_EVENT_TYPES[cfg.eventType] || WR_EVENT_TYPES.megapo;
+    const beRoas = 100 / cfg.margin;
     const opts = Object.entries(WR_EVENT_TYPES).map(([k, v]) =>
-        `<option value="${k}"${k === _wr.eventType ? ' selected' : ''}>${v.label} (${Math.round(v.roas * 100)}%)</option>`).join('');
+        `<option value="${k}"${k === cfg.eventType ? ' selected' : ''}>${v.label} (${Math.round(v.roas * 100)}%)</option>`).join('');
 
     const ctrl = `
         <div class="wr-budget-ctrl">
+            <span class="wr-budget-brand">${brand === 'ALL' ? '전체' : brand} 기준</span>
             <label>이벤트 유형
                 <select onchange="window._wrSetEventType(this.value)">${opts}</select>
             </label>
             <label>공헌이익률
-                <input type="number" min="1" max="99" step="1" value="${_wr.margin}"
+                <input type="number" min="1" max="99" step="1" value="${cfg.margin}"
                        onwheel="this.blur()"
                        onchange="window._wrSetMargin(this.value)"><span>%</span>
             </label>
@@ -1319,10 +1347,11 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
 
     /* 예산 조정 판정 */
     if ((!sections || sections.includes('budget')) && byBudget.length) {
-        const ev = WR_EVENT_TYPES[_wr.eventType] || WR_EVENT_TYPES.megapo;
-        const beRoas = 100 / _wr.margin;
-        html += `<h3>⚖️ 예산 조정 판정</h3>`;
-        html += `<p style="font-size:11px;color:#64748b;margin:0 0 6px">${ev.label} 기준 · 효율 상한 ROAS ${Math.round(ev.roas*100)}% · 손실 상한 ROAS ${Math.round(beRoas*100)}%(공헌이익률 ${_wr.margin}%) · 기준 객단가 최근 ${WR_BASELINE_DAYS}일 롤링</p>`;
+        const budgetCfg = _wrBrandCfg();
+        const ev = WR_EVENT_TYPES[budgetCfg.eventType] || WR_EVENT_TYPES.megapo;
+        const beRoas = 100 / budgetCfg.margin;
+        html += `<h3>⚖️ 예산 조정 판정 (${_wrCurrentBrand() === 'ALL' ? '전체' : _wrCurrentBrand()} 기준)</h3>`;
+        html += `<p style="font-size:11px;color:#64748b;margin:0 0 6px">${ev.label} 기준 · 효율 상한 ROAS ${Math.round(ev.roas*100)}% · 손실 상한 ROAS ${Math.round(beRoas*100)}%(공헌이익률 ${budgetCfg.margin}%) · 기준 객단가 최근 ${WR_BASELINE_DAYS}일 롤링</p>`;
         html += `<table><thead><tr>
             <th style="text-align:left">제품</th><th>광고비</th><th>현재 CPA</th><th>효율 상한</th><th>손실 상한</th><th>소진율</th><th>판정</th><th>예산 조정</th>
         </tr></thead><tbody>`;
