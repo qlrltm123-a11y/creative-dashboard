@@ -551,10 +551,17 @@ function _wrBudgetSectionHtml(rows) {
             </label>
             <label>공헌이익률
                 <input type="number" min="1" max="99" step="1" value="${_wr.margin}"
+                       onwheel="this.blur()"
                        onchange="window._wrSetMargin(this.value)"><span>%</span>
             </label>
             <span class="wr-budget-note">효율 상한 ROAS ${Math.round(ev.roas * 100)}% · 손실 상한 ROAS ${Math.round(beRoas * 100)}%</span>
-        </div>`;
+        </div>
+        ${beRoas > ev.roas ? `<div class="wr-budget-warn">
+            <i class="fas fa-triangle-exclamation"></i>
+            목표 ROAS ${Math.round(ev.roas * 100)}%가 손익분기 ${Math.round(beRoas * 100)}%보다 낮습니다 —
+            목표를 달성해도 손해인 구조라 조건부 구간 없이 전부 중단으로 판정됩니다.
+            목표 ROAS를 ${Math.round(beRoas * 100)}% 이상으로 올려야 합니다.
+        </div>` : ''}`;
 
     if (!rows.length) {
         return `<div class="wr-section" id="wr-budget-section">
