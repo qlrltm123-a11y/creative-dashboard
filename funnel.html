@@ -382,6 +382,16 @@ function _defaultFunnelEvent(rawData, events) {
   return bestEv;
 }
 
+// 헤더용 "이번 시즌(X) vs 직전 시즌(Y)" 라벨 — 항상 262Q/261Q로 고정 표기되던 것을
+// 실제 선택된 이벤트(_funnelEvent) 기준으로 동적 계산하도록 수정.
+function _seasonLabelPair(events) {
+  if (_funnelEvent === 'all' || !_funnelEvent) return { cur: '이번 시즌(262Q)', prev: '직전 시즌(261Q)' };
+  const curLabel = _evLabel(_funnelEvent);
+  const prevEv = _megapoPrevEvent(_funnelEvent, events);
+  const prevLabel = prevEv ? _evLabel(prevEv) : (_funnelEvent === 'MEGAWARI' ? '261Q 메가와리' : '직전 데이터 없음');
+  return { cur: `이번 시즌(${curLabel})`, prev: `직전 시즌(${prevLabel})` };
+}
+
 function setFunnelEvent(v) {
   _funnelEvent = v;
   if (!brandData[currentBrand]) return;
@@ -708,10 +718,11 @@ function buildPanelHTML(brand, events=[]) {
         ${events.map(ev=>`<button class="fm-btn${_funnelEvent===ev?' active':''}" onclick="setFunnelEvent('${ev.replace(/'/g,"\\'")}')">${_evLabel(ev)}</button>`).join('')}
       </div>
     </div>` : '';
+  const _sl = _seasonLabelPair(events);
   return `
     ${evFilterHtml}
     <div id="inner-${brand}-summary">
-      <div class="sec-label">${brand} 현황 요약 · 이번 시즌(262Q) vs 직전 시즌(261Q)</div>
+      <div class="sec-label">${brand} 현황 요약 · ${_sl.cur} vs ${_sl.prev}</div>
       <div class="kpi-row" id="kpi-${brand}"></div>
       <div class="brand-trend-box">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
