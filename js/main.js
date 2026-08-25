@@ -641,7 +641,8 @@ function switchSection(sectionName) {
                     const b = (typeof currentBrand !== 'undefined') ? currentBrand : 'ALL';
                     // iframe은 로드 완료(onload) 시점에 로딩 표시 해제 (빈 화면 방지)
                     frame.addEventListener('load', () => { if (panel) panel.classList.remove('section-loading'); }, { once: true });
-                    frame.src = frame.dataset.src + '?brand=' + encodeURIComponent(b);
+                    const sep = frame.dataset.src.includes('?') ? '&' : '?';
+                    frame.src = frame.dataset.src + sep + 'brand=' + encodeURIComponent(b);
                     return; // 로딩 해제를 onload에 위임 (아래 즉시 해제 스킵)
                 }
             }
