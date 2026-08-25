@@ -305,7 +305,7 @@ function setFunnelMetric(v) {
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
     const data = _filterDataByEvent(brandData[b], _funnelEvent);
     const prods = [...new Set([...Object.keys(data['262Q']),...Object.keys(data['261Q'])])];
-    renderSummaryTab(b, data, prods);
+    renderSummaryTab(b, data, prods, _getEventList(brandData[b]));
     document.querySelectorAll(`#inner-${b}-summary .fm-btn`).forEach(btn => {
       const metric = btn.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
       btn.classList.toggle('active', metric === v);
@@ -385,11 +385,13 @@ function _defaultFunnelEvent(rawData, events) {
 // 헤더용 "이번 시즌(X) vs 직전 시즌(Y)" 라벨 — 항상 262Q/261Q로 고정 표기되던 것을
 // 실제 선택된 이벤트(_funnelEvent) 기준으로 동적 계산하도록 수정.
 function _seasonLabelPair(events) {
-  if (_funnelEvent === 'all' || !_funnelEvent) return { cur: '이번 시즌(262Q)', prev: '직전 시즌(261Q)' };
+  if (_funnelEvent === 'all' || !_funnelEvent) {
+    return { cur: '이번 시즌(262Q)', prev: '직전 시즌(261Q)', curLabel: '262Q', prevLabel: '261Q' };
+  }
   const curLabel = _evLabel(_funnelEvent);
   const prevEv = _megapoPrevEvent(_funnelEvent, events);
   const prevLabel = prevEv ? _evLabel(prevEv) : (_funnelEvent === 'MEGAWARI' ? '261Q 메가와리' : '직전 데이터 없음');
-  return { cur: `이번 시즌(${curLabel})`, prev: `직전 시즌(${prevLabel})` };
+  return { cur: `이번 시즌(${curLabel})`, prev: `직전 시즌(${prevLabel})`, curLabel, prevLabel };
 }
 
 function setFunnelEvent(v) {
@@ -720,8 +722,8 @@ function render(brand) {
   // destroy old charts
   Object.keys(charts).filter(k=>k.startsWith(brand+'_')).forEach(k=>{charts[k].destroy();delete charts[k];});
 
-  renderSummaryTab(brand, data, prods);
-  renderFunnelCards(brand, data, prods);
+  renderSummaryTab(brand, data, prods, events);
+  renderFunnelCards(brand, data, prods, events);
   renderDeltaCards(brand, data, prods);
   renderTrendCharts(brand, data, prods);
 }
@@ -836,7 +838,8 @@ function brandDailySeries(qData, prods) {
   }));
 }
 
-function renderSummaryTab(brand, data, prods) {
+function renderSummaryTab(brand, data, prods, events=[]) {
+  const _sl = _seasonLabelPair(events);
   const ser262 = brandDailySeries(data['262Q'], prods);
   const ser261 = brandDailySeries(data['261Q'], prods);
   if (!ser262.length) return;
@@ -860,21 +863,21 @@ function renderSummaryTab(brand, data, prods) {
   };
   document.getElementById(`kpi-${brand}`).innerHTML = `
     <div class="kpi-card slate">
-      <div class="kpi-label">총 유입 (262Q 누적)</div>
+      <div class="kpi-label">총 유입 (${_sl.curLabel} 누적)</div>
       <div class="kpi-val">${n(agg262.inflow)}</div>
       <div class="kpi-sub">${days}일 · ~${lastDate}</div>
       ${inflowD!==null?badge(inflowD,'%'):''}
-      <div class="kpi-sub" style="margin-top:4px">261Q 직전 시즌 ${n(agg261.inflow)}</div>
+      <div class="kpi-sub" style="margin-top:4px">${_sl.prevLabel} 직전 시즌 ${n(agg261.inflow)}</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">🛒 장바구니수 (262Q 누적)</div>
+      <div class="kpi-label">🛒 장바구니수 (${_sl.curLabel} 누적)</div>
       <div class="kpi-val" style="color:#6366f1">${n(agg262.cart)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.cart>0?(agg262.cart-agg261.cart)/agg261.cart*100:null;return d!==null?badge(d,'%'):'';})()}
       <div class="kpi-sub" style="margin-top:4px">직전 시즌 ${n(agg261.cart)}건</div>
     </div>
     <div class="kpi-card purple">
-      <div class="kpi-label">💳 구매수 (262Q 누적)</div>
+      <div class="kpi-label">💳 구매수 (${_sl.curLabel} 누적)</div>
       <div class="kpi-val" style="color:#7c3aed">${n(agg262.buy)}</div>
       <div class="kpi-sub">건</div>
       ${(()=>{const d=agg261.buy>0?(agg262.buy-agg261.buy)/agg261.buy*100:null;return d!==null?badge(d,'%'):'';})()}
@@ -1011,7 +1014,8 @@ function aggregate(rows) {
   return {inflow:totInflow, cart:totCart, buy:totBuy, cartRate, buyRate};
 }
 
-function renderFunnelCards(brand, data, prods) {
+function renderFunnelCards(brand, data, prods, events=[]) {
+  const _sl = _seasonLabelPair(events);
   const grid = document.getElementById(`funnel-${brand}`);
   prods.forEach(prod => {
     const rows262 = data['262Q'][prod] || [];
@@ -1055,7 +1059,7 @@ function renderFunnelCards(brand, data, prods) {
             <div class="stage-label" style="color:#94a3b8">유입</div>
             <div class="stage-mid">
               <div class="stage-bar-wrap"><div class="stage-bar bar-inflow" style="width:100%"></div></div>
-              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· 261Q 직전 시즌 ${n(agg261.inflow)}</span>`:''}</div>
+              <div class="stage-count">${n(agg262.inflow)}건 ${agg261?`<span style="color:#cbd5e1">· ${_sl.prevLabel} 직전 시즌 ${n(agg261.inflow)}</span>`:''}</div>
             </div>
             <div class="stage-right">
               <div class="stage-rate" style="color:#94a3b8;font-size:11px">직전비</div>
