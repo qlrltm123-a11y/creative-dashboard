@@ -401,6 +401,13 @@ const DEFAULT_MEGAPO_URLS = {
   WM: 'data/megapo-wm.csv',
   CG: 'data/megapo-cg.csv',
 };
+// 263Q(3분기) 메가와리 탭 — Megawari_WM_2 / Megawari_CG_2, 메가포와 같은 스프레드시트 내 별도 탭.
+// BOH는 아직 해당 탭이 만들어지지 않아 URL 없음(빈 값이면 자동으로 건너뜀, 탭 생성 후 채우면 됨).
+const DEFAULT_Q3_URLS = {
+  BOH: '',
+  WM: 'data/megawari-wm-3q.csv',
+  CG: 'data/megawari-cg-3q.csv',
+};
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 // v2 키: 막힌 게시 URL 기본값 시절에 저장된 커스텀 값을 무시하고 새 기본값(로컬 스냅샷)을 쓰도록 키 교체
@@ -457,7 +464,8 @@ function applyMegapoUrl(brand) {
 // ── 캐시 (localStorage) — 새로고침 시 재fetch 없이 즉시 로드, '시트 갱신'만 재fetch ──
 // v2: 메가포 컬럼 매핑 변경으로 옛 캐시 무효화
 // v4: 메가와리(기본 탭)도 로컬 스냅샷 전환 — 이전에 캐시된 빈 262Q/261Q 데이터 무효화
-const fcacheKey = b => `fdata_v4_${b}`;
+// v5: 263Q 메가와리(Megawari_*_2) 데이터 추가 — 이전 캐시엔 없으므로 무효화
+const fcacheKey = b => `fdata_v5_${b}`;
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
@@ -496,17 +504,22 @@ async function loadBrand(brand, force=false) {
   setPanelState(brand,'loading');
   if (!url) { setPanelState(brand,'error',`${brand} 시트 URL을 위에 입력해주세요.`); return; }
 
-  const [text, megapoText] = await Promise.all([
+  const q3Url = DEFAULT_Q3_URLS[brand] || '';
+  const [text, megapoText, q3Text] = await Promise.all([
     fetchCsv(url),
     megapoUrl ? fetchCsv(megapoUrl) : Promise.resolve(null),
+    q3Url ? fetchCsv(q3Url) : Promise.resolve(null),
   ]);
   // 베이스 탭(게시 URL, 여전히 401 차단)이 실패해도 메가포 탭(로컬 스냅샷)만으로 렌더 가능하게 —
-  // 둘 다 실패했을 때만 에러 처리
-  if (!text && !megapoText) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
+  // 셋 다 실패했을 때만 에러 처리
+  if (!text && !megapoText && !q3Text) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
   const regularData = text ? parseSheet(parseCSV(text), COL_262, COL_261) : {'262Q':{}, '261Q':{}};
   const megapoData  = megapoText ? parseMegapoBlocks(parseCSV(megapoText)) : null;
-  brandData[brand]  = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
+  const q3Data      = q3Text ? parseQ3Megawari(parseCSV(q3Text)) : null;
+  let merged = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
+  if (q3Data) merged = mergeSheetData(merged, q3Data);
+  brandData[brand] = merged;
   _fSaveCache(brand);
   render(brand);
   _fStampUpdated();
@@ -612,6 +625,33 @@ function parseMegapoBlocks(rows) {
   }
   const sk = d => { const [m, rest] = d.split('월'); return parseInt(m) * 100 + parseInt((rest || '').replace('일', '') || 0); };
   Object.values(merged).forEach(a => a.sort((x, y) => sk(x.date) - sk(y.date)));
+  return {'262Q': merged, '261Q': {}};
+}
+
+// ── 263Q 메가와리 전용 파서 (Megawari_*_2 탭, A~I열: event,code,제품,date,유입,장바구니,구매,장바구니전환율,구매전환율) ──
+// 구탭(Megawari_boh/wm/cg)과 달리 맨 앞에 event열이 추가돼 한 칸씩 밀렸고, 시트 자체의 event값
+// (예: 'Teaser Start')은 실행 단계 라벨이라 대시보드에선 쓰지 않고 전 행을 '263Q 메가와리' 한
+// 이벤트로 묶는다 — 기존 '262Q 메가와리'(레거시 공란 이벤트)와 겹치지 않는 별도 버킷이 된다.
+const COL_263Q = { product: 2, date: 3, inflow: 4, cart: 5, buy: 6 };
+function parseQ3Megawari(rows) {
+  if (!rows || rows.length < 2) return {'262Q': {}, '261Q': {}};
+  const merged = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r) continue;
+    const prod = (r[COL_263Q.product] || '').trim();
+    const date = (r[COL_263Q.date] || '').trim();
+    if (!prod || !date || prod === '제품' || date === 'date') continue;
+    const inflow = parseNum(r[COL_263Q.inflow]), cart = parseNum(r[COL_263Q.cart]), buy = parseNum(r[COL_263Q.buy]);
+    if (inflow == null && cart == null && buy == null) continue; // 아직 데이터 없는 미래 날짜 행
+    if (!merged[prod]) merged[prod] = [];
+    merged[prod].push({
+      date, inflow, cart, buy, event: '263Q 메가와리',
+      cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
+      buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
+    });
+  }
+  Object.values(merged).forEach(a => a.sort((x, y) => dateKey(x.date) - dateKey(y.date)));
   return {'262Q': merged, '261Q': {}};
 }
 
