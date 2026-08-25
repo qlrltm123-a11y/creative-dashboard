@@ -325,7 +325,9 @@ function _normFunnelEvent(ev) { return ev.replace(/^\d{4}\s*/, ''); }
 const _evLabel = ev => ev === 'MEGAWARI' ? '262Q 메가와리' : ev;
 // 'N월 메가포' 이벤트의 '직전' 이벤트 = 존재하는 메가포 이벤트 중 월이 더 작은 것 중 가장 가까운 것
 // (예: 8월 메가포 → 7월 메가포, 7월 메가포 → 5월 메가포, 5월 메가포 → 없음)
+// '263Q 메가와리'의 직전 시즌은 '262Q 메가와리'(레거시 공란 이벤트, 내부 센티널 'MEGAWARI') 고정.
 function _megapoPrevEvent(ev, allEvents) {
+  if (ev === '263Q 메가와리') return 'MEGAWARI';
   const m = (ev || '').match(/^(\d+)월\s*메가포$/);
   if (!m) return null;
   const cur = parseInt(m[1], 10);
