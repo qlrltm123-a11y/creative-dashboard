@@ -322,12 +322,12 @@ let _funnelEvent = 'all';
 // 이벤트명 정규화: '2607MEGAPO' / '2607 MEGAPO' → 'MEGAPO' (시즌 불문 동일 이벤트로 매칭)
 function _normFunnelEvent(ev) { return ev.replace(/^\d{4}\s*/, ''); }
 // 이벤트 없는 행(기존 퍼널 데이터)은 'MEGAWARI'로 취급 — 표시 라벨은 '262Q 메가와리'
-const _evLabel = ev => ev === 'MEGAWARI' ? '262Q 메가와리' : ev;
+const _evLabel = ev => (ev === 'MEGAWARI' || ev === 'MEGAWARI_Q3CMP') ? '262Q 메가와리' : ev;
 // 'N월 메가포' 이벤트의 '직전' 이벤트 = 존재하는 메가포 이벤트 중 월이 더 작은 것 중 가장 가까운 것
 // (예: 8월 메가포 → 7월 메가포, 7월 메가포 → 5월 메가포, 5월 메가포 → 없음)
 // '263Q 메가와리'의 직전 시즌은 '262Q 메가와리'(레거시 공란 이벤트, 내부 센티널 'MEGAWARI') 고정.
 function _megapoPrevEvent(ev, allEvents) {
-  if (ev === '263Q 메가와리') return 'MEGAWARI';
+  if (ev === '263Q 메가와리') return 'MEGAWARI_Q3CMP';
   const m = (ev || '').match(/^(\d+)월\s*메가포$/);
   if (!m) return null;
   const cur = parseInt(m[1], 10);
@@ -340,7 +340,7 @@ function _megapoPrevEvent(ev, allEvents) {
 function _getEventList(rawData) {
   const evs = new Set(); let hasBlank = false;
   ['262Q','261Q'].forEach(q => Object.values(rawData[q]).forEach(rows =>
-    rows.forEach(r => { if (r.event) evs.add(r.event); else hasBlank = true; })));
+    rows.forEach(r => { if (r.event === 'MEGAWARI_Q3CMP') return; if (r.event) evs.add(r.event); else hasBlank = true; })));
   const result = [];
   if (hasBlank && evs.size > 0 && !evs.has('MEGAWARI')) result.push('MEGAWARI');
   result.push(...[...evs].sort());
@@ -477,7 +477,8 @@ function applyMegapoUrl(brand) {
 // v2: 메가포 컬럼 매핑 변경으로 옛 캐시 무효화
 // v4: 메가와리(기본 탭)도 로컬 스냅샷 전환 — 이전에 캐시된 빈 262Q/261Q 데이터 무효화
 // v5: 263Q 메가와리(Megawari_*_2) 데이터 추가 — 이전 캐시엔 없으므로 무효화
-const fcacheKey = b => `fdata_v5_${b}`;
+// v6: 263Q 탭의 262Q 비교 데이터를 외부 레거시 CSV 대신 같은 시트의 L~Q열(직전 시즌 블록)에서 읽도록 변경
+const fcacheKey = b => `fdata_v6_${b}`;
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
@@ -645,6 +646,11 @@ function parseMegapoBlocks(rows) {
 // (예: 'Teaser Start')은 실행 단계 라벨이라 대시보드에선 쓰지 않고 전 행을 '263Q 메가와리' 한
 // 이벤트로 묶는다 — 기존 '262Q 메가와리'(레거시 공란 이벤트)와 겹치지 않는 별도 버킷이 된다.
 const COL_263Q = { product: 2, date: 3, inflow: 4, cart: 5, buy: 6 };
+// 같은 시트에 나란히 있는 '직전 시즌(262Q 메가와리)' 비교 블록(L~Q열, product는 같은 행의 C열 공유).
+// 레거시 외부 CSV(data/megawari-{wm,cg}.csv)의 'MEGAWARI' 데이터와는 별개 소스라
+// 합쳐지면 중복 집계가 나므로, 전용 내부 태그('MEGAWARI_Q3CMP')로만 구분해 263Q 비교에만 쓴다
+// (탭 버튼엔 노출 안 됨 — _getEventList/​_evLabel에서 별도 처리).
+const COL_263Q_CMP = { date: 11, inflow: 12, cart: 13, buy: 14 };
 function parseQ3Megawari(rows) {
   if (!rows || rows.length < 2) return {'262Q': {}, '261Q': {}};
   const merged = {};
@@ -652,16 +658,33 @@ function parseQ3Megawari(rows) {
     const r = rows[i];
     if (!r) continue;
     const prod = (r[COL_263Q.product] || '').trim();
+    if (!prod || prod === '제품') continue;
+
     const date = (r[COL_263Q.date] || '').trim();
-    if (!prod || !date || prod === '제품' || date === 'date') continue;
-    const inflow = parseNum(r[COL_263Q.inflow]), cart = parseNum(r[COL_263Q.cart]), buy = parseNum(r[COL_263Q.buy]);
-    if (inflow == null && cart == null && buy == null) continue; // 아직 데이터 없는 미래 날짜 행
-    if (!merged[prod]) merged[prod] = [];
-    merged[prod].push({
-      date, inflow, cart, buy, event: '263Q 메가와리',
-      cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
-      buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
-    });
+    if (date && date !== 'date') {
+      const inflow = parseNum(r[COL_263Q.inflow]), cart = parseNum(r[COL_263Q.cart]), buy = parseNum(r[COL_263Q.buy]);
+      if (inflow != null || cart != null || buy != null) {
+        if (!merged[prod]) merged[prod] = [];
+        merged[prod].push({
+          date, inflow, cart, buy, event: '263Q 메가와리',
+          cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
+          buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
+        });
+      }
+    }
+
+    const cDate = (r[COL_263Q_CMP.date] || '').trim();
+    if (cDate && cDate !== 'date') {
+      const cInflow = parseNum(r[COL_263Q_CMP.inflow]), cCart = parseNum(r[COL_263Q_CMP.cart]), cBuy = parseNum(r[COL_263Q_CMP.buy]);
+      if (cInflow != null || cCart != null || cBuy != null) {
+        if (!merged[prod]) merged[prod] = [];
+        merged[prod].push({
+          date: cDate, inflow: cInflow, cart: cCart, buy: cBuy, event: 'MEGAWARI_Q3CMP',
+          cartRate: (cInflow > 0 && cCart != null) ? cCart / cInflow * 100 : null,
+          buyRate:  (cCart > 0   && cBuy != null)  ? cBuy / cCart * 100    : null,
+        });
+      }
+    }
   }
   Object.values(merged).forEach(a => a.sort((x, y) => dateKey(x.date) - dateKey(y.date)));
   return {'262Q': merged, '261Q': {}};
