@@ -256,7 +256,12 @@ main{padding:22px 28px;max-width:1600px;margin:0 auto}
 const BRANDS = ['BOH','WM','CG'];
 // 기존 탭 (BOH/WM/CG): A열=제품코드 (무시), event 없음
 const COL_262 = {date:1,product:2,inflow:3,cart:4,buy:5,cartRate:6,buyRate:7};
+// BOH/CG 시트: 블록이 2개뿐(이번 시즌 + 261Q 직전 비교)이라 두 번째 블록(K~Q)이 곧 261Q.
 const COL_261 = {date:10,product:11,inflow:12,cart:13,buy:14,cartRate:15,buyRate:16};
+// WM 시트만 구조가 달라 블록이 3개(이번 시즌 / 이번 시즌 중복 미러 / 진짜 261Q)임 —
+// 두 번째 블록(K~Q)은 첫 블록과 완전히 같은 값의 미러라 비교 데이터로 쓸 수 없고,
+// 실제 작년 동기(261Q) 데이터는 세 번째 블록(S~Y열)에 있음.
+const COL_261_WM = {date:20,product:21,inflow:22,cart:23,buy:24,cartRate:25,buyRate:26};
 // 메가포 탭: 한 행에 최신→과거 순으로 스냅샷 블록이 옆으로 반복 나열됨(D열/L열/T열…에 date).
 // 블록 자체엔 회차명이 없음(event열 항상 공란) — 각 블록의 date는 "다음 메가포 시작 2일 전(D-2)"
 // 시점이라, date+2일 → 그 달을 이벤트 라벨("N월 메가포")로 계산해 자동으로 월별 분리한다.
@@ -480,7 +485,8 @@ function applyMegapoUrl(brand) {
 // v4: 메가와리(기본 탭)도 로컬 스냅샷 전환 — 이전에 캐시된 빈 262Q/261Q 데이터 무효화
 // v5: 263Q 메가와리(Megawari_*_2) 데이터 추가 — 이전 캐시엔 없으므로 무효화
 // v6: 263Q 탭의 262Q 비교 데이터를 외부 레거시 CSV 대신 같은 시트의 L~Q열(직전 시즌 블록)에서 읽도록 변경
-const fcacheKey = b => `fdata_v6_${b}`;
+// v7: WM 기본 탭(262Q)의 261Q 비교가 컬럼 오프셋 버그로 밀려 읽히던 것 수정(S~Y열이 진짜 261Q)
+const fcacheKey = b => `fdata_v7_${b}`;
 function _fSaveCache(brand) {
   try { localStorage.setItem(fcacheKey(brand), JSON.stringify({ data: brandData[brand], ts: Date.now() })); } catch(e){}
 }
@@ -529,7 +535,7 @@ async function loadBrand(brand, force=false) {
   // 셋 다 실패했을 때만 에러 처리
   if (!text && !megapoText && !q3Text) { setPanelState(brand,'error','로드 실패: 시트가 공개 게시되어 있는지 확인하세요.'); return; }
 
-  const regularData = text ? parseSheet(parseCSV(text), COL_262, COL_261) : {'262Q':{}, '261Q':{}};
+  const regularData = text ? parseSheet(parseCSV(text), COL_262, brand === 'WM' ? COL_261_WM : COL_261) : {'262Q':{}, '261Q':{}};
   const megapoData  = megapoText ? parseMegapoBlocks(parseCSV(megapoText)) : null;
   const q3Data      = q3Text ? parseQ3Megawari(parseCSV(q3Text)) : null;
   let merged = megapoData ? mergeSheetData(regularData, megapoData) : regularData;
