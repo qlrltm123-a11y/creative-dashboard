@@ -851,6 +851,9 @@ function _wrCreativeSectionHtml(byCreative) {
                 <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
                     <i class="fas fa-copy mr-1"></i>복사
                 </button>
+                <button class="wr-copy-btn" onclick="window._wrCopyTop3Simple(this)" title="순위별 표 형식(소재명·지출·CTR·CPC·결과·결과값·ROAS)으로 TOP 3만 복사">
+                    <i class="fas fa-table mr-1"></i>TOP 3 표로 복사
+                </button>
             </span>
         </div>
         <div class="wr-creative-grid">
@@ -858,6 +861,76 @@ function _wrCreativeSectionHtml(byCreative) {
         </div>
     </div>`;
 }
+
+/* ── TOP 3 소재를 순위별 표(첨부 이미지 형식)로 단순 복사 ──
+   소재명/지출/CTR/CPC/결과/결과값/ROAS를 1위~3위 열로 나열한 표 하나만 만들어
+   전체 보고서 복사보다 간단하게 붙여넣을 수 있게 한다. */
+function _wrBuildTop3SimpleHtml(imgMap) {
+    imgMap = imgMap || {};
+    const cache      = _wrRenderCache;
+    const list       = cache ? cache.list       : _wrGetList();
+    const byCreative = cache ? cache.byCreative : _wrByCreative(list);
+    const top3 = byCreative.slice(0, 3);
+    if (!top3.length) return '';
+
+    const toThumb = (url) => {
+        if (!url) return '';
+        if (imgMap[url]) return imgMap[url];
+        if (url.includes('drive.google.com')) {
+            const m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+        }
+        return url;
+    };
+
+    const css = `
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #334155; margin: 0; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: center; vertical-align: middle; }
+        th { background: #f1f5f9; font-weight: 700; color: #334155; }
+        td.label { background: #f8fafc; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; }
+        td.roas { font-weight: 700; color: #7c3aed; }
+        img.thumb { max-width: 160px; max-height: 160px; display: block; margin: 0 auto; }
+    `;
+
+    const rankLabels = top3.map((_, i) => `${i + 1}위`);
+    const rows = [
+        { label: '소재명', roas: false, cells: top3.map(c => {
+            const src = toThumb(c.thumb);
+            return src ? `<img class="thumb" src="${src}">` : (c.name || '-');
+        }) },
+        { label: '지출',   roas: false, cells: top3.map(c => _wrW(c.spend)) },
+        { label: 'CTR',    roas: false, cells: top3.map(c => _wrP(c.ctr)) },
+        { label: 'CPC',    roas: false, cells: top3.map(c => c.clicks > 0 ? _wrW(c.spend / c.clicks) : '-') },
+        { label: '결과',   roas: false, cells: top3.map(c => _wrN(c.conv)) },
+        { label: '결과값', roas: false, cells: top3.map(c => _wrW(c.rev)) },
+        { label: 'ROAS',   roas: true,  cells: top3.map(c => _wrR(c.roas)) },
+    ];
+
+    let html = `<html><head><meta charset="utf-8"><style>${css}</style></head><body>`;
+    html += `<table><thead><tr><th style="text-align:left">순위</th>${rankLabels.map(r => `<th>${r}</th>`).join('')}</tr></thead><tbody>`;
+    rows.forEach(r => {
+        html += `<tr><td class="label">${r.label}</td>${r.cells.map(c => `<td${r.roas ? ' class="roas"' : ''}>${c}</td>`).join('')}</tr>`;
+    });
+    html += `</tbody></table></body></html>`;
+    return html;
+}
+window._wrCopyTop3Simple = async function(btnEl) {
+    _wrBtnLoading(btnEl);
+    try {
+        const cache      = _wrRenderCache;
+        const list       = cache ? cache.list       : _wrGetList();
+        const byCreative = cache ? cache.byCreative : _wrByCreative(list);
+        const urls   = byCreative.slice(0, 3).map(c => c.thumb).filter(Boolean);
+        const imgMap = urls.length ? await _wrFetchAllBase64(urls) : {};
+        const html   = _wrBuildTop3SimpleHtml(imgMap);
+        await _wrDoCopy(html, btnEl);
+    } catch (e) {
+        console.error('[WR] _wrCopyTop3Simple error:', e);
+        _wrBtnDone(btnEl, false);
+        alert('복사 실패. 브라우저 클립보드 권한을 허용해주세요.');
+    }
+};
 
 /* ─────────────────────────────────────────────
    제품별 인사이트 섹션
