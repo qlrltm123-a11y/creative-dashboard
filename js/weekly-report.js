@@ -153,6 +153,26 @@ function _wrSum(list) {
     };
 }
 
+/* ── 일별 집계 (선택된 기간의 날짜별 합계) ── */
+function _wrByDaily(list) {
+    const m = {};
+    list.forEach(c => {
+        const d = (c.start_date || '').slice(0, 10);
+        if (!d) return;
+        if (!m[d]) m[d] = {spend:0,impr:0,clicks:0,rev:0,conv:0};
+        m[d].spend  += c.spend       || 0;
+        m[d].impr   += c.impressions || 0;
+        m[d].clicks += c.clicks      || 0;
+        m[d].rev    += c.revenue     || 0;
+        m[d].conv   += c.conversions || 0;
+    });
+    return Object.entries(m).map(([date, d]) => ({
+        date, ...d,
+        ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
+        roas: d.spend > 0 ? d.rev    / d.spend  : 0,
+    })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /* ── 제품별 집계 (매체별과 동일한 형식의 단순 합계표) ── */
 function _wrByProduct(list) {
     const m = {};
@@ -505,6 +525,46 @@ function _wrKpiSectionHtml(kpi, count) {
                 <div class="wr-kpi-lbl">${c.lbl}</div>
                 <div class="wr-kpi-val">${c.val}</div>
             </div>`).join('')}
+        </div>
+    </div>`;
+}
+
+/* ── 일별 데이터 섹션 HTML (선택한 기간이 여러 날일 때만 표시) ── */
+function _wrDailySectionHtml(byDaily) {
+    if (byDaily.length < 2) return '';
+    const rows = byDaily.map(d => `
+        <tr class="wr-tr">
+            <td class="wr-td"><strong>${d.date}</strong></td>
+            <td class="wr-td wr-td-num">${_wrW(d.spend)}</td>
+            <td class="wr-td wr-td-num">${_wrN(d.impr)}</td>
+            <td class="wr-td wr-td-num">${_wrN(d.clicks)}</td>
+            <td class="wr-td wr-td-num">${_wrP(d.ctr)}</td>
+            <td class="wr-td wr-td-num">${_wrW(d.rev)}</td>
+            <td class="wr-td wr-td-num wr-roas-cell">${_wrR(d.roas)}</td>
+            <td class="wr-td wr-td-num">${d.conv > 0 ? _wrN(d.conv) : '-'}</td>
+        </tr>`).join('');
+    return `
+    <div class="wr-section" id="wr-daily-section">
+        <div class="wr-section-hd">
+            <span><i class="fas fa-calendar-day mr-1.5" style="color:#0ea5e9"></i>일별 데이터</span>
+            <button class="wr-copy-btn" onclick="window._wrCopySection('daily', this)">
+                <i class="fas fa-copy mr-1"></i>복사
+            </button>
+        </div>
+        <div class="wr-table-wrap">
+            <table class="wr-table">
+                <thead><tr>
+                    <th class="wr-th wr-th-left">날짜</th>
+                    <th class="wr-th">광고비</th>
+                    <th class="wr-th">노출 수</th>
+                    <th class="wr-th">클릭 수</th>
+                    <th class="wr-th">클릭률</th>
+                    <th class="wr-th">매출</th>
+                    <th class="wr-th">광고효율</th>
+                    <th class="wr-th">구매</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
         </div>
     </div>`;
 }
@@ -1084,6 +1144,7 @@ function renderWeeklyReport() {
 
     const list        = _wrGetList();
     const kpi         = _wrSum(list);
+    const byDaily       = _wrByDaily(list);
     const byPlatform    = _wrByPlatform(list);
     const byTargeting   = _wrByTargeting(list);
     const byProductAgg  = _wrByProduct(list);
@@ -1092,7 +1153,7 @@ function renderWeeklyReport() {
     const byProduct     = _wrByProductInsight(list);
 
     // 복사 시 재계산 방지용 캐시
-    _wrRenderCache = { list, kpi, byPlatform, byTargeting, byProductAgg, byBudget, byCreative, byProduct };
+    _wrRenderCache = { list, kpi, byDaily, byPlatform, byTargeting, byProductAgg, byBudget, byCreative, byProduct };
     _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
@@ -1125,6 +1186,7 @@ function renderWeeklyReport() {
 
     body.innerHTML =
         _wrKpiSectionHtml(kpi, list.length) +
+        _wrDailySectionHtml(byDaily) +
         _wrPlatformSectionHtml(byPlatform) +
         _wrTargetingSectionHtml(byTargeting) +
         _wrProductAggSectionHtml(byProductAgg) +
@@ -1175,6 +1237,7 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
     const cache      = _wrRenderCache;
     const list       = cache ? cache.list       : _wrGetList();
     const kpi        = cache ? cache.kpi        : _wrSum(list);
+    const byDaily      = cache ? cache.byDaily      : _wrByDaily(list);
     const byPlatform   = cache ? cache.byPlatform   : _wrByPlatform(list);
     const byTargeting  = cache ? cache.byTargeting  : _wrByTargeting(list);
     const byProductAgg = cache ? cache.byProductAgg : _wrByProduct(list);
@@ -1260,6 +1323,26 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
             <td class="roas">${_wrR(kpi.roas)}</td>
             <td class="num">${kpi.conv > 0 ? _wrN(kpi.conv) : '-'}</td>
         </tr></tbody></table>`;
+    }
+
+    /* 일별 데이터 */
+    if ((!sections || sections.includes('daily')) && byDaily.length >= 2) {
+        html += `<h3>📅 일별 데이터</h3><table><thead><tr>
+            <th style="text-align:left">날짜</th><th>광고비</th><th>노출</th><th>클릭</th><th>CTR</th><th>매출</th><th>ROAS</th><th>전환</th>
+        </tr></thead><tbody>`;
+        byDaily.forEach(d => {
+            html += `<tr>
+                <td class="left"><strong>${d.date}</strong></td>
+                <td class="num">${_wrW(d.spend)}</td>
+                <td class="num">${_wrN(d.impr)}</td>
+                <td class="num">${_wrN(d.clicks)}</td>
+                <td class="num">${_wrP(d.ctr)}</td>
+                <td class="num">${_wrW(d.rev)}</td>
+                <td class="roas">${_wrR(d.roas)}</td>
+                <td class="num">${d.conv > 0 ? _wrN(d.conv) : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
     }
 
     /* 매체별 */
