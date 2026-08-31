@@ -395,27 +395,50 @@ function _wrByCreative(list) {
         m[key].rev    += c.revenue     || 0;
         m[key].conv   += c.conversions || 0;
     });
-    return Object.values(m).map(d => ({
+    const arr = Object.values(m).map(d => ({
         ...d,
         platform: [...d.platforms].join(' · '),
         ctr:  d.impr  > 0 ? d.clicks / d.impr  : 0,
         roas: d.spend > 0 ? d.rev    / d.spend  : 0,
-    })).sort((a, b) => _wrSortFn()(b) - _wrSortFn()(a)).slice(0, 30);
+    }));
+    const stats = _wrEffStats(arr);
+    return arr.sort((a, b) => _wrSortFn()(b, stats) - _wrSortFn()(a, stats)).slice(0, 30);
 }
 
-// 종합 스코어: 광고효율(ROAS) × 매출 × 광고비 가중
+// 중앙값 헬퍼 (0 이하는 제외 — 미집행 소재가 중앙값을 끌어내리지 않게)
+function _wrMedian(nums) {
+    const a = nums.filter(n => n > 0).sort((x, y) => x - y);
+    if (!a.length) return 0;
+    const mid = Math.floor(a.length / 2);
+    return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+function _wrEffStats(arr) {
+    return {
+        medRoas:  _wrMedian(arr.map(d => d.roas)),
+        medRev:   _wrMedian(arr.map(d => d.rev)),
+        medSpend: _wrMedian(arr.map(d => d.spend)),
+    };
+}
+
+// 종합 스코어: 광고효율(ROAS) × 매출 × 광고비 가중 — 이번 목록의 "중앙값" 대비 상대값으로 계산.
 // = 효율이 좋으면서, 매출 규모가 크고, 광고비도 충분히 집행해 검증된 소재가 상위.
-//   매출·광고비는 log 가중 — 소액 편차가 순위를 과하게 흔들지 않게.
+//   절대금액(원) 대신 같은 목록 안의 중앙값 대비 배수로 계산 — 브랜드/기간마다 광고비·매출
+//   스케일이 천차만별이라, 절대값 로그 스케일링만으로는 점수가 항상 어느 한쪽에 쏠렸음.
+//   매출·광고비는 log 가중 — 중앙값 대비 편차가 과하게 순위를 흔들지 않게.
 //   (광고비 가중 0.3 < 매출 가중 0.5: 광고비는 매출과 상관이 커서 중복 반영을 낮춤)
-function _wrEffScore(d) {
-    return (d.roas || 0)
-        * (1 + Math.log10(1 + (d.rev   || 0) / 10000) * 0.5)
-        * (1 + Math.log10(1 + (d.spend || 0) / 10000) * 0.3);
+function _wrEffScore(d, st) {
+    st = st || { medRoas: 0, medRev: 0, medSpend: 0 };
+    const roasRatio  = st.medRoas  > 0 ? (d.roas  || 0) / st.medRoas  : (d.roas || 0);
+    const revRatio   = st.medRev   > 0 ? (d.rev   || 0) / st.medRev   : 0;
+    const spendRatio = st.medSpend > 0 ? (d.spend || 0) / st.medSpend : 0;
+    return roasRatio
+        * (1 + Math.log2(1 + revRatio)   * 0.5)
+        * (1 + Math.log2(1 + spendRatio) * 0.3);
 }
 
 // ── TOP 소재 정렬 기준 (사용자 선택, '잘된 광고 TOP'과 '고효율 TOP 5' 공통) ──
 const _WR_SORTS = {
-    score: { label: '종합 (ROAS×매출×광고비)', fn: d => _wrEffScore(d) },
+    score: { label: '종합 (ROAS×매출×광고비, 중앙값 대비)', fn: (d, st) => _wrEffScore(d, st) },
     roas:  { label: '광고효율(ROAS)',          fn: d => d.roas  || 0 },
     rev:   { label: '매출',                    fn: d => d.rev   || 0 },
     spend: { label: '광고비',                  fn: d => d.spend || 0 },
@@ -851,8 +874,8 @@ function _wrCreativeSectionHtml(byCreative) {
                 <button class="wr-copy-btn" onclick="window._wrCopySection('creatives', this)">
                     <i class="fas fa-copy mr-1"></i>복사
                 </button>
-                <button class="wr-copy-btn" onclick="window._wrCopyTop3Simple(this)" title="순위별 표 형식(소재명·지출·CTR·CPC·결과·결과값·ROAS)으로 TOP 3만 복사">
-                    <i class="fas fa-table mr-1"></i>TOP 3 표로 복사
+                <button class="wr-copy-btn" onclick="window._wrCopyTop5Simple(this)" title="순위별 표 형식(소재명·지출·CTR·CPC·결과·결과값·ROAS)으로 TOP 5만 복사">
+                    <i class="fas fa-table mr-1"></i>TOP 5 표로 복사
                 </button>
             </span>
         </div>
@@ -862,16 +885,16 @@ function _wrCreativeSectionHtml(byCreative) {
     </div>`;
 }
 
-/* ── TOP 3 소재를 순위별 표(첨부 이미지 형식)로 단순 복사 ──
-   소재명/지출/CTR/CPC/결과/결과값/ROAS를 1위~3위 열로 나열한 표 하나만 만들어
+/* ── TOP 5 소재를 순위별 표(첨부 이미지 형식)로 단순 복사 ──
+   소재명/지출/CTR/CPC/결과/결과값/ROAS를 1위~5위 열로 나열한 표 하나만 만들어
    전체 보고서 복사보다 간단하게 붙여넣을 수 있게 한다. */
-function _wrBuildTop3SimpleHtml(imgMap) {
+function _wrBuildTop5SimpleHtml(imgMap) {
     imgMap = imgMap || {};
     const cache      = _wrRenderCache;
     const list       = cache ? cache.list       : _wrGetList();
     const byCreative = cache ? cache.byCreative : _wrByCreative(list);
-    const top3 = byCreative.slice(0, 3);
-    if (!top3.length) return '';
+    const top5 = byCreative.slice(0, 5);
+    if (!top5.length) return '';
 
     const toThumb = (url) => {
         if (!url) return '';
@@ -893,18 +916,18 @@ function _wrBuildTop3SimpleHtml(imgMap) {
         img.thumb { max-width: 160px; max-height: 160px; display: block; margin: 0 auto; }
     `;
 
-    const rankLabels = top3.map((_, i) => `${i + 1}위`);
+    const rankLabels = top5.map((_, i) => `${i + 1}위`);
     const rows = [
-        { label: '소재명', roas: false, cells: top3.map(c => {
+        { label: '소재명', roas: false, cells: top5.map(c => {
             const src = toThumb(c.thumb);
             return src ? `<img class="thumb" src="${src}">` : (c.name || '-');
         }) },
-        { label: '지출',   roas: false, cells: top3.map(c => _wrW(c.spend)) },
-        { label: 'CTR',    roas: false, cells: top3.map(c => _wrP(c.ctr)) },
-        { label: 'CPC',    roas: false, cells: top3.map(c => c.clicks > 0 ? _wrW(c.spend / c.clicks) : '-') },
-        { label: '결과',   roas: false, cells: top3.map(c => _wrN(c.conv)) },
-        { label: '결과값', roas: false, cells: top3.map(c => _wrW(c.rev)) },
-        { label: 'ROAS',   roas: true,  cells: top3.map(c => _wrR(c.roas)) },
+        { label: '지출',   roas: false, cells: top5.map(c => _wrW(c.spend)) },
+        { label: 'CTR',    roas: false, cells: top5.map(c => _wrP(c.ctr)) },
+        { label: 'CPC',    roas: false, cells: top5.map(c => c.clicks > 0 ? _wrW(c.spend / c.clicks) : '-') },
+        { label: '결과',   roas: false, cells: top5.map(c => _wrN(c.conv)) },
+        { label: '결과값', roas: false, cells: top5.map(c => _wrW(c.rev)) },
+        { label: 'ROAS',   roas: true,  cells: top5.map(c => _wrR(c.roas)) },
     ];
 
     let html = `<html><head><meta charset="utf-8"><style>${css}</style></head><body>`;
@@ -915,18 +938,18 @@ function _wrBuildTop3SimpleHtml(imgMap) {
     html += `</tbody></table></body></html>`;
     return html;
 }
-window._wrCopyTop3Simple = async function(btnEl) {
+window._wrCopyTop5Simple = async function(btnEl) {
     _wrBtnLoading(btnEl);
     try {
         const cache      = _wrRenderCache;
         const list       = cache ? cache.list       : _wrGetList();
         const byCreative = cache ? cache.byCreative : _wrByCreative(list);
-        const urls   = byCreative.slice(0, 3).map(c => c.thumb).filter(Boolean);
+        const urls   = byCreative.slice(0, 5).map(c => c.thumb).filter(Boolean);
         const imgMap = urls.length ? await _wrFetchAllBase64(urls) : {};
-        const html   = _wrBuildTop3SimpleHtml(imgMap);
+        const html   = _wrBuildTop5SimpleHtml(imgMap);
         await _wrDoCopy(html, btnEl);
     } catch (e) {
-        console.error('[WR] _wrCopyTop3Simple error:', e);
+        console.error('[WR] _wrCopyTop5Simple error:', e);
         _wrBtnDone(btnEl, false);
         alert('복사 실패. 브라우저 클립보드 권한을 허용해주세요.');
     }
@@ -964,12 +987,14 @@ function _wrByProductInsight(list) {
             creMap[key].rev    += c.revenue     || 0;
             creMap[key].conv   += c.conversions || 0;
         });
-        const top5 = Object.values(creMap)
+        const creArr = Object.values(creMap)
             .map(d => ({ ...d,
                 platform: [...d.platforms].join(' · '),
                 ctr:  d.impr>0  ? d.clicks/d.impr : 0,
-                roas: d.spend>0 ? d.rev/d.spend    : 0 }))
-            .sort((a, b) => _wrTop5SortFn()(b) - _wrTop5SortFn()(a))
+                roas: d.spend>0 ? d.rev/d.spend    : 0 }));
+        const creStats = _wrEffStats(creArr);
+        const top5 = creArr
+            .sort((a, b) => _wrTop5SortFn()(b, creStats) - _wrTop5SortFn()(a, creStats))
             .slice(0, 5);
 
         // ── ROAS 가중 집계 헬퍼 ──
