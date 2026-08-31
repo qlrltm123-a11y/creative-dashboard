@@ -1601,73 +1601,8 @@ function _wrBuildConfluenceHtml(sections, imgMap) {
                 html += `</tr>`;
             });
             html += `</tbody></table>`;
-            // 소구/후킹/메시지요소/키워드 인사이트
-            const hasInsight = pd.topAppeals.length || pd.topHooks.length || (pd.topPhrases&&pd.topPhrases.length) || pd.topKeywords.length;
-            if (hasInsight) {
-                html += `<table style="margin-top:6px;width:100%"><tr>`;
-                // 소구포인트
-                html += `<td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">💡 소구포인트</strong><br><br>`;
-                pd.topAppeals.forEach(d => {
-                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#6366f1;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
-                });
-                // 후킹유형
-                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">⚡ 후킹 유형</strong><br><br>`;
-                pd.topHooks.forEach(d => {
-                    html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
-                });
-                // 메시지 요소 (카피 반복구절)
-                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">✍️ 고효율 메시지 요소</strong><br><br>`;
-                if (pd.topPhrases && pd.topPhrases.length) {
-                    pd.topPhrases.forEach(d => {
-                        html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#eef2ff;color:#4f46e5;border-radius:4px;font-size:11px">${d.k} ${_wrR(d.avgRoas)}</span>`;
-                    });
-                } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
-                // 키워드
-                html += `</td><td style="width:25%;vertical-align:top;border:1px solid #e2e8f0;padding:10px">
-                    <strong style="font-size:12px">🔑 키워드</strong><br><br>`;
-                if (pd.topKeywords.length) {
-                    pd.topKeywords.forEach(d => {
-                        html += `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;background:#f0fdf4;color:#166534;border-radius:4px;font-size:11px">${d.k} ×${d.count}</span>`;
-                    });
-                } else { html += '<span style="font-size:11px;color:#94a3b8">데이터 없음</span>'; }
-                html += `</td></tr></table>`;
-            }
-
-            /* ── CEP 검증 연결: 브릿지 + 판정 표 ── */
-            const cepEntry = cepEntries && cepEntries.find(e => e.product === pd.product);
-            if (cepEntry) {
-                const { cepRows, ranksByCep, matchedRanks } = cepEntry;
-                html += `<div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:10px 14px;margin:10px 0 8px;font-size:12px;color:#5b21b6;line-height:1.7">
-                    <strong>❓ 여기서 질문 — 위 소재들은 '왜' 잘됐을까?</strong><br>
-                    모델 덕인지 메시지 덕인지 소재 랭킹만으로는 구분되지 않습니다.
-                    같은 상황 소구(CEP)를 쓴 소재들을 묶어 검증한 결과가 아래입니다.
-                    (위 TOP ${matchedRanks.join('·')}번 소재가 CEP 검증 로그와 연결됨)
-                </div>`;
-                const maxRev = Math.max(...cepRows.map(r => r.revenue));
-                html += `<table><thead><tr>
-                    <th style="text-align:left">CEP (상황 소구)</th><th>판정</th><th>ROAS</th><th>CV</th><th>매출</th><th style="text-align:left">비고</th>
-                </tr></thead><tbody>`;
-                cepRows.forEach((r, i) => {
-                    const ranks = ranksByCep[r.cepTitle];
-                    const notes = [];
-                    if (i === 0 && cepRows.length > 1) notes.push('✅ 효율 1위');
-                    if (r.revenue === maxRev && cepRows.length > 1) notes.push('📦 매출 최대');
-                    if (ranks) notes.push(`TOP ${[...ranks].sort((a, b) => a - b).join('·')}번 소재 소속`);
-                    html += `<tr>
-                        <td class="left"><strong>${r.cepTitle}</strong></td>
-                        <td style="text-align:center;white-space:nowrap">${r.verdict}</td>
-                        <td class="roas">${r.roas.toFixed(0)}%</td>
-                        <td class="num">${_wrN(r.cv)}</td>
-                        <td class="num">${_wrW(r.revenue)}</td>
-                        <td class="left" style="font-size:11px;color:#64748b">${notes.join(' · ') || '-'}</td>
-                    </tr>`;
-                });
-                html += `</tbody></table>`;
-                html += `<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">💡 <strong>읽는 법</strong>: CEP = 소비자가 이 제품을 떠올리는 구체적 상황. 같은 CEP를 여러 소재로 표현해도 성과가 좋으면, 소재 실행이 아니라 <strong>그 메시지가 통한다</strong>는 뜻입니다.</p>`;
-            }
+            // ★ 소구포인트/후킹/메시지요소/키워드/CEP 판정은 복사본에서 제외 —
+            //   붙여넣었을 때 소재명·지표만 깔끔하게 보이게 (화면 표시용 카드에는 그대로 남아있음).
         });
     }
 
