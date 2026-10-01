@@ -342,14 +342,24 @@ function _megapoPrevEvent(ev, allEvents) {
     .sort((a, b) => b - a);
   return months.length ? `${months[0]}월 메가포` : null;
 }
+// 이벤트 탭 정렬 키: 캘린더 순서대로 나열되도록 분기 메가와리는 "분기 마지막 달 - 0.5"로,
+// 월별 메가포는 "그 달"로 환산해 섞어서 정렬한다(메가와리가 보통 분기 마지막 달에 열려
+// 같은 달 메가포보다 앞서야 하므로 -0.5 오프셋). 예: 262Q(2분기→6월) → 5월 메가포 다음,
+// 7월 메가포 이전에 위치. 미지 패턴은 맨 뒤로 보낸다.
+function _eventSortKey(ev) {
+  if (ev === 'MEGAWARI') return 26*12 + 2*3 - 0.5; // 262Q 메가와리 취급
+  let m = ev.match(/^(\d{2})(\d)Q\s*메가와리$/);
+  if (m) return parseInt(m[1],10)*12 + parseInt(m[2],10)*3 - 0.5;
+  m = ev.match(/^(\d+)월\s*메가포$/);
+  if (m) return 26*12 + parseInt(m[1],10);
+  return Infinity;
+}
 function _getEventList(rawData) {
   const evs = new Set(); let hasBlank = false;
   ['262Q','261Q'].forEach(q => Object.values(rawData[q]).forEach(rows =>
     rows.forEach(r => { if (r.event === 'MEGAWARI_Q3CMP') return; if (r.event) evs.add(r.event); else hasBlank = true; })));
-  const result = [];
-  if (hasBlank && evs.size > 0 && !evs.has('MEGAWARI')) result.push('MEGAWARI');
-  result.push(...[...evs].sort());
-  return result;
+  if (hasBlank && evs.size > 0 && !evs.has('MEGAWARI')) evs.add('MEGAWARI');
+  return [...evs].sort((a,b) => _eventSortKey(a) - _eventSortKey(b));
 }
 function _filterDataByEvent(rawData, event) {
   if (event === 'all') return rawData;
