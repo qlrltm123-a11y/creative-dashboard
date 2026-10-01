@@ -618,8 +618,8 @@ function _addDaysKoreanDate(dateStr, days) {
   }
   return { month, day };
 }
-function _megapoEventLabel(dateStr) {
-  const d = _addDaysKoreanDate(dateStr, 2);
+function _megapoEventLabel(dateStr, extraDays) {
+  const d = _addDaysKoreanDate(dateStr, extraDays == null ? 2 : extraDays);
   return d ? `${d.month}월 메가포` : (dateStr || '메가포');
 }
 function _detectMegapoBlocks(headerRow) {
@@ -635,6 +635,23 @@ function parseMegapoBlocks(rows) {
   let productCol = header.findIndex(h => (h || '').trim() === '제품');
   if (productCol < 0) productCol = 2; // 폴백(관측된 고정 위치)
   const blocks = _detectMegapoBlocks(header);
+  const firstBlock = blocks[0];
+  // 'TEASER START'가 찍힌 날짜 = 다음 회차의 티징 시작일. +2일 월 환산 규칙은 보통
+  // 월말 D-1 기준으로 다음 달 1일을 넘기도록 맞춰져 있는데, 이번처럼 티저가 D-2에
+  // 시작하면(예: 9/28) +2일로는 그 달(9월)을 못 벗어나 직전 회차에 잘못 묶인다.
+  // 이런 날짜는 같은 날짜를 공유하는 다른 제품 행(event열이 비어있는)에도 동일하게
+  // 적용해야 하므로, 먼저 전체를 훑어 티저 날짜 집합을 만들고 +3일을 적용해 항상
+  // 다음 달(다음 회차)로 분류되게 한다.
+  const teaserDates = new Set();
+  if (firstBlock) {
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r && (r[0] || '').trim() === 'TEASER START') {
+        const d = (r[firstBlock.date] || '').trim();
+        if (d) teaserDates.add(d);
+      }
+    }
+  }
   const merged = {};
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -647,8 +664,9 @@ function parseMegapoBlocks(rows) {
       const inflow = parseNum(r[b.inflow]), cart = parseNum(r[b.cart]), buy = parseNum(r[b.buy]);
       if (inflow == null && cart == null && buy == null) return; // 아직 데이터 없는 블록
       if (!merged[prod]) merged[prod] = [];
+      const extraDays = (b === firstBlock && teaserDates.has(date)) ? 3 : 2;
       merged[prod].push({
-        date, inflow, cart, buy, event: _megapoEventLabel(date),
+        date, inflow, cart, buy, event: _megapoEventLabel(date, extraDays),
         cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
         buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
       });
