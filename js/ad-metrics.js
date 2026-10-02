@@ -107,17 +107,26 @@ function _amRoundsOf(retail, canon) {
     });
     return rounds;
 }
+// 본행사 오픈일: 과거 프로모션은 본행사 이벤트의 시작일. creatives 기반 'N월 CODE'는 티저와
+// 본행사가 한 라벨이라, 회차가 라벨 월 1일 이전에 시작했으면(월말 티저) 그 1일을 오픈일로 본다.
+function _amMainStart(evs, start, end) {
+    const main = evs.find(e => _amEvPart(e.name) === 'main');
+    if (main) return main.start;
+    const lbl = evs.map(e => (e.name.match(/^(\d{1,2})월\s/) || [])[1]).find(Boolean);
+    if (lbl) {
+        const first = `${_amShiftDays(start, 3).slice(0, 4)}-${String(lbl).padStart(2, '0')}-01`;
+        if (first > start && first <= end) return first;
+    }
+    return start;
+}
 function _amRoundSlice(round, part) {
     const parts = AM_PART_MATCH[part] || [part];
     const evs = round.events.filter(e => parts.includes(_amEvPart(e.name)));
     if (!evs.length) return null;
     const main = evs.find(e => _amEvPart(e.name) !== 'teaser') || evs[0];
-    return {
-        name: main.name,
-        names: new Set(evs.map(e => e.name)),
-        start: evs.reduce((m, e) => e.start < m ? e.start : m, evs[0].start),
-        end: evs.reduce((m, e) => e.end > m ? e.end : m, evs[0].end),
-    };
+    const start = evs.reduce((m, e) => e.start < m ? e.start : m, evs[0].start);
+    const end = evs.reduce((m, e) => e.end > m ? e.end : m, evs[0].end);
+    return { name: main.name, names: new Set(evs.map(e => e.name)), start, end, mainStart: _amMainStart(evs, start, end) };
 }
 
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
@@ -466,8 +475,9 @@ function _amRender() {
     // 직전/전년은 '같은 이벤트 유형'의 이전 회차·1년 전 회차와 비교 — 티저/본행사/애프터를 한
     // 회차로 묶어서 고르므로 '직전 달 아무 이벤트'나 같은 회차의 티저가 직전으로 잡히지 않는다.
     // (예: 10월 MEGAPO → 직전=8월 MEGAPO, 전년=2510 메가포). 같은 리테일끼리만 매칭.
-    // 진행 중인 행사는 최신 데이터일까지의 경과 일수(N일차)만큼만 직전·전년 회차도 잘라 비교.
-    let prevAgg = null, yoyAgg = null, cmpLabel = '', cmpNote = '';
+    // 진행 중인 행사는 본행사 오픈일(D1)부터 최신 데이터일까지(DN)만, 직전·전년 회차도 각자의
+    // 오픈일부터 같은 N일만 잘라 비교 (티저 유무가 회차마다 달라 첫날 기준으로 맞추면 왜곡됨).
+    let prevAgg = null, yoyAgg = null, cmpLabel = '', cmpNote = '', curAgg = total;
     if (evMeta) {
         const rounds = _amRoundsOf(evMeta.retail, _amCanonicalType(evMeta.name));
         const idx = rounds.findIndex(rd => rd.events.some(e => e.name === evMeta.name));
@@ -486,19 +496,25 @@ function _amRender() {
 
         const latest = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
         const inProgress = latest && evMeta.end >= latest;
-        const dayN = inProgress ? _amDaysInclusive(evMeta.start, latest) : 0;
-        const sliceRows = sl => {
-            const until = inProgress ? _amShiftDays(sl.start, dayN - 1) : sl.end;
-            return brandAll.filter(r => sl.names.has(r.event) && r.date >= sl.start && r.date <= until);
-        };
-        const periodOf = sl => `${sl.start.slice(2)}~${(inProgress ? _amShiftDays(sl.start, dayN - 1) : sl.end).slice(5)}`;
-        if (prevSlice) prevAgg = _amAgg(sliceRows(prevSlice));
-        if (yoySlice) yoyAgg = _amAgg(sliceRows(yoySlice));
-        cmpLabel = `직전: ${prevSlice ? `${_amEsc(prevSlice.name)} (${periodOf(prevSlice)})` : '없음'} · 전년: ${yoySlice ? `${_amEsc(yoySlice.name)} (${periodOf(yoySlice)})` : '없음'}`
-            + (inProgress ? ` · <b>진행 중 ${dayN}일차 기준</b>` : '');
-        cmpNote = inProgress
-            ? `진행 중이라 현재(${evMeta.start.slice(5)}~${latest.slice(5)}, ${dayN}일차)와 같은 일수만큼 직전·전년 회차의 첫 ${dayN}일을 잘라 비교합니다.`
-            : '직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 전체 기간 기준.';
+        const curMain = _amMainStart([evMeta], evMeta.start, evMeta.end);
+        const dayN = inProgress ? _amDaysInclusive(curMain, latest) : 0;
+        const winEnd = sl => inProgress ? _amShiftDays(sl.mainStart, dayN - 1) : sl.end;
+        const winStart = sl => inProgress ? sl.mainStart : sl.start;
+        const sliceRows = sl => brandAll.filter(r => sl.names.has(r.event) && r.date >= winStart(sl) && r.date <= winEnd(sl));
+        const periodOf = sl => `${winStart(sl).slice(2)}~${winEnd(sl).slice(5)}`;
+        if (inProgress && dayN <= 0) {
+            cmpLabel = `본행사 오픈(${curMain.slice(5)}) 전 티저 기간 — 오픈 후부터 직전·전년 비교`;
+            cmpNote = '본행사 오픈일 기준으로 비교하므로 티저 기간에는 비교 값을 표시하지 않습니다.';
+        } else {
+            if (inProgress) curAgg = _amAgg(rows.filter(r => r.date >= curMain && r.date <= latest));
+            if (prevSlice) prevAgg = _amAgg(sliceRows(prevSlice));
+            if (yoySlice) yoyAgg = _amAgg(sliceRows(yoySlice));
+            cmpLabel = `직전: ${prevSlice ? `${_amEsc(prevSlice.name)} (${periodOf(prevSlice)})` : '없음'} · 전년: ${yoySlice ? `${_amEsc(yoySlice.name)} (${periodOf(yoySlice)})` : '없음'}`
+                + (inProgress ? ` · <b>본행사 D1~D${dayN} 기준</b>` : '');
+            cmpNote = inProgress
+                ? `진행 중이라 본행사 오픈일 기준으로 맞춰 비교합니다 — 현재 ${curMain.slice(5)}~${latest.slice(5)}(D1~D${dayN}, 티저 제외) vs 직전·전년 회차의 오픈일부터 ${dayN}일.`
+                : '직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 전체 기간 기준.';
+        }
     }
     const metricDefs = [
         { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
@@ -512,7 +528,7 @@ function _amRender() {
     ];
     const hasCmp = !!evMeta;
     const cmpPair = (m, agg) => agg
-        ? `<td>${m.f(agg)}</td>${_amDeltaCell(total[m.k], agg[m.k], m.g)}`
+        ? `<td>${m.f(agg)}</td>${_amDeltaCell(curAgg[m.k], agg[m.k], m.g)}`
         : `<td class="am-d-na">-</td><td class="am-d-na">-</td>`;
     const kpiHtml = `
         <div class="am-card am-sum-card">
@@ -521,7 +537,7 @@ function _amRender() {
                 <thead><tr><th>지표</th><th>현재</th>${hasCmp ? '<th>직전 행사</th><th>직전비</th><th>전년 동행사</th><th>YoY</th>' : ''}</tr></thead>
                 <tbody>${metricDefs.map(m => `<tr>
                     <td class="am-t-name">${m.l}</td>
-                    <td class="am-sum-cur">${m.f(total)}</td>
+                    <td class="am-sum-cur">${m.f(curAgg)}</td>
                     ${hasCmp ? cmpPair(m, prevAgg) + cmpPair(m, yoyAgg) : ''}
                 </tr>`).join('')}</tbody>
             </table>
