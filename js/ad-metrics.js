@@ -558,6 +558,46 @@ function _amRender() {
             ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 행사·전년 동행사 증감이 표시됩니다.</p>` : `<p class="am-sum-note">${cmpNote}</p>`}
         </div>`;
 
+    // 역대 회차 추이 — 선택 이벤트와 같은 유형의 모든 회차(티저~애프터 전체). 진행 중 회차는
+    // 최신 데이터일까지 누적. 날짜 필터와 무관하게 전 기간 기준.
+    let roundSeries = null, roundsHtml = '';
+    if (evMeta) {
+        const canon = _amCanonicalType(evMeta.name);
+        const latestAll = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
+        roundSeries = _amRoundsOf(evMeta.retail, canon).map(rd => {
+            const names = new Set(rd.events.map(e => e.name));
+            const a = _amAgg(brandAll.filter(r => names.has(r.event)));
+            const ongoing = !!latestAll && rd.end >= latestAll;
+            return {
+                ...a, ongoing,
+                label: rd.mainStart.slice(2, 7).replace('-', '.'),
+                period: `${rd.start.slice(5)}~${(ongoing ? latestAll : rd.end).slice(5)}`,
+                dayN: ongoing ? Math.max(0, _amDaysInclusive(rd.mainStart, latestAll)) : 0,
+                cur: rd.events.some(e => e.name === evMeta.name),
+                noRev: a.rev === 0,
+            };
+        }).filter(s => s.cost > 0);
+        const typeKo = { MEGAPO: '메가포', MEGAWARI: '메가와리' }[canon] || canon;
+        const hasNoRev = roundSeries.some(s => s.noRev);
+        roundsHtml = roundSeries.length > 1 ? `
+        <div class="am-card">
+            <div class="am-card-h"><i class="fas fa-chart-column"></i> 역대 ${_amEsc(typeKo)} 회차 추이 <span class="am-card-sub">광고비·매출(막대) · ROAS(선) · 진행 중 회차는 누적</span></div>
+            <div class="am-chart-wrap am-chart-wrap--tall"><canvas id="am-rounds-chart"></canvas></div>
+            <table class="am-table">
+                <thead><tr><th>회차</th><th>기간</th><th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th>CPA</th></tr></thead>
+                <tbody>${roundSeries.map(s => `<tr${s.cur ? ' style="font-weight:600;background:#eef2ff"' : ''}>
+                    <td class="am-t-name">${s.label}${s.ongoing ? ` <span class="am-etc-tag">진행 중${s.dayN ? ` D${s.dayN}` : ' 티저'}</span>` : ''}</td>
+                    <td>${s.period}</td>
+                    <td>${_amKRWshort(s.cost)}</td>
+                    <td>${s.noRev ? '-' : _amKRWshort(s.rev)}</td>
+                    <td class="am-t-roas ${s.noRev ? '' : s.roas >= 200 ? 'am-good' : s.roas >= 100 ? 'am-mid' : 'am-low'}">${s.noRev ? '-' : _amPct(s.roas)}</td>
+                    <td>${s.noRev ? '-' : _amInt(s.cv)}</td>
+                    <td>${s.cv > 0 ? _amKRW(s.cpa) : '-'}</td></tr>`).join('')}</tbody>
+            </table>
+            ${hasNoRev ? `<p class="am-sum-note">매출·구매가 '-'인 회차는 원본(ad-performance)에 전환값이 수집되지 않은 기간이라 광고비만 표시합니다.</p>` : ''}
+        </div>` : '';
+    }
+
     // 매체별 ROAS
     const media = _amGroup(rows, r => r.media).filter(m => m.cost > 0).sort((a, b) => b.cost - a.cost);
     const mediaHtml = `
@@ -639,15 +679,50 @@ function _amRender() {
             ${etcHtml}
         </div>`;
 
-    root.innerHTML = `<div class="am-wrap">${selHtml}${kpiHtml}${mediaHtml}${dailyHtml}${prodHtml}</div>`;
+    root.innerHTML = `<div class="am-wrap">${selHtml}${kpiHtml}${roundsHtml}${mediaHtml}${dailyHtml}${prodHtml}</div>`;
 
     document.getElementById('am-event-sel').addEventListener('change', e => {
         _amSelectedEvent = e.target.value;
         _amRender();
     });
 
+    _amDrawRoundsChart(roundSeries);
     _amDrawMediaChart(media);
     _amDrawDailyChart(rows);
+}
+
+let _amRoundsChart = null;
+function _amDrawRoundsChart(series) {
+    if (_amRoundsChart) { _amRoundsChart.destroy(); _amRoundsChart = null; }
+    const cv = document.getElementById('am-rounds-chart');
+    if (!cv || !series || typeof Chart === 'undefined') return;
+    const labels = series.map(s => s.ongoing ? [s.label, '진행중'] : s.label);
+    _amRoundsChart = new Chart(cv, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar', label: '광고비', data: series.map(s => Math.round(s.cost)), backgroundColor: series.map(s => s.cur ? '#818cf8' : '#c7d2fe'), yAxisID: 'y', order: 2, borderRadius: 3 },
+                { type: 'bar', label: '매출', data: series.map(s => s.noRev ? null : Math.round(s.rev)), backgroundColor: series.map(s => s.cur ? '#34d399' : '#a7f3d0'), yAxisID: 'y', order: 2, borderRadius: 3 },
+                { type: 'line', label: 'ROAS %', data: series.map(s => s.noRev ? null : Math.round(s.roas)), borderColor: '#6366f1', backgroundColor: '#6366f1', pointRadius: 4, borderWidth: 2, yAxisID: 'y1', order: 1, tension: 0.25, spanGaps: false },
+            ],
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { callbacks: {
+                    title: items => { const s = series[items[0].dataIndex]; return `${s.label} · ${s.period}${s.ongoing ? ` (진행 중${s.dayN ? ` D${s.dayN}` : ''} 누적)` : ''}`; },
+                    label: c => c.parsed.y == null ? `${c.dataset.label}: 데이터 없음`
+                        : c.dataset.yAxisID === 'y1' ? `ROAS ${c.parsed.y}%` : `${c.dataset.label} ₩${c.parsed.y.toLocaleString()}`,
+                } },
+            },
+            scales: {
+                x: { ticks: { maxRotation: 0, autoSkip: false, font: { size: 10 } } },
+                y: { position: 'left', beginAtZero: true, title: { display: true, text: '광고비·매출', font: { size: 10 } }, ticks: { callback: v => v >= 1e8 ? (v / 1e8).toFixed(1) + '억' : v >= 1e4 ? Math.round(v / 1e4) + '만' : v, font: { size: 10 } } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: 'ROAS %', font: { size: 10 } }, ticks: { callback: v => v + '%', font: { size: 10 } } },
+            },
+        },
+    });
 }
 
 function _amDrawMediaChart(media) {
