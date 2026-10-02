@@ -5079,11 +5079,13 @@ function renderKRSection() {
     const summary = document.getElementById('kr-summary-cards');
     if (!grid) return;
 
-    // 전체 raw 데이터에서 인플루언서 소재 필터 (-EDIT 패턴, UGC 표기, 또는 WM식 _inf_ 표기)
+    // 전체 raw 데이터에서 인플루언서 소재 필터: -EDIT 패턴, UGC 표기, 또는 광고명에 inf 토큰
+    // (_inf_ / _inf-이름 / -INF- / _influencer_). 'skinfit'처럼 단어 안에 든 inf는 제외.
+    const _INF_RE = /(^|[_\-()])inf(luencer)?(?=[_\-]|$)/i;
     const allData = window.allCreatives || [];
     let krData = allData.filter(c => {
         const name = (c.ad_name || c.creative_name || c.id || '').toString();
-        return /-EDIT/i.test(name) || /UGC/i.test(name) || /_inf_/i.test(name);
+        return /-EDIT/i.test(name) || /UGC/i.test(name) || _INF_RE.test(name);
     });
 
     // 브랜드 필터 적용 (currentBrand 전역 변수 직접 참조 — 탭 전환 시 항상 최신값)
@@ -5148,11 +5150,14 @@ function renderKRSection() {
                 .replace(/_(JP|KR|EN)$/i, '')
                 .toLowerCase();
         }
-        if (/_inf_/i.test(name)) {
-            // WM식 표기: <제품>_<테마>_inf_<인플루언서명>_..._VID_1x1|9x16_날짜
-            // 사이즈(1x1/9x16)·날짜 접미사만 제거해 동일 소재의 화면비 변형끼리만 묶는다
+        if (_INF_RE.test(name)) {
+            // WM/CG식: <제품>_<테마>_inf_|inf-<인플루언서명>_..._VID_1x1|9x16_날짜
+            // BOH JP식: 날짜_<제품>_influencer_VID_<이름>_행사_1080x1920_JP
+            // 사이즈·날짜·로케일 접미사만 제거해 동일 소재의 화면비 변형끼리만 묶는다
             return name
-                .replace(/_(IMG|VID)_\d{1,2}x\d{1,2}_\d{6}.*/i, '')
+                .replace(/_(IMG|VID|BNR)_\d{1,2}x\d{1,2}_\d{6}.*/i, '')
+                .replace(/_\d{3,4}x\d{3,4}.*/i, '')
+                .replace(/_(JP|KR|EN)$/i, '')
                 .toLowerCase();
         }
         return name.toLowerCase();
