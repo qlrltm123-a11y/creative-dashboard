@@ -4550,7 +4550,7 @@ function buildPerformanceComment(c, type, benchmark) {
 }
 
 // BEST TOP 20 썸네일 카드
-// opts.stats: 소재명 아래 효율 한 줄(광고비·CTR·전환) 표시 — ROAS는 썸네일 배지에 이미 있음
+// opts.stats: 소재명 아래 효율 지표(매출·ROAS·CTR·CVR) 2x2 표시
 function createBestThumbCard(c, rank, metric, opts = {}) {
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const value = cfg.format(c[metric]);
@@ -4592,7 +4592,12 @@ function createBestThumbCard(c, rank, metric, opts = {}) {
         <div class="btc-info">
             ${brand ? `<span class="btc-brand">${brand}</span>` : ''}
             <p class="btc-name" title="${adName}">${adName}</p>
-            ${opts.stats ? `<p class="text-[11px] text-slate-500 mb-1 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis" title="광고비 · CTR · 전환수">₩${formatKoreanShort(c.spend || 0)} · CTR ${((c.ctr || 0) * 100).toFixed(1)}% · CV ${Math.round(c.conversions || 0).toLocaleString()}</p>` : ''}
+            ${opts.stats ? `<div class="grid grid-cols-2 gap-x-2 text-[11px] text-slate-500 mb-1 tabular-nums">${[
+                ['매출', '₩' + formatKoreanShort(c.revenue || 0)],
+                ['ROAS', Math.round((c.roas || 0) * 100) + '%'],
+                ['CTR', ((c.ctr || 0) * 100).toFixed(1) + '%'],
+                ['CVR', ((c.cvr || 0) * 100).toFixed(1) + '%'],
+            ].map(([k, v]) => `<span class="whitespace-nowrap">${k} <b class="text-slate-700 font-semibold">${v}</b></span>`).join('')}</div>` : ''}
             ${appealsHtml ? `<div class="btc-chips">${appealsHtml}</div>` : ''}
             ${cepHtml}
         </div>
