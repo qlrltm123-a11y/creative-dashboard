@@ -5189,22 +5189,23 @@ function renderKRSection() {
     // 배지
     if (badge) badge.textContent = `인플루언서 소재 ${sorted.length}개`;
 
+    // 제품별 집계 — ROAS/CTR/CVR은 소재 평균이 아니라 합계 기준(광고비 적은 소재의 극단값에 안 휘둘리게)
+    const _krStat = items => {
+        const s = k => items.reduce((a, c) => a + (c[k] || 0), 0);
+        const spend = s('spend'), rev = s('revenue'), imp = s('impressions'), clk = s('clicks'), cv = s('conversions');
+        return { n: items.length, spend, rev, cv, roas: spend > 0 ? rev / spend : 0, ctr: imp > 0 ? clk / imp : 0, cvr: clk > 0 ? cv / clk : 0 };
+    };
+    // spend는 이미 원화(엔화 원본은 spend_jpy) — 환율을 다시 곱하지 않는다
+    const _krKRW = v => v >= 1e8 ? '₩' + (v / 1e8).toFixed(1) + '억' : v >= 1e4 ? '₩' + Math.round(v / 1e4).toLocaleString() + '만' : '₩' + Math.round(v).toLocaleString();
+
     // 요약 카드
     if (summary && sorted.length) {
-        const avg = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0) / sorted.length;
-        const sum = (key) => sorted.reduce((s, c) => s + (c[key] || 0), 0);
-        const fx = typeof getFxRate === 'function' ? getFxRate() : 9.5;
-        const avgRoas = avg('roas'), avgCtr = avg('ctr'), totalCv = sum('conversions'), totalSpend = sum('spend');
-        const totalSpendKrw = Math.round(totalSpend * fx);
-        const spendStr = totalSpendKrw >= 100000000
-            ? '₩' + (totalSpendKrw / 100000000).toFixed(1) + '억'
-            : totalSpendKrw >= 10000
-            ? '₩' + (totalSpendKrw / 10000).toFixed(0) + '만'
-            : '₩' + totalSpendKrw.toLocaleString();
+        const tot = _krStat(sorted);
+        const spendStr = _krKRW(tot.spend);
         summary.innerHTML = [
-            { label: '평균 ROAS', val: Math.round(avgRoas * 100) + '%', icon: 'fa-chart-line', color: 'text-indigo-600' },
-            { label: '평균 CTR',  val: (avgCtr * 100).toFixed(2) + '%', icon: 'fa-mouse-pointer', color: 'text-blue-600' },
-            { label: '총 전환수', val: Math.round(totalCv).toLocaleString(), icon: 'fa-shopping-cart', color: 'text-emerald-600' },
+            { label: 'ROAS (합계)', val: Math.round(tot.roas * 100) + '%', icon: 'fa-chart-line', color: 'text-indigo-600' },
+            { label: 'CTR (합계)',  val: (tot.ctr * 100).toFixed(2) + '%', icon: 'fa-mouse-pointer', color: 'text-blue-600' },
+            { label: '총 전환수', val: Math.round(tot.cv).toLocaleString(), icon: 'fa-shopping-cart', color: 'text-emerald-600' },
             { label: '총 광고비', val: spendStr, icon: 'fa-won-sign', color: 'text-amber-600' },
         ].map(s => `
             <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
@@ -5230,11 +5231,38 @@ function renderKRSection() {
     grid.classList.remove('hidden');
     empty?.classList.add('hidden');
 
-    // 소재 카드 렌더 (compact 썸네일 — createBestThumbCard 재사용, metric=roas)
-    grid.innerHTML = sorted.map((c, i) => createBestThumbCard(c, i + 1, 'roas')).join('');
+    // 제품별로 묶어서 렌더 — 제품 순서는 선택한 정렬 지표의 제품 합계 기준(기본: ROAS 높은 제품 먼저),
+    // 제품 안의 소재는 기존 정렬(sorted) 순서 그대로. 순위 배지는 제품 내 순위.
+    const groups = new Map();
+    sorted.forEach(c => {
+        const k = (c.brand || '') + '|' + (c.product || '기타');
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(c);
+    });
+    const gKey = { roas: 'roas', ctr: 'ctr', cvr: 'cvr', conversions: 'cv', spend: 'spend' }[sortKey];
+    const gList = [...groups.entries()].map(([k, items]) => {
+        const [gBrand, ...rest] = k.split('|');
+        return { brand: gBrand, product: rest.join('|'), items, st: _krStat(items) };
+    }).sort((a, b) => gKey ? b.st[gKey] - a.st[gKey] : a.product.localeCompare(b.product));
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+    const showBrand = !(brand && brand !== 'ALL');
+    const roasCls = r => r >= 2 ? 'text-emerald-600' : r >= 1 ? 'text-amber-600' : 'text-rose-500';
+    const ordered = [];
+    grid.innerHTML = gList.map(g => {
+        const st = g.st;
+        const head = `
+            <div class="col-span-full flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-4 mt-1 border-t border-slate-100 first:border-t-0 first:pt-0 first:mt-0">
+                <span class="text-sm font-bold text-slate-800">${showBrand ? `<span class="text-[10px] font-semibold text-slate-400 mr-1">${esc(g.brand)}</span>` : ''}${esc(g.product)}</span>
+                <span class="text-xs text-slate-400">소재 ${st.n}개</span>
+                <span class="text-xs font-bold ${roasCls(st.roas)}">ROAS ${Math.round(st.roas * 100)}%</span>
+                <span class="text-xs text-slate-500">광고비 ${_krKRW(st.spend)} · 전환 ${Math.round(st.cv).toLocaleString()} · CTR ${(st.ctr * 100).toFixed(2)}% · CVR ${(st.cvr * 100).toFixed(1)}%</span>
+            </div>`;
+        const cards = g.items.map((c, i) => { ordered.push(c); return createBestThumbCard(c, i + 1, 'roas'); }).join('');
+        return head + cards;
+    }).join('');
 
     grid.querySelectorAll('.best-thumb-card').forEach((card, idx) => {
-        card.addEventListener('click', () => openModal(card.dataset.id, sorted[idx]));
+        card.addEventListener('click', () => openModal(card.dataset.id, ordered[idx]));
     });
 
     renderKRInsights(sorted);
@@ -5255,8 +5283,9 @@ function renderKRInsights(items) {
     const appeals  = topKw(items, 'appeal_points', 8);
     const hooks    = topKw(items, 'hook_type', 4);
     const emotions = topKw(items, 'target_emotion', 4);
-    const avgRoas  = items.reduce((s, c) => s + (c.roas || 0), 0) / items.length;
-    const avgCtr   = items.reduce((s, c) => s + (c.ctr  || 0), 0) / items.length;
+    const _sum = k => items.reduce((s, c) => s + (c[k] || 0), 0);
+    const avgRoas  = _sum('spend') > 0 ? _sum('revenue') / _sum('spend') : 0;
+    const avgCtr   = _sum('impressions') > 0 ? _sum('clicks') / _sum('impressions') : 0;
 
     const chipsOf = (pairs, cls = '') => pairs.map(([k, v]) =>
         `<span class="bi-chip ${cls}">${k}<span class="bi-cnt">${v}</span></span>`).join('');
@@ -5275,9 +5304,9 @@ function renderKRInsights(items) {
             <div class="bi-chips">${chipsOf(emotions, 'bi-chip-emo') || '<span class="bi-empty">없음</span>'}</div>
         </div>
         <div class="bi-avg">
-            <div class="bi-title"><i class="fas fa-chart-bar"></i> 평균 ROAS</div>
+            <div class="bi-title"><i class="fas fa-chart-bar"></i> ROAS (합계)</div>
             <div class="bi-avg-val">${Math.round(avgRoas * 100)}%</div>
-            <div class="text-xs text-slate-400 mt-1">평균 CTR ${(avgCtr * 100).toFixed(2)}%</div>
+            <div class="text-xs text-slate-400 mt-1">CTR ${(avgCtr * 100).toFixed(2)}% (합계)</div>
         </div>`;
 }
 window.renderKRSection = renderKRSection;
