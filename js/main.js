@@ -4550,7 +4550,8 @@ function buildPerformanceComment(c, type, benchmark) {
 }
 
 // BEST TOP 20 썸네일 카드
-function createBestThumbCard(c, rank, metric) {
+// opts.stats: 소재명 아래 효율 한 줄(광고비·CTR·전환) 표시 — ROAS는 썸네일 배지에 이미 있음
+function createBestThumbCard(c, rank, metric, opts = {}) {
     const cfg = METRIC_CONFIG[metric] || { label: metric };
     const value = cfg.format(c[metric]);
     const isVideo = c.media_type === 'video';
@@ -4591,6 +4592,7 @@ function createBestThumbCard(c, rank, metric) {
         <div class="btc-info">
             ${brand ? `<span class="btc-brand">${brand}</span>` : ''}
             <p class="btc-name" title="${adName}">${adName}</p>
+            ${opts.stats ? `<p class="text-[11px] text-slate-500 mb-1 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis" title="광고비 · CTR · 전환수">₩${formatKoreanShort(c.spend || 0)} · CTR ${((c.ctr || 0) * 100).toFixed(1)}% · CV ${Math.round(c.conversions || 0).toLocaleString()}</p>` : ''}
             ${appealsHtml ? `<div class="btc-chips">${appealsHtml}</div>` : ''}
             ${cepHtml}
         </div>
@@ -5257,7 +5259,7 @@ function renderKRSection() {
                 <span class="text-xs font-bold ${roasCls(st.roas)}">ROAS ${Math.round(st.roas * 100)}%</span>
                 <span class="text-xs text-slate-500">광고비 ${_krKRW(st.spend)} · 전환 ${Math.round(st.cv).toLocaleString()} · CTR ${(st.ctr * 100).toFixed(2)}% · CVR ${(st.cvr * 100).toFixed(1)}%</span>
             </div>`;
-        const cards = g.items.map((c, i) => { ordered.push(c); return createBestThumbCard(c, i + 1, 'roas'); }).join('');
+        const cards = g.items.map((c, i) => { ordered.push(c); return createBestThumbCard(c, i + 1, 'roas', { stats: true }); }).join('');
         return head + cards;
     }).join('');
 
