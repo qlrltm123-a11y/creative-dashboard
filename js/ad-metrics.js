@@ -105,19 +105,30 @@ function _amRoundsOf(retail, canon) {
             if (e.end > last.end) last.end = e.end;
         } else rounds.push({ start: e.start, end: e.end, events: [e] });
     });
+    // 회차별 본행사 오픈일. 오픈일을 특정 못 하는 creatives 회차(예: 8/24~ 메가와리 — 티저와
+    // 본행사가 한 라벨)는 가장 최근 회차의 티저 일수만큼 밀어 추정한다 (262Q: 티저 4일 → 8/28).
+    let teaserDays = 0;
+    rounds.forEach(rd => {
+        const r = _amMainStart(rd.events, rd.start, rd.end);
+        rd.mainStart = r.sure ? r.date
+            : (teaserDays && _amShiftDays(rd.start, teaserDays) <= rd.end ? _amShiftDays(rd.start, teaserDays) : rd.start);
+        const teaser = rd.events.find(e => _amEvPart(e.name) === 'teaser');
+        if (teaser && rd.mainStart > teaser.start) teaserDays = _amDaysInclusive(teaser.start, rd.mainStart) - 1;
+    });
     return rounds;
 }
 // 본행사 오픈일: 과거 프로모션은 본행사 이벤트의 시작일. creatives 기반 'N월 CODE'는 티저와
 // 본행사가 한 라벨이라, 회차가 라벨 월 1일 이전에 시작했으면(월말 티저) 그 1일을 오픈일로 본다.
+// sure=false면 날짜만으로 오픈일을 특정 못 한 것 — _amRoundsOf가 직전 회차 티저 일수로 보정.
 function _amMainStart(evs, start, end) {
     const main = evs.find(e => _amEvPart(e.name) === 'main');
-    if (main) return main.start;
+    if (main) return { date: main.start, sure: true };
     const lbl = evs.map(e => (e.name.match(/^(\d{1,2})월\s/) || [])[1]).find(Boolean);
     if (lbl) {
         const first = `${_amShiftDays(start, 3).slice(0, 4)}-${String(lbl).padStart(2, '0')}-01`;
-        if (first > start && first <= end) return first;
+        if (first >= start && first <= end) return { date: first, sure: true };
     }
-    return start;
+    return { date: start, sure: false };
 }
 function _amRoundSlice(round, part) {
     const parts = AM_PART_MATCH[part] || [part];
@@ -126,7 +137,9 @@ function _amRoundSlice(round, part) {
     const main = evs.find(e => _amEvPart(e.name) !== 'teaser') || evs[0];
     const start = evs.reduce((m, e) => e.start < m ? e.start : m, evs[0].start);
     const end = evs.reduce((m, e) => e.end > m ? e.end : m, evs[0].end);
-    return { name: main.name, names: new Set(evs.map(e => e.name)), start, end, mainStart: _amMainStart(evs, start, end) };
+    const hasMain = evs.some(e => ['main', 'all'].includes(_amEvPart(e.name)));
+    const mainStart = hasMain && round.mainStart >= start && round.mainStart <= end ? round.mainStart : start;
+    return { name: main.name, names: new Set(evs.map(e => e.name)), start, end, mainStart };
 }
 
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
@@ -496,7 +509,8 @@ function _amRender() {
 
         const latest = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
         const inProgress = latest && evMeta.end >= latest;
-        const curMain = _amMainStart([evMeta], evMeta.start, evMeta.end);
+        const curMain = curRound && part === 'all' && curRound.mainStart >= evMeta.start && curRound.mainStart <= evMeta.end
+            ? curRound.mainStart : evMeta.start;
         const dayN = inProgress ? _amDaysInclusive(curMain, latest) : 0;
         const winEnd = sl => inProgress ? _amShiftDays(sl.mainStart, dayN - 1) : sl.end;
         const winStart = sl => inProgress ? sl.mainStart : sl.start;
