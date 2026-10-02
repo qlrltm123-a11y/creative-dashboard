@@ -16,14 +16,15 @@ const AM_FUTURE_CUTOFF = '2026-08-01';
 //믿지 않고, 과거 데이터와 똑같이 "날짜가 그 기간의 행사와 겹치면 그 행사로 편입"한다.
 // (예: 8월에 도는 AO 소재는 그 기간의 '8월 MEGAPO'가 있으면 같이 잡힘, 없으면 상시광고)
 const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '']);
-// creatives event(반복 행사) → 'N월 EVENT' 라벨 (예: 8월 Megapo → '8월 MEGAPO')
-// AO/RT/UA 등은 null 반환 — 호출측에서 날짜 겹침으로 나중에 재판정한다.
-function _amCreativeEvent(code, date) {
+// creatives event(반복 행사) 코드 → 대문자 코드. 'N월' 회차 라벨은 _amLabelCreativeRounds가
+// 연속 구간 단위로 붙인다. AO/RT/UA 등은 null 반환 — 호출측에서 날짜 겹침으로 나중에 재판정한다.
+function _amCreativeEvent(code) {
     const c = (code || '').trim();
     if (AM_NON_EVENTS.has(c)) return null;
-    const m = parseInt((date || '').slice(5, 7), 10);
-    return (m ? m + '월 ' : '') + c.toUpperCase();
+    return c.toUpperCase();
 }
+// 같은 유형 이벤트 사이 공백이 이 일수 이하면 한 회차(티저→본행사→애프터)로 묶는다.
+const AM_ROUND_GAP_DAYS = 4;
 
 let _amRows = null;          // [{date, brand, retail, media, product, event, imp, click, cost, cv, rev}]
 let _amEvents = null;        // [{start, end, name, grade, retail}]
@@ -52,8 +53,9 @@ function _amInt(v) { return Math.round(v).toLocaleString(); }
 function _amPct(v) { return (v || 0).toFixed(0) + '%'; }
 
 // ── 기간 비교용 날짜 헬퍼 ──
-function _amShiftDays(d, n) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
-function _amShiftYears(d, n) { const x = new Date(d + 'T00:00:00'); x.setFullYear(x.getFullYear() + n); return x.toISOString().slice(0, 10); }
+// UTC 기준으로 계산 — 로컬 자정을 toISOString하면 KST에서 하루 밀린다.
+function _amShiftDays(d, n) { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+function _amShiftYears(d, n) { const x = new Date(d + 'T00:00:00Z'); x.setUTCFullYear(x.getUTCFullYear() + n); return x.toISOString().slice(0, 10); }
 function _amDaysInclusive(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
 // 이벤트명에서 회차 접두(2607 / 262Q / 8월 등) 제거 → 이벤트 '유형'
 // (예: '2607 메가포' → '메가포', '8월 MEGAPO' → 'MEGAPO')
@@ -80,6 +82,44 @@ function _amCanonicalType(name) {
     }
     return up; // 매핑 안 된 유형은 기존처럼 이름 그대로 비교(정확히 같은 이름끼리만 매칭)
 }
+// 회차 내 구간: 티저/애프터/본행사. creatives 기반 'N월 CODE'는 티저+본행사가 한 라벨로
+// 섞여 있어 'all'로 본다.
+function _amEvPart(name) {
+    const s = (name || '').toUpperCase();
+    if (/애프터|AFTER/.test(s)) return 'after';
+    if (/티져|티저|TEASER/.test(s)) return 'teaser';
+    return /^\d{1,2}월\s/.test(name || '') ? 'all' : 'main';
+}
+// 현재 구간과 비교할 상대 회차의 구간 (본행사끼리, 티저끼리 … / 'all'은 티저+본행사)
+const AM_PART_MATCH = { all: ['teaser', 'main', 'all'], main: ['main', 'all'], teaser: ['teaser'], after: ['after'] };
+// 같은 리테일·같은 유형 이벤트를 날짜순으로 이어 붙여 회차 목록 생성
+function _amRoundsOf(retail, canon) {
+    const evs = _amEvents
+        .filter(e => e.retail === retail && _amCanonicalType(e.name) === canon)
+        .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+    const rounds = [];
+    evs.forEach(e => {
+        const last = rounds[rounds.length - 1];
+        if (last && _amDaysInclusive(last.end, e.start) - 1 <= AM_ROUND_GAP_DAYS) {
+            last.events.push(e);
+            if (e.end > last.end) last.end = e.end;
+        } else rounds.push({ start: e.start, end: e.end, events: [e] });
+    });
+    return rounds;
+}
+function _amRoundSlice(round, part) {
+    const parts = AM_PART_MATCH[part] || [part];
+    const evs = round.events.filter(e => parts.includes(_amEvPart(e.name)));
+    if (!evs.length) return null;
+    const main = evs.find(e => _amEvPart(e.name) !== 'teaser') || evs[0];
+    return {
+        name: main.name,
+        names: new Set(evs.map(e => e.name)),
+        start: evs.reduce((m, e) => e.start < m ? e.start : m, evs[0].start),
+        end: evs.reduce((m, e) => e.end > m ? e.end : m, evs[0].end),
+    };
+}
+
 // 증감 셀: goodUp=true면 상승이 긍정(초록). 비교 기간 값이 0이면 '-'
 function _amDeltaCell(cur, prev, goodUp) {
     if (!prev) return '<td class="am-d-na">-</td>';
@@ -265,11 +305,42 @@ function _amAddCreativeRows(crows) {
             media: _amMedia(r[cc.media]),
             adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
             product: _amProduct(r[cc.adname], brand),
-            event: _amCreativeEvent(r[cc.event], date),
+            event: _amCreativeEvent(r[cc.event]),
             imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
             cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]),
         });
     }
+    _amLabelCreativeRounds();
+}
+
+// 같은 행사 코드의 연속 구간(공백 AM_ROUND_GAP_DAYS 이하)을 한 회차로 묶어 'N월 CODE'로 라벨링.
+// 월은 회차 시작일+3일 기준 — 월말 티저(예: 9/28~)가 다음 달 본행사와 한 회차('10월 MEGAPO')로
+// 묶이게 한다. (행 날짜의 월로 붙이면 9/28~9/30이 '9월 MEGAPO'로 쪼개져 직전 비교가 깨진다)
+function _amLabelCreativeRounds() {
+    const byCode = new Map();
+    _amRows.forEach(r => {
+        if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
+        if (!byCode.has(r.event)) byCode.set(r.event, new Set());
+        byCode.get(r.event).add(r.date);
+    });
+    const labelOf = new Map();
+    byCode.forEach((dates, code) => {
+        const sorted = [...dates].sort();
+        let start = sorted[0], prev = sorted[0], members = [];
+        const flush = () => {
+            const m = parseInt(_amShiftDays(start, 3).slice(5, 7), 10);
+            members.forEach(d => labelOf.set(code + '|' + d, `${m}월 ${code}`));
+        };
+        sorted.forEach(d => {
+            if (members.length && _amDaysInclusive(prev, d) - 1 > AM_ROUND_GAP_DAYS) { flush(); start = d; members = []; }
+            members.push(d); prev = d;
+        });
+        flush();
+    });
+    _amRows.forEach(r => {
+        if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
+        r.event = labelOf.get(r.event + '|' + r.date) || r.event;
+    });
 }
 
 // creatives 기반 미래 이벤트(예: '8월 MEGAPO')를 날짜범위·리테일과 함께 _amEvents에 합성 추가
@@ -392,27 +463,42 @@ function _amRender() {
         </div>`;
 
     // 합계 요약 표 (+ 직전 행사 · 전년 동행사 증감)
-    // 직전/전년은 '같은 이벤트 유형'의 이전 회차·1년 전 회차와 비교
-    // (예: 7월 메가포 → 직전=직전 메가포(5월), 전년=작년 7월 메가포). 같은 리테일끼리만 매칭.
-    let prevAgg = null, yoyAgg = null, cmpLabel = '';
+    // 직전/전년은 '같은 이벤트 유형'의 이전 회차·1년 전 회차와 비교 — 티저/본행사/애프터를 한
+    // 회차로 묶어서 고르므로 '직전 달 아무 이벤트'나 같은 회차의 티저가 직전으로 잡히지 않는다.
+    // (예: 10월 MEGAPO → 직전=8월 MEGAPO, 전년=2510 메가포). 같은 리테일끼리만 매칭.
+    // 진행 중인 행사는 최신 데이터일까지의 경과 일수(N일차)만큼만 직전·전년 회차도 잘라 비교.
+    let prevAgg = null, yoyAgg = null, cmpLabel = '', cmpNote = '';
     if (evMeta) {
-        const curType = _amCanonicalType(evMeta.name);
-        const sameType = _amEvents
-            .filter(e => e.retail === evMeta.retail && _amCanonicalType(e.name) === curType)
-            .sort((a, b) => a.start.localeCompare(b.start));
-        const idx = sameType.findIndex(e => e.name === evMeta.name);
-        const prevEv = idx > 0 ? sameType[idx - 1] : null;
-        // 전년 동행사: 같은 유형 중 시작일이 (올해 시작 -1년)에 가장 가까운 회차 (90일 이내)
-        const yTarget = _amShiftYears(evMeta.start, -1);
-        let yoyEv = null, best = Infinity;
-        sameType.forEach(e => {
-            if (e.name === evMeta.name) return;
-            const diff = Math.abs((new Date(e.start) - new Date(yTarget)) / 86400000);
-            if (diff <= 90 && diff < best) { best = diff; yoyEv = e; }
+        const rounds = _amRoundsOf(evMeta.retail, _amCanonicalType(evMeta.name));
+        const idx = rounds.findIndex(rd => rd.events.some(e => e.name === evMeta.name));
+        const curRound = rounds[idx];
+        const part = _amEvPart(evMeta.name);
+        const prevSlice = idx > 0 ? _amRoundSlice(rounds[idx - 1], part) : null;
+        // 전년 동행사: 회차 시작일이 (올해 회차 시작 -1년)에 가장 가까운 회차 (90일 이내)
+        const yTarget = _amShiftYears(curRound ? curRound.start : evMeta.start, -1);
+        let yoyRound = null, best = Infinity;
+        rounds.forEach((rd, i) => {
+            if (i === idx) return;
+            const diff = Math.abs(_amDaysInclusive(yTarget, rd.start) - 1);
+            if (diff <= 90 && diff < best) { best = diff; yoyRound = rd; }
         });
-        if (prevEv) prevAgg = _amAgg(brandAll.filter(r => r.event === prevEv.name));
-        if (yoyEv) yoyAgg = _amAgg(brandAll.filter(r => r.event === yoyEv.name));
-        cmpLabel = `직전: ${prevEv ? _amEsc(prevEv.name) : '없음'} · 전년: ${yoyEv ? _amEsc(yoyEv.name) : '없음'}`;
+        const yoySlice = yoyRound ? _amRoundSlice(yoyRound, part) : null;
+
+        const latest = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
+        const inProgress = latest && evMeta.end >= latest;
+        const dayN = inProgress ? _amDaysInclusive(evMeta.start, latest) : 0;
+        const sliceRows = sl => {
+            const until = inProgress ? _amShiftDays(sl.start, dayN - 1) : sl.end;
+            return brandAll.filter(r => sl.names.has(r.event) && r.date >= sl.start && r.date <= until);
+        };
+        const periodOf = sl => `${sl.start.slice(2)}~${(inProgress ? _amShiftDays(sl.start, dayN - 1) : sl.end).slice(5)}`;
+        if (prevSlice) prevAgg = _amAgg(sliceRows(prevSlice));
+        if (yoySlice) yoyAgg = _amAgg(sliceRows(yoySlice));
+        cmpLabel = `직전: ${prevSlice ? `${_amEsc(prevSlice.name)} (${periodOf(prevSlice)})` : '없음'} · 전년: ${yoySlice ? `${_amEsc(yoySlice.name)} (${periodOf(yoySlice)})` : '없음'}`
+            + (inProgress ? ` · <b>진행 중 ${dayN}일차 기준</b>` : '');
+        cmpNote = inProgress
+            ? `진행 중이라 현재(${evMeta.start.slice(5)}~${latest.slice(5)}, ${dayN}일차)와 같은 일수만큼 직전·전년 회차의 첫 ${dayN}일을 잘라 비교합니다.`
+            : '직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 전체 기간 기준.';
     }
     const metricDefs = [
         { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
@@ -439,7 +525,7 @@ function _amRender() {
                     ${hasCmp ? cmpPair(m, prevAgg) + cmpPair(m, yoyAgg) : ''}
                 </tr>`).join('')}</tbody>
             </table>
-            ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 행사·전년 동행사 증감이 표시됩니다.</p>` : `<p class="am-sum-note">직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 기준.</p>`}
+            ${!hasCmp ? `<p class="am-sum-note">특정 이벤트를 선택하면 직전 행사·전년 동행사 증감이 표시됩니다.</p>` : `<p class="am-sum-note">${cmpNote}</p>`}
         </div>`;
 
     // 매체별 ROAS
