@@ -123,6 +123,8 @@ function _amRoundsOf(retail, canon) {
 function _amMainStart(evs, start, end) {
     const main = evs.find(e => _amEvPart(e.name) === 'main');
     if (main) return { date: main.start, sure: true };
+    const tagged = evs.map(e => e.mainStart).filter(Boolean).sort()[0];
+    if (tagged) return { date: tagged, sure: true };
     const lbl = evs.map(e => (e.name.match(/^(\d{1,2})월\s/) || [])[1]).find(Boolean);
     if (lbl) {
         const first = `${_amShiftDays(start, 3).slice(0, 4)}-${String(lbl).padStart(2, '0')}-01`;
@@ -317,6 +319,7 @@ function _amAddCreativeRows(crows) {
         cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'],
     };
     if (cc.date == null) return;
+    const phaseCol = _amFindPhaseCol(crows);
     for (let i = 1; i < crows.length; i++) {
         const r = crows[i]; if (!r) continue;
         const date = (r[cc.date] || '').trim();
@@ -328,6 +331,7 @@ function _amAddCreativeRows(crows) {
             adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
             product: _amProduct(r[cc.adname], brand),
             event: _amCreativeEvent(r[cc.event]),
+            phase: phaseCol < 0 ? '' : _amPhase(r[phaseCol]),
             imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
             cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]),
         });
@@ -335,22 +339,47 @@ function _amAddCreativeRows(crows) {
     _amLabelCreativeRounds();
 }
 
+// creatives AC열: 행사 소재는 Teaser/MainEvent, AO는 공란. 헤더 이름이 정해져 있지 않아
+// 값(Teaser/MainEvent)이 들어 있는 열을 찾아 쓴다. 없으면 -1 → 기존 날짜 추정 규칙 사용.
+function _amPhase(v) {
+    const s = (v || '').trim().toLowerCase().replace(/[\s_-]/g, '');
+    return s === 'teaser' ? 'teaser' : (s === 'mainevent' || s === 'main') ? 'main' : '';
+}
+function _amFindPhaseCol(crows) {
+    const width = crows.reduce((m, r) => Math.max(m, r ? r.length : 0), 0);
+    let best = -1, bestHits = 0;
+    for (let j = 0; j < width; j++) {
+        let hits = 0, other = 0;
+        for (let i = 1; i < crows.length; i++) {
+            const v = (crows[i] || [])[j];
+            if (!v || !v.trim()) continue;
+            if (v.length <= 12 && _amPhase(v)) hits++; else other++;
+            if (other > 200 && hits * 9 < other) break; // 다른 값이 대부분인 열은 조기 종료
+        }
+        if (hits > bestHits && hits >= other * 9) { best = j; bestHits = hits; }
+    }
+    return best;
+}
+
 // 같은 행사 코드의 연속 구간(공백 AM_ROUND_GAP_DAYS 이하)을 한 회차로 묶어 'N월 CODE'로 라벨링.
 // 월은 회차 시작일+3일 기준 — 월말 티저(예: 9/28~)가 다음 달 본행사와 한 회차('10월 MEGAPO')로
 // 묶이게 한다. (행 날짜의 월로 붙이면 9/28~9/30이 '9월 MEGAPO'로 쪼개져 직전 비교가 깨진다)
 function _amLabelCreativeRounds() {
-    const byCode = new Map();
+    const byCode = new Map(), mainDates = new Set();
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
         if (!byCode.has(r.event)) byCode.set(r.event, new Set());
         byCode.get(r.event).add(r.date);
+        if (r.phase === 'main') mainDates.add(r.event + '|' + r.date);
     });
     const labelOf = new Map();
     byCode.forEach((dates, code) => {
         const sorted = [...dates].sort();
         let start = sorted[0], prev = sorted[0], members = [];
+        // AC열 MainEvent가 있으면 본행사 첫날의 월, 없으면 시작일+3일의 월
         const flush = () => {
-            const m = parseInt(_amShiftDays(start, 3).slice(5, 7), 10);
+            const firstMain = members.find(d => mainDates.has(code + '|' + d));
+            const m = parseInt((firstMain || _amShiftDays(start, 3)).slice(5, 7), 10);
             members.forEach(d => labelOf.set(code + '|' + d, `${m}월 ${code}`));
         };
         sorted.forEach(d => {
@@ -371,16 +400,18 @@ function _amAddFutureEvents() {
     const fut = new Map();
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
-        if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {} });
+        if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {}, main: '' });
         const f = fut.get(r.event);
         if (r.date < f.min) f.min = r.date;
         if (r.date > f.max) f.max = r.date;
+        if (r.phase === 'main' && (!f.main || r.date < f.main)) f.main = r.date;
         f.retail[r.retail] = (f.retail[r.retail] || 0) + 1;
     });
     fut.forEach((f, name) => {
         if (_amEvents.some(e => e.name === name)) return;
         const retail = (Object.entries(f.retail).sort((a, b) => b[1] - a[1])[0] || [''])[0];
-        _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail });
+        // mainStart: AC열 MainEvent 첫날 (없으면 '' → _amMainStart가 날짜로 추정)
+        _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail, mainStart: f.main });
     });
 }
 
