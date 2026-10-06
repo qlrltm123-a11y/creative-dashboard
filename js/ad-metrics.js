@@ -274,7 +274,7 @@ function _amEnsureData() {
             header.forEach((h, i) => { idx[(h || '').trim()] = i; });
             const col = {
                 date: idx['날짜'], brand: idx['브랜드'], retail: idx['Retail'], media: idx['매체'],
-                obj: idx['목적'], ctype: idx['소재타입'], adname: idx['광고명'],
+                obj: idx['목적'], ctype: idx['소재타입'], adname: idx['광고명'], camp: idx['캠페인'],
                 imp: idx['노출수'], click: idx['클릭수'], cost: idx['광고비(₩)'],
                 cv: idx['구매수'], rev: idx['구매전환값(₩)'],
             };
@@ -298,6 +298,28 @@ function _amEnsureData() {
             }
             // 2) 미래(CUTOFF 이후): creatives 탭 — 이벤트는 event 컬럼(N월 라벨). cost/sales 이미 원화.
             if (crText) _amAddCreativeRows(parse(crText));
+            // 2-1) creatives 탭에 캠페인이 통째로 빠진 경우(본기간 Purchase·Challengers·Criteo 등)
+            //      실제 소진과 일치하는 ad-performance에서 (캠페인×날짜) 누락분만 보충.
+            //      이벤트는 비워두고 4)에서 날짜 겹침으로 판정.
+            const crKeys = new Set(_amRows.filter(r => r.date >= AM_FUTURE_CUTOFF).map(r => r.camp + '|' + r.date));
+            for (let i = 1; i < rows.length; i++) {
+                const r = rows[i];
+                if (!r || r.length < 5) continue;
+                const date = (r[col.date] || '').trim();
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < AM_FUTURE_CUTOFF) continue;
+                const camp = (r[col.camp] || '').trim().toLowerCase();
+                if (crKeys.has(camp + '|' + date)) continue;
+                const brand = (r[col.brand] || '').trim();
+                _amRows.push({
+                    date, brand, retail: (r[col.retail] || '').trim(), camp,
+                    media: _amMedia(r[col.media]),
+                    adname: (r[col.adname] || '').trim() || '(광고명 없음)',
+                    product: _amProduct(r[col.adname], brand),
+                    event: null, phase: '',
+                    imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
+                    cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
+                });
+            }
             // 3) creatives 기반 미래 이벤트를 캘린더에 합성 추가 (직전/전년 비교 가능하도록)
             _amAddFutureEvents();
             // 4) AO/RT/UA 행을 날짜 겹침으로 재판정 (같은 기간 행사에 편입, 없으면 상시광고)
@@ -317,7 +339,7 @@ function _amAddCreativeRows(crows) {
     const cc = {
         date: ci['date'], brand: ci['brand'], retail: ci['retail'], media: ci['media'],
         adname: ci['ad_name'], imp: ci['impressions'], click: ci['clicks'],
-        cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'],
+        cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'], camp: ci['campaign_name'],
     };
     if (cc.date == null) return;
     const phaseCol = _amFindPhaseCol(crows);
@@ -328,6 +350,7 @@ function _amAddCreativeRows(crows) {
         const brand = (r[cc.brand] || '').trim();
         _amRows.push({
             date, brand, retail: (r[cc.retail] || '').trim(),
+            camp: (r[cc.camp] || '').trim().toLowerCase(),
             media: _amMedia(r[cc.media]),
             adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
             product: _amProduct(r[cc.adname], brand),

@@ -468,17 +468,16 @@ async function fetchGoogleSheet(url) {
     return csvToObjects(text);
 }
 
-// ── EC_rawdata(data/ad-performance.csv) 백필 — Criteo 한정 ────────────────
-// creatives_template "creatives" 탭에 Criteo 소재 단위 입력이 누락된 달이 있음
-// (5·6·7월 SingleOne_Criteo가 EC_rawdata에는 있는데 creatives 탭엔 8월치만 있음).
-// 두 시트의 매체명 표기 체계가 서로 달라(예: creatives 탭은 다른 명명 규칙을 씀)
-// 전체 매체를 대상으로 갭을 찾으면 오탐이 매우 커서(수만 행), 확인된 갭인
-// Criteo 계열로만 한정해서 EC_rawdata의 집계 행으로 채워 넣는다. creatives 탭에
-// 이미 있는 (플랫폼×브랜드×월) 조합은 절대 건드리지 않음(중복 집계 방지).
+// ── EC_rawdata(data/ad-performance.csv) 백필 ──────────────────────────────
+// creatives_template "creatives" 탭은 소재 등록 기준이라 캠페인이 통째로 빠지는 일이
+// 잦음(예: 10월 메가포 본기간 Purchase 캠페인, Challengers, Criteo 일부 월). 실제 매체
+// 소진과 일치하는 EC_rawdata에서 creatives에 없는 (캠페인×날짜) 행만 채워 넣는다.
+// 매체명 표기는 두 시트가 달라도 캠페인명은 같아서, 캠페인×날짜로 비교하면 브랜드·월별
+// 합계가 EC_rawdata와 일치함(중복 집계 없음 — 2026-10 검증). creatives 시작일 이전
+// 이력은 붙이지 않는다(소재 분석 범위 밖).
 // EC_rawdata는 헤더가 한국어+단위표기(광고비(₩) 등)라 csvToObjects의 별칭
 // 테이블과 안 맞는 것만 리네임해서, 기존 파싱/정규화 로직을 그대로 재사용한다.
 const AD_PERF_LOCAL_CSV = 'data/ad-performance.csv';
-const AD_PERF_BACKFILL_PLATFORMS = ['criteo']; // 확인된 갭만 — 필요시 여기에 추가
 const AD_PERF_HEADER_RENAME = {
     '캠페인': '캠페인명', '광고세트': '광고그룹', 'ctr(%)': 'ctr',
     '광고비(₩)': '광고비', '구매수': '전환수', '구매전환값(₩)': '매출', 'cpa(₩)': 'cpa',
@@ -499,20 +498,15 @@ async function _backfillFromAdPerformance(baseData) {
         const key = h.trim().toLowerCase();
         return AD_PERF_HEADER_RENAME[key] || h;
     }).join(',');
-    const adPerfObjs = csvToObjects(renamedHeader + '\n' + text.slice(nl + 1))
-        .filter(c => AD_PERF_BACKFILL_PLATFORMS.some(p => (c.platform || '').toLowerCase().includes(p)));
+    const adPerfObjs = csvToObjects(renamedHeader + '\n' + text.slice(nl + 1));
 
-    // creatives 탭에 이미 존재하는 (매체×브랜드×월) 조합 집합 — Criteo 관련만 비교
-    const existingKeys = new Set(baseData
-        .filter(c => AD_PERF_BACKFILL_PLATFORMS.some(p => (c.platform || '').toLowerCase().includes(p)))
-        .map(c => `${(c.platform || '').toLowerCase()}||${(c.brand || '').toLowerCase()}||${(c.start_date || '').slice(0, 7)}`)
-    );
-    const backfill = adPerfObjs.filter(c => {
-        const key = `${(c.platform || '').toLowerCase()}||${(c.brand || '').toLowerCase()}||${(c.start_date || '').slice(0, 7)}`;
-        return !existingKeys.has(key);
-    });
+    const day = c => (c.start_date || '').slice(0, 10);
+    const key = c => `${(c.campaign_name || '').trim().toLowerCase()}||${day(c)}`;
+    const minDate = baseData.reduce((m, c) => { const d = day(c); return d && d < m ? d : m; }, '9999');
+    const existingKeys = new Set(baseData.map(key));
+    const backfill = adPerfObjs.filter(c => day(c) >= minDate && !existingKeys.has(key(c)));
     if (backfill.length) {
-        console.warn(`[Sheets] EC_rawdata 백필(Criteo): creatives 탭에 없는 ${backfill.length}행을 EC_rawdata에서 보충`);
+        console.warn(`[Sheets] EC_rawdata 백필: creatives 탭에 없는 캠페인×날짜 ${backfill.length}행을 EC_rawdata에서 보충`);
     }
     return baseData.concat(backfill);
 }
