@@ -32,8 +32,9 @@ async function _cepFetchCsv() {
     throw lastErr || new Error('CEP 데이터 로드 실패');
 }
 
-// 폴백용 고정 인덱스 (헤더 탐지 실패 시): 검증 완료,브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,소구포인트,검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
-const CEP_COL = { brand: 1, name: 2, product: 3, start: 4, end: 5, url: 6, cep: 7, detail: 8, imp: 9, click: 10, ctr: 11, cost: 13, cv: 14, revenue: 17, roas: 18 };
+// 폴백용 고정 인덱스 (헤더 탐지 실패 시) — 현재 시트 배치:
+// A1,브랜드,소재명,제품,운영 시작일,운영 종료일,media urls,CEP (소구포인트),메시지,검증 상세,IMP,Click,CTR,CPC,COST,CV,CVR,CPA,Revenue,ROAS
+const CEP_COL = { brand: 1, name: 2, product: 3, start: 4, end: 5, url: 6, cep: 7, message: 8, detail: 9, imp: 10, click: 11, ctr: 12, cost: 14, cv: 15, revenue: 18, roas: 19 };
 
 // 헤더명 → 필드 자동 매핑: 시트에 컬럼이 추가/이동돼도 헤더 텍스트로 위치를 찾는다
 const CEP_HEADER_NAMES = {
@@ -41,17 +42,23 @@ const CEP_HEADER_NAMES = {
     cep: '소구포인트', detail: '검증 상세', message: '메시지',
     imp: 'IMP', click: 'Click', ctr: 'CTR', cost: 'COST', cv: 'CV', revenue: 'Revenue', roas: 'ROAS',
 };
+// 텍스트 컬럼은 헤더 문구가 바뀌어도(예: '소구포인트' → 'CEP (소구포인트)') 포함 관계로 찾는다.
+// 숫자 컬럼은 'CV'⊂'CVR'처럼 서로 포함되므로 정확히 일치할 때만 매칭.
+const CEP_FUZZY_FIELDS = new Set(['cep', 'detail', 'message', 'url', 'start', 'end']);
 function _cepDetectCols(headerRow) {
-    const norm = c => (c || '').trim().toLowerCase();
+    const norm = c => (c || '').replace(/\s+/g, '').toLowerCase();
     const cells = (headerRow || []).map(norm);
     const cols = {};
-    let found = 0;
     Object.entries(CEP_HEADER_NAMES).forEach(([field, label]) => {
-        const idx = cells.indexOf(label.toLowerCase());
-        if (idx >= 0) { cols[field] = idx; found++; }
+        const key = norm(label);
+        let idx = cells.indexOf(key);
+        if (idx < 0 && CEP_FUZZY_FIELDS.has(field)) idx = cells.findIndex(c => c.includes(key));
+        if (idx >= 0) cols[field] = idx;
     });
     // 핵심 컬럼(소재명/제품/소구포인트)을 못 찾으면 폴백 사용
-    return (cols.name != null && cols.product != null && cols.cep != null) ? cols : CEP_COL;
+    if (cols.name != null && cols.product != null && cols.cep != null) return cols;
+    console.warn('[CEP] 헤더 탐지 실패 — 고정 열 위치로 읽음. 시트 헤더를 확인하세요:', headerRow);
+    return CEP_COL;
 }
 
 const CEP_VERDICT_META = {
