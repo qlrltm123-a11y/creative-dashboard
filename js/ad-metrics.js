@@ -10,18 +10,20 @@
 const AM_AD_URL = 'data/ad-performance.csv';
 const AM_PROMO_URL = 'data/promotions.csv';
 const AM_CREATIVES_URL = 'data/creatives.csv';
-// 이 날짜 이후는 creatives 탭(event 컬럼) 기반으로 이벤트 라벨링 (과거=ad-performance+promotions)
-const AM_FUTURE_CUTOFF = '2026-08-01';
-// creatives event 컬럼값 중 실제 행사가 아닌 것(상시/타겟팅) — 이 행들은 자기 태그를 그대로
-//믿지 않고, 과거 데이터와 똑같이 "날짜가 그 기간의 행사와 겹치면 그 행사로 편입"한다.
-// (예: 8월에 도는 AO 소재는 그 기간의 '8월 MEGAPO'가 있으면 같이 잡힘, 없으면 상시광고)
-const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '']);
-// creatives event(반복 행사) 코드 → 대문자 코드. 'N월' 회차 라벨은 _amLabelCreativeRounds가
-// 연속 구간 단위로 붙인다. AO/RT/UA 등은 null 반환 — 호출측에서 날짜 겹침으로 나중에 재판정한다.
-function _amCreativeEvent(code) {
-    const c = (code || '').trim();
-    if (AM_NON_EVENTS.has(c)) return null;
-    return c.toUpperCase();
+// 실제 값은 로드 시 creatives 시트 첫 날짜(2026-04-28)로 덮어씀 — 그 이후 행은 시트 AB열(event)·AC열
+// (Teaser/MainEvent) 기준으로 행사를 판정하고, 이전 행만 promotions.csv 일정(날짜 겹침)으로 판정한다.
+let AM_FUTURE_CUTOFF = '2026-08-01';
+// AB열 값 중 특정 행사가 아닌 것 — 캠페인명 표기로 다시 판정 (AO는 별도로 상시광고 처리)
+const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '', '#REF!']);
+// 캠페인명의 행사 표기 (예: ..._Purchase_UA_Megapo_261001 → MEGAPO, ..._JP_AO_AO_RT_... → AO)
+const AM_CAMP_EVENT_RE = /_(After-Megawari|Megawari|Megapo|SuperSale|Marathon|Kankos|Kamitoku|AO)(?=_|$)/i;
+// 시트 AB열 값 우선, AO는 상시(행사 아님), RT/UA/#REF!/공란·시트 미등록 캠페인은 캠페인명 표기로 판정
+function _amEventCode(abValue, camp) {
+    const c = (abValue || '').trim();
+    if (/^ao$/i.test(c)) return 'AO';
+    if (c && !AM_NON_EVENTS.has(c)) return c.toUpperCase();
+    const m = (camp || '').match(AM_CAMP_EVENT_RE);
+    return m ? m[1].toUpperCase() : null;
 }
 // 같은 유형 이벤트 사이 공백이 이 일수 이하면 한 회차(티저→본행사→애프터)로 묶는다.
 const AM_ROUND_GAP_DAYS = 4;
@@ -265,7 +267,11 @@ function _amEnsureData() {
             fetch(AM_CREATIVES_URL, { cache: 'no-store' }).then(r => r.ok ? r.text() : '').catch(() => ''),
         ]).then(([adText, promoText, crText]) => {
             const parse = (typeof parseCSV === 'function') ? parseCSV : _amParseCSVFallback;
-            _amEvents = _amBuildEvents(parse(promoText));
+            const crRows = crText ? parse(crText) : null;
+            const crMin = _amCreativesMinDate(crRows);
+            if (crMin) AM_FUTURE_CUTOFF = crMin;
+            // promotions 일정은 creatives 시트가 없는 기간에만 사용 (이후는 시트 AB·AC열이 기준)
+            _amEvents = _amBuildEvents(parse(promoText)).filter(e => e.start < AM_FUTURE_CUTOFF);
 
             const rows = parse(adText);
             // 헤더 매핑
@@ -296,11 +302,11 @@ function _amEnsureData() {
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
                 });
             }
-            // 2) 미래(CUTOFF 이후): creatives 탭 — 이벤트는 event 컬럼(N월 라벨). cost/sales 이미 원화.
-            if (crText) _amAddCreativeRows(parse(crText));
+            // 2) CUTOFF 이후: creatives 탭 — 행사는 AB열(event), 티저/본기간은 AC열. cost/sales 이미 원화.
+            if (crRows) _amAddCreativeRows(crRows);
             // 2-1) creatives 탭에 캠페인이 통째로 빠진 경우(본기간 Purchase·Challengers·Criteo 등)
             //      실제 소진과 일치하는 ad-performance에서 (캠페인×날짜) 누락분만 보충.
-            //      이벤트는 비워두고 4)에서 날짜 겹침으로 판정.
+            //      행사는 캠페인명 표기로 판정(없으면 4)에서 날짜 겹침).
             const crKeys = new Set(_amRows.filter(r => r.date >= AM_FUTURE_CUTOFF).map(r => r.camp + '|' + r.date));
             for (let i = 1; i < rows.length; i++) {
                 const r = rows[i];
@@ -310,19 +316,22 @@ function _amEnsureData() {
                 const camp = (r[col.camp] || '').trim().toLowerCase();
                 if (crKeys.has(camp + '|' + date)) continue;
                 const brand = (r[col.brand] || '').trim();
+                const code = _amEventCode('', r[col.camp]);
                 _amRows.push({
                     date, brand, retail: (r[col.retail] || '').trim(), camp,
                     media: _amMedia(r[col.media]),
                     adname: (r[col.adname] || '').trim() || '(광고명 없음)',
                     product: _amProduct(r[col.adname], brand),
-                    event: null, phase: '',
+                    event: code === 'AO' ? null : code, ao: code === 'AO', phase: '',
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
                 });
             }
+            // 2-2) 행사 코드별 연속 구간 → 회차 라벨('10월 MEGAPO' 등). 보충 행까지 넣은 뒤에 묶어야 같은 회차로 합쳐짐
+            _amLabelCreativeRounds();
             // 3) creatives 기반 미래 이벤트를 캘린더에 합성 추가 (직전/전년 비교 가능하도록)
             _amAddFutureEvents();
-            // 4) AO/RT/UA 행을 날짜 겹침으로 재판정 (같은 기간 행사에 편입, 없으면 상시광고)
+            // 4) AO는 상시광고, 행사 판정이 안 된 나머지(RT/UA 등)만 날짜 겹침으로 판정
             _amResolveOpenEvents();
             return _amRows;
         }).finally(() => { _amLoadPromise = null; });
@@ -348,19 +357,27 @@ function _amAddCreativeRows(crows) {
         const date = (r[cc.date] || '').trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < AM_FUTURE_CUTOFF) continue;
         const brand = (r[cc.brand] || '').trim();
+        const code = _amEventCode(r[cc.event], r[cc.camp]);
         _amRows.push({
             date, brand, retail: (r[cc.retail] || '').trim(),
             camp: (r[cc.camp] || '').trim().toLowerCase(),
             media: _amMedia(r[cc.media]),
             adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
             product: _amProduct(r[cc.adname], brand),
-            event: _amCreativeEvent(r[cc.event]),
+            event: code === 'AO' ? null : code, ao: code === 'AO',
             phase: phaseCol < 0 ? '' : _amPhase(r[phaseCol]),
             imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
             cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]),
         });
     }
-    _amLabelCreativeRounds();
+}
+function _amCreativesMinDate(crows) {
+    if (!crows || crows.length < 2) return '';
+    const di = (crows[0] || []).findIndex(c => (c || '').trim().toLowerCase() === 'date');
+    if (di < 0) return '';
+    let min = '';
+    for (let i = 1; i < crows.length; i++) { const d = ((crows[i] || [])[di] || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(d) && (!min || d < min)) min = d; }
+    return min;
 }
 
 // creatives AC열: 행사 소재는 Teaser/MainEvent, AO는 공란. 헤더 이름이 정해져 있지 않아
@@ -439,13 +456,13 @@ function _amAddFutureEvents() {
     });
 }
 
-// AO/RT/UA(event=null) 행 재판정 — 과거 데이터와 동일하게 날짜+리테일이 겹치는 행사가 있으면
-// 그 행사로 편입하고, 없으면 '상시광고'. 미래 이벤트 캘린더가 완성된 뒤(=_amAddFutureEvents 이후)
-// 호출해야 그 기간에 도는 AO 소재도 '8월 MEGAPO' 등으로 같이 잡힌다.
+// 행사 미판정 행 처리 — 시트에서 AO로 적은 행은 행사 기간이어도 '상시광고'(시트 기준을 따름).
+// 그 외 판정이 안 된 행(RT/UA 태그, 캠페인명에 행사 표기 없는 보충 행)만 날짜+리테일 겹침으로 판정.
+// 미래 이벤트 캘린더가 완성된 뒤(=_amAddFutureEvents 이후) 호출해야 한다.
 function _amResolveOpenEvents() {
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || r.event) return;
-        r.event = _amEventFor(r.date, r.retail);
+        r.event = r.ao ? '상시광고' : _amEventFor(r.date, r.retail);
     });
 }
 
