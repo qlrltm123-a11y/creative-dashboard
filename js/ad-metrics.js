@@ -13,11 +13,11 @@ const AM_CREATIVES_URL = 'data/creatives.csv';
 // 실제 값은 로드 시 creatives 시트 첫 날짜(2026-04-28)로 덮어씀 — 그 이후 행은 시트 AB열(event)·AC열
 // (Teaser/MainEvent) 기준으로 행사를 판정하고, 이전 행만 promotions.csv 일정(날짜 겹침)으로 판정한다.
 let AM_FUTURE_CUTOFF = '2026-08-01';
-// AB열 값 중 특정 행사가 아닌 것 — 캠페인명 표기로 다시 판정 (AO는 별도로 상시광고 처리)
+// AB열 값 중 특정 행사가 아닌 것 — 캠페인명 표기로 다시 판정 (AO는 날짜 겹침으로 행사 편입 판정)
 const AM_NON_EVENTS = new Set(['AO', 'RT', 'UA', 'ao', 'rt', 'ua', '', '#REF!']);
 // 캠페인명의 행사 표기 (예: ..._Purchase_UA_Megapo_261001 → MEGAPO, ..._JP_AO_AO_RT_... → AO)
 const AM_CAMP_EVENT_RE = /_(After-Megawari|Megawari|Megapo|SuperSale|Marathon|Kankos|Kamitoku|AO)(?=_|$)/i;
-// 시트 AB열 값 우선, AO는 상시(행사 아님), RT/UA/#REF!/공란·시트 미등록 캠페인은 캠페인명 표기로 판정
+// 시트 AB열 값 우선, AO는 'AO'(이후 날짜 겹침으로 판정), RT/UA/#REF!/공란·시트 미등록 캠페인은 캠페인명 표기로 판정
 function _amEventCode(abValue, camp) {
     const c = (abValue || '').trim();
     if (/^ao$/i.test(c)) return 'AO';
@@ -456,13 +456,14 @@ function _amAddFutureEvents() {
     });
 }
 
-// 행사 미판정 행 처리 — 시트에서 AO로 적은 행은 행사 기간이어도 '상시광고'(시트 기준을 따름).
-// 그 외 판정이 안 된 행(RT/UA 태그, 캠페인명에 행사 표기 없는 보충 행)만 날짜+리테일 겹침으로 판정.
+// 행사 미판정 행 처리 — AO(상시) 및 판정이 안 된 행(RT/UA 태그, 캠페인명에 행사 표기 없는 보충 행)은
+// 날짜+리테일이 겹치는 행사가 있으면 그 행사로 편입(행사 기간에 함께 돌린 상시 소재도 행사 성과에 포함),
+// 없으면 '상시광고'. 행사 기간 자체는 시트 AB·AC열로 정해진 캘린더 기준.
 // 미래 이벤트 캘린더가 완성된 뒤(=_amAddFutureEvents 이후) 호출해야 한다.
 function _amResolveOpenEvents() {
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || r.event) return;
-        r.event = r.ao ? '상시광고' : _amEventFor(r.date, r.retail);
+        r.event = _amEventFor(r.date, r.retail);
     });
 }
 
