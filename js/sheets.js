@@ -12,9 +12,9 @@ const FX_RATE_KEY = 'jpy_to_krw_rate';
 const LOCAL_SHEET_CSV = 'data/creatives.csv';
 const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTVqotU6K1y0u9atjKrRpaFgDamwAdUmxldvBbYepguKNm6MzzRDm5uUMmEGFFw_R3EOxmu1_ihWfKE/pub?gid=1561941261&single=true&output=csv';
 
-// 💴 → 💰 엔화→원화 환율 (기본값: 1엔 = 9.5원, 2025년 5월 기준 근사치)
+// 💴 → 💰 엔화→원화 환율 (기본값: 1엔 = 8.4원, 영업팀 기준)
 // LocalStorage에 저장된 값이 있으면 우선 사용 (사용자가 UI에서 변경 가능)
-const DEFAULT_FX_JPY_TO_KRW = 9.5;
+const DEFAULT_FX_JPY_TO_KRW = 8.4;
 
 function getFxRate() {
     try {

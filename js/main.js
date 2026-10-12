@@ -546,7 +546,7 @@ function bindEvents() {
         fxBtn.addEventListener('click', async () => {
             const newRate = parseFloat(fxInput.value);
             if (isNaN(newRate) || newRate <= 0) {
-                alert('올바른 환율을 입력해주세요. (예: 9.5)');
+                alert('올바른 환율을 입력해주세요. (예: 8.4)');
                 return;
             }
             if (typeof window.setFxRate === 'function') {
@@ -1462,7 +1462,7 @@ function updateKPIs() {
     const spendEl = document.getElementById('kpi-spend');
     spendEl.innerHTML = formatKpiCurrency(spend);
     if (spendJpy > 0) {
-        spendEl.title = `원본: ¥${formatNumber(spendJpy)} (환율 ¥1 = ₩${(typeof window.getFxRate === 'function' ? window.getFxRate() : 9.5)})`;
+        spendEl.title = `원본: ¥${formatNumber(spendJpy)} (환율 ¥1 = ₩${(typeof window.getFxRate === 'function' ? window.getFxRate() : 8.4)})`;
     }
 
     // ★ KPI 증감 배지 — 최근 7일 vs 직전 7일 (start_date 없으면 정적 텍스트 fallback)

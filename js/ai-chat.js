@@ -132,7 +132,7 @@ function _acBuildContext() {
     try { actualsByDate = (JSON.parse(localStorage.getItem('smDash2')||'{}').actualsByDate) || {}; } catch(e) {}
     if (Object.keys(targets).length) {
         const gmv = {};
-        let _fx = 9.5;
+        let _fx = 8.4;
         try { const v = parseFloat(localStorage.getItem('jpy_to_krw_rate')); if (!isNaN(v) && v > 0) _fx = v; } catch(e) {}
         Object.keys(targets).forEach(brand => {
             gmv[brand] = Object.keys(targets[brand]).sort().map(dt => {
