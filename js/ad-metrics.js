@@ -25,6 +25,8 @@ function _amEventCode(abValue, camp) {
     const m = (camp || '').match(AM_CAMP_EVENT_RE);
     return m ? m[1].toUpperCase() : null;
 }
+// 회차별 본기간 종료일 (키 = 행사코드:오픈 월). 시트가 애프터 기간까지 같은 이벤트로 태깅한 회차만 지정.
+const AM_MAIN_END = { 'MEGAPO:2026-07': '2026-07-09', 'MEGAPO:2026-08': '2026-08-09' };
 // 같은 유형 이벤트 사이 공백이 이 일수 이하면 한 회차(티저→본행사→애프터)로 묶는다.
 const AM_ROUND_GAP_DAYS = 4;
 
@@ -421,8 +423,11 @@ function _amLabelCreativeRounds() {
         // AC열 MainEvent가 있으면 본행사 첫날의 월, 없으면 시작일+3일의 월
         const flush = () => {
             const firstMain = _amTrustedMain(members, d => mainDates.has(code + '|' + d), d => teaserDates.has(code + '|' + d));
-            const m = parseInt((firstMain || _amShiftDays(start, 3)).slice(5, 7), 10);
-            members.forEach(d => labelOf.set(code + '|' + d, `${m}월 ${code}`));
+            const ym = (firstMain || _amShiftDays(start, 3)).slice(0, 7);
+            const m = parseInt(ym.slice(5, 7), 10);
+            const mainEnd = AM_MAIN_END[`${code}:${ym}`];
+            // 본기간 종료일 이후(시트가 같은 이벤트로 태깅한 애프터 기간)는 'N월 AFTER-CODE'로 분리
+            members.forEach(d => labelOf.set(code + '|' + d, mainEnd && d > mainEnd ? `${m}월 AFTER-${code}` : `${m}월 ${code}`));
         };
         sorted.forEach(d => {
             if (members.length && _amDaysInclusive(prev, d) - 1 > AM_ROUND_GAP_DAYS) { flush(); start = d; members = []; }
