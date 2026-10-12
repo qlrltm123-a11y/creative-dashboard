@@ -125,7 +125,7 @@ function _amRoundsOf(retail, canon) {
 function _amMainStart(evs, start, end) {
     const main = evs.find(e => _amEvPart(e.name) === 'main');
     if (main) return { date: main.start, sure: true };
-    const tagged = evs.map(e => e.mainStart).filter(Boolean).sort()[0];
+    const tagged = evs.filter(e => _amEvPart(e.name) !== 'after').map(e => e.mainStart).filter(Boolean).sort()[0];
     if (tagged) return { date: tagged, sure: true };
     const lbl = evs.map(e => (e.name.match(/^(\d{1,2})월\s/) || [])[1]).find(Boolean);
     if (lbl) {
@@ -406,12 +406,13 @@ function _amFindPhaseCol(crows) {
 // 월은 회차 시작일+3일 기준 — 월말 티저(예: 9/28~)가 다음 달 본행사와 한 회차('10월 MEGAPO')로
 // 묶이게 한다. (행 날짜의 월로 붙이면 9/28~9/30이 '9월 MEGAPO'로 쪼개져 직전 비교가 깨진다)
 function _amLabelCreativeRounds() {
-    const byCode = new Map(), mainDates = new Set();
+    const byCode = new Map(), mainDates = new Set(), teaserDates = new Set();
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
         if (!byCode.has(r.event)) byCode.set(r.event, new Set());
         byCode.get(r.event).add(r.date);
         if (r.phase === 'main') mainDates.add(r.event + '|' + r.date);
+        if (r.phase === 'teaser') teaserDates.add(r.event + '|' + r.date);
     });
     const labelOf = new Map();
     byCode.forEach((dates, code) => {
@@ -419,7 +420,7 @@ function _amLabelCreativeRounds() {
         let start = sorted[0], prev = sorted[0], members = [];
         // AC열 MainEvent가 있으면 본행사 첫날의 월, 없으면 시작일+3일의 월
         const flush = () => {
-            const firstMain = members.find(d => mainDates.has(code + '|' + d));
+            const firstMain = _amTrustedMain(members, d => mainDates.has(code + '|' + d), d => teaserDates.has(code + '|' + d));
             const m = parseInt((firstMain || _amShiftDays(start, 3)).slice(5, 7), 10);
             members.forEach(d => labelOf.set(code + '|' + d, `${m}월 ${code}`));
         };
@@ -435,24 +436,36 @@ function _amLabelCreativeRounds() {
     });
 }
 
+// AC열 MainEvent 첫날을 오픈일로 쓰되, Teaser가 그 이후 날짜에도 찍혀 있으면(시트 입력 뒤바뀜)
+// 신뢰하지 않고 '' 반환 → 날짜 규칙(메가포=라벨 달 1일, 메가와리=직전 티저 일수)으로 추정.
+function _amTrustedMain(dates, isMain, isTeaser) {
+    const sorted = [...dates].sort();
+    const firstMain = sorted.find(isMain);
+    if (!firstMain) return '';
+    return sorted.some(d => isTeaser(d) && d >= firstMain) ? '' : firstMain;
+}
+
 // creatives 기반 미래 이벤트(예: '8월 MEGAPO')를 날짜범위·리테일과 함께 _amEvents에 합성 추가
 // (event=null인 AO/RT/UA 행은 아직 특정 행사가 아니므로 제외 — 캘린더가 완성된 뒤 재판정)
 function _amAddFutureEvents() {
     const fut = new Map();
     _amRows.forEach(r => {
         if (r.date < AM_FUTURE_CUTOFF || !r.event) return;
-        if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {}, main: '' });
+        if (!fut.has(r.event)) fut.set(r.event, { min: r.date, max: r.date, retail: {}, dates: new Set(), main: new Set(), teaser: new Set() });
         const f = fut.get(r.event);
         if (r.date < f.min) f.min = r.date;
         if (r.date > f.max) f.max = r.date;
-        if (r.phase === 'main' && (!f.main || r.date < f.main)) f.main = r.date;
+        f.dates.add(r.date);
+        if (r.phase === 'main') f.main.add(r.date);
+        if (r.phase === 'teaser') f.teaser.add(r.date);
         f.retail[r.retail] = (f.retail[r.retail] || 0) + 1;
     });
     fut.forEach((f, name) => {
         if (_amEvents.some(e => e.name === name)) return;
         const retail = (Object.entries(f.retail).sort((a, b) => b[1] - a[1])[0] || [''])[0];
-        // mainStart: AC열 MainEvent 첫날 (없으면 '' → _amMainStart가 날짜로 추정)
-        _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail, mainStart: f.main });
+        // mainStart: AC열 MainEvent 첫날 (없거나 티저와 뒤바뀌어 있으면 '' → _amMainStart가 날짜로 추정)
+        const mainStart = _amTrustedMain(f.dates, d => f.main.has(d), d => f.teaser.has(d));
+        _amEvents.push({ start: f.min, end: f.max, name, grade: '', retail, mainStart });
     });
 }
 
