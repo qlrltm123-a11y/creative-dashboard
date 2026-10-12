@@ -371,6 +371,27 @@
             <div id="appeal-insight-content"></div>
         </section>
 
+        <!-- 소구(컨셉)별 효율 — 광고명 컨셉 토큰 기준, 제품 평균 대비 -->
+        <section class="chart-card mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="chart-title"><i class="fas fa-layer-group mr-2 text-emerald-500"></i>소구(컨셉)별 효율 <span class="info-tip" tabindex="0" data-tip="광고명 두 번째 칸(예: SoftBlurEye_MoodSwitch_… → MoodSwitch)으로 같은 컨셉 소재를 묶어, 같은 조건의 제품 평균 ROAS 대비 몇 배인지 보여줘요. 1.2배 이상=확대, 0.8배 미만=지양.">ⓘ</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">💡 <b>이걸로 알 수 있는 것</b>: 지금 필터 조건에서 제품별로 어떤 컨셉이 효율 좋은지 → 다음 소재 기획 방향 (썸네일 = 컨셉 대표 소재 · 6/15 이전은 매출 집계 기준이 달라 제외)</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-1 text-xs text-slate-600 cursor-pointer"><input type="checkbox" id="concept-exclude-collab" checked> 콜라보 제외</label>
+                    <select id="concept-sort" class="filter-select text-sm">
+                        <option value="idx" selected>평균 대비 배수</option>
+                        <option value="sp">광고비</option>
+                        <option value="ctr">클릭률(CTR)</option>
+                        <option value="cvr">구매전환율(CVR)</option>
+                        <option value="cpatc">장바구니 단가(낮은순)</option>
+                    </select>
+                </div>
+            </div>
+            <div id="concept-efficiency-content"></div>
+        </section>
+
         <!-- 정렬 기준 (제품은 상단 통합 필터에서 제어) -->
         <section class="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <div class="flex flex-wrap items-center gap-3">
@@ -978,6 +999,7 @@
     <script defer src="js/cep-verification.js?v=261006a"></script>
     <script defer src="js/ad-metrics.js?v=261012b"></script>
     <script defer src="js/ai-chat.js?v=260703"></script>
-    <script defer src="js/main.js?v=261002m"></script>
+    <script defer src="js/concept-efficiency.js?v=261012a"></script>
+    <script defer src="js/main.js?v=261012a"></script>
 </body>
 </html>

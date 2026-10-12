@@ -2992,6 +2992,10 @@ function renderPlatformMatrixHeatmap(enriched, platformTotals, appealTotals, met
 // "이 소구는 좋았다 → 다음에 이렇게 만들자"
 // ============================
 function renderAppealInsight() {
+    // 같은 필터 변경 시점에 소구(컨셉)별 효율도 함께 갱신
+    if (typeof renderConceptEfficiency === 'function') {
+        try { initConceptEfficiency(); renderConceptEfficiency(); } catch (e) { console.warn('[concept]', e); }
+    }
     const container = document.getElementById('appeal-insight-content');
     if (!container) return;
 
