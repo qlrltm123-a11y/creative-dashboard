@@ -1255,13 +1255,23 @@ function renderWeeklyReport() {
     _wrSaveFilter(); // 필터 상태 localStorage 저장
 
     // 날짜 범위 라벨
+    const pendingRows = list.filter(c => c._noMetrics);
     const rangeEl = document.getElementById('wr-range-label');
     if (rangeEl) {
         const hasDates = _wr.dateFrom || _wr.dateTo;
-        rangeEl.textContent = hasDates
+        rangeEl.textContent = (hasDates
             ? `${_wr.dateFrom || '?'} ~ ${_wr.dateTo || '?'} · ${list.length}개 소재`
-            : `전체 기간 · ${list.length}개 소재`;
+            : `전체 기간 · ${list.length}개 소재`)
+            + (pendingRows.length ? ` · 수치 대기 ${pendingRows.length}개` : '');
     }
+    const pendingDates = [...new Set(pendingRows.map(c => (c.start_date || '').slice(0, 10)).filter(Boolean))].sort();
+    const pendingNote = pendingRows.length
+        ? `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #fcd34d;background:#fffbeb;border-radius:12px;color:#92400e;font-size:13px;line-height:1.6">
+            <strong>⏳ 수치 대기 ${pendingRows.length}개 소재</strong> (${pendingDates.join(', ')})<br>
+            소재는 등록됐지만 성과 수치가 아직 시트에 들어오지 않았어요. 0으로 보이는 건 <strong>실적 0이 아니라 미반영</strong>이에요.
+            시트에 수치가 채워지고 동기화되면 자동으로 반영됩니다.
+           </div>`
+        : '';
 
     const body = document.getElementById('wr-body');
     if (!body) return;
@@ -1283,6 +1293,7 @@ function renderWeeklyReport() {
     }
 
     body.innerHTML =
+        pendingNote +
         _wrKpiSectionHtml(kpi, list.length) +
         _wrDailySectionHtml(byDaily) +
         _wrPlatformSectionHtml(byPlatform) +

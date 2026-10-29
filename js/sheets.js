@@ -222,6 +222,10 @@ function csvToObjects(csvText) {
 
     const numberFields = ['impressions', 'clicks', 'ctr', 'spend', 'conversions', 'cpa', 'roas', 'revenue', 'cpc', 'cvr', 'add_to_cart', 'atc_rate', 'cost_per_atc'];
     const arrayFields = ['appeal_points', 'hook_type', 'target_emotion'];
+    // 소재 행은 먼저 등록되고 성과 수치는 나중에 채워지는 경우가 있어, 빈칸(미반영)과 실제 0을 구분한다.
+    const METRIC_KEYS = ['impressions', 'clicks', 'spend', 'revenue', 'conversions'];
+    const hasMetricCols = headers.some(h => METRIC_KEYS.includes(h));
+    let sheetErrorEvents = 0;
 
     // ★ 숫자 파싱 함수 (쉼표, 통화기호, 퍼센트 처리)
     const parseNumber = (raw) => {
@@ -288,8 +292,10 @@ function csvToObjects(csvText) {
 
     const result = rows.slice(1).map((row, idx) => {
         const obj = {};
+        let metricFilled = false;
         headers.forEach((key, i) => {
             let val = (row[i] || '').trim();
+            if (val && METRIC_KEYS.includes(key)) metricFilled = true;
             if (numberFields.includes(key)) {
                 val = parseNumber(val);
             } else if (arrayFields.includes(key)) {
@@ -324,9 +330,15 @@ function csvToObjects(csvText) {
             obj.retail = RETAIL_DISPLAY[key] || obj.retail.trim();
         }
 
-        // event 필드 정규화
+        if (hasMetricCols && !metricFilled) obj._noMetrics = true;
+
+        // event 필드 정규화 — 시트 수식 오류값(#REF! 등)은 이벤트로 노출하지 않는다
         if (obj.event) {
             obj.event = String(obj.event).trim();
+            if (/^#(REF!|N\/A|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!|ERROR!)/i.test(obj.event)) {
+                obj.event = '';
+                sheetErrorEvents++;
+            }
         }
 
         // 장바구니(ATC) 파생 지표 자동 계산
@@ -451,6 +463,10 @@ function csvToObjects(csvText) {
         }
     });
 
+    if (sheetErrorEvents) {
+        console.warn(`[Sheets] event열 수식 오류값(#REF! 등) ${sheetErrorEvents}행 → 이벤트 없음으로 처리. 시트 event열 수식을 확인하세요.`);
+    }
+
     if (filtered.length === 0 && result.length > 0) {
         console.warn('[Sheets] ⚠️ 모든 행이 빈 값으로 판별됨. 첫 행 샘플:', result[0]);
     }
@@ -482,6 +498,8 @@ const AD_PERF_HEADER_RENAME = {
     '캠페인': '캠페인명', '광고세트': '광고그룹', 'ctr(%)': 'ctr',
     '광고비(₩)': '광고비', '구매수': '전환수', '구매전환값(₩)': '매출', 'cpa(₩)': 'cpa',
 };
+const AD_PERF_METRIC_FIELDS = ['impressions', 'clicks', 'spend', 'revenue', 'conversions', 'add_to_cart',
+    'ctr', 'cvr', 'roas', 'cpa', 'cpc', 'atc_rate', 'cost_per_atc'];
 async function _backfillFromAdPerformance(baseData) {
     let text;
     try {
@@ -502,9 +520,45 @@ async function _backfillFromAdPerformance(baseData) {
 
     const day = c => (c.start_date || '').slice(0, 10);
     const key = c => `${(c.campaign_name || '').trim().toLowerCase()}||${day(c)}`;
+    const adKey = c => `${key(c)}||${(c.ad_name || '').trim().toLowerCase()}`;
     const minDate = baseData.reduce((m, c) => { const d = day(c); return d && d < m ? d : m; }, '9999');
     const existingKeys = new Set(baseData.map(key));
-    const backfill = adPerfObjs.filter(c => day(c) >= minDate && !existingKeys.has(key(c)));
+
+    // creatives에 행은 있는데 수치가 빈칸인 경우(소재 등록이 수치 입력보다 먼저) — 같은
+    // 캠페인×날짜×광고명의 EC_rawdata 수치로 채운다. 캠페인×날짜 행이 전부 빈칸이면
+    // creatives에 없는 광고명 행도 보충한다(일부만 빈칸이면 중복 집계 위험이라 채우기만).
+    const total = new Map(), blank = new Map();
+    baseData.forEach(c => {
+        const k = key(c);
+        total.set(k, (total.get(k) || 0) + 1);
+        if (c._noMetrics) blank.set(k, (blank.get(k) || 0) + 1);
+    });
+    const fullyBlankKeys = new Set([...blank].filter(([k, n]) => n === total.get(k)).map(([k]) => k));
+    const perfByAd = new Map();
+    adPerfObjs.forEach(c => {
+        if (day(c) < minDate) return;
+        const k = adKey(c);
+        if (!perfByAd.has(k)) perfByAd.set(k, []);
+        perfByAd.get(k).push(c);
+    });
+    const consumed = new Set();
+    let filled = 0;
+    baseData.forEach(c => {
+        if (!c._noMetrics) return;
+        const src = (perfByAd.get(adKey(c)) || []).find(p => !consumed.has(p));
+        if (!src) return;
+        AD_PERF_METRIC_FIELDS.forEach(f => { c[f] = src[f]; });
+        consumed.add(src);
+        delete c._noMetrics;
+        c._metricsFrom = 'ad-performance';
+        filled++;
+    });
+
+    const backfill = adPerfObjs.filter(c => day(c) >= minDate && !consumed.has(c)
+        && (!existingKeys.has(key(c)) || fullyBlankKeys.has(key(c))));
+    if (filled) {
+        console.warn(`[Sheets] EC_rawdata 수치 채움: creatives 탭에서 수치가 빈 ${filled}행을 EC_rawdata 값으로 채움`);
+    }
     if (backfill.length) {
         console.warn(`[Sheets] EC_rawdata 백필: creatives 탭에 없는 캠페인×날짜 ${backfill.length}행을 EC_rawdata에서 보충`);
     }

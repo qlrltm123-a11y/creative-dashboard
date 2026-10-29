@@ -67,6 +67,32 @@ function _megapoEventLabel(c) {
 }
 // 성과 분석 섹션 전용 이벤트 매처 — Megapo는 위 월별 라벨 기준으로 매칭
 function _pfHasEvent(arr, c) { return !arr.length || arr.includes(_megapoEventLabel(c)); }
+
+// 헤더: 화면 연 시각 대신 "광고비가 들어온 마지막 날짜"를 보여줘 0원이 미반영인지 바로 알게 한다
+function _stampDataFreshness() {
+    const el = document.getElementById('last-updated');
+    if (!el) return;
+    const loadedAt = new Date().toLocaleString('ko-KR');
+    // 반영일은 전 브랜드 기준(시트 신선도), 수치 대기는 선택 브랜드에서 그날 광고비가 하나도 없는 날짜만
+    let lastPerf = '';
+    const pending = new Set(), brandSpendDays = new Set();
+    const inBrand = c => !currentBrand || currentBrand === 'ALL' || c.brand === currentBrand;
+    (allCreatives || []).forEach(c => {
+        const d = (c.start_date || '').slice(0, 10);
+        if (!d) return;
+        if (!c._noMetrics && (c.spend || 0) > 0) {
+            if (d > lastPerf) lastPerf = d;
+            if (inBrand(c)) brandSpendDays.add(d);
+        }
+        if (c._noMetrics && inBrand(c)) pending.add(d);
+    });
+    const md = d => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
+    const waiting = [...pending].filter(d => !brandSpendDays.has(d)).sort().slice(-3);
+    if (!lastPerf) { el.textContent = loadedAt; return; }
+    const who = currentBrand && currentBrand !== 'ALL' ? `${currentBrand} ` : '';
+    el.textContent = `성과 반영 ~${md(lastPerf)}` + (waiting.length ? ` · ${who}${waiting.map(md).join('·')} 수치 대기` : '');
+    el.title = `광고비가 들어온 마지막 날짜(전 브랜드 기준)${waiting.length ? ' · 수치 대기 = 소재는 등록됐지만 성과 수치가 아직 시트에 없음' : ''} · 화면 연 시각 ${loadedAt}`;
+}
 // AI 인사이트 섹션 — 복수 선택 배열 (단일 legacy 변수도 유지)
 let aiProducts = [];  let aiProduct = '';
 let aiCampaigns = []; let aiCampaign = '';
@@ -105,7 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
     bindEvents();
     updateDashboard();
-    document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
+    _stampDataFreshness();
     setStickyHeaderOffset();
 });
 
@@ -209,7 +235,7 @@ window.updateDashboard = function() {
     }
     // overview: updateKPIs + updateCharts 만으로 충분 (renderProductPerformance 불필요)
 
-    document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
+    _stampDataFreshness();
     // 날짜 picker min/max 범위를 전체 데이터 기준으로 설정
     _setDatePickerRange();
 };
@@ -563,7 +589,7 @@ function bindEvents() {
                     }
                 }
                 updateDashboard();
-                document.getElementById('last-updated').textContent = new Date().toLocaleString('ko-KR');
+                _stampDataFreshness();
             } catch (e) {
                 console.error('환율 적용 실패', e);
             } finally {
