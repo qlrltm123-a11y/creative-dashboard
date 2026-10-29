@@ -624,10 +624,22 @@ function _megapoEventLabel(dateStr, extraDays) {
 }
 function _detectMegapoBlocks(headerRow) {
   const blocks = [];
-  (headerRow || []).forEach((h, i) => {
-    if ((h || '').trim().toLowerCase() === 'date') blocks.push({ date:i, inflow:i+1, cart:i+2, buy:i+3 });
+  const header = headerRow || [];
+  header.forEach((h, i) => {
+    if ((h || '').trim().toLowerCase() !== 'date') return;
+    const prevEnd = blocks.length ? blocks[blocks.length - 1].buy : -1;
+    let eventCol = -1;
+    for (let k = i - 1; k > prevEnd; k--) {
+      if ((header[k] || '').trim().toLowerCase() === 'event') { eventCol = k; break; }
+    }
+    blocks.push({ date:i, inflow:i+1, cart:i+2, buy:i+3, event:eventCol });
   });
   return blocks;
+}
+// 시트 event열의 '2611 MEGAPO' → '11월 메가포'. TEASER/공란/기타는 null.
+function _megapoEventFromCode(code) {
+  const m = (code || '').trim().match(/^\d{2}(\d{2})\s*MEGAPO$/i);
+  return m ? `${parseInt(m[1], 10)}월 메가포` : null;
 }
 function parseMegapoBlocks(rows) {
   if (!rows || rows.length < 2) return {'262Q':{}, '261Q':{}};
@@ -652,6 +664,15 @@ function parseMegapoBlocks(rows) {
       }
     }
   }
+  // 시트 event열에 'YYMM MEGAPO' 코드가 있으면 그게 정답 — 같은 블록의 TEASER/공란 행도
+  // 그 회차로 묶는다(날짜+2일 추정은 티저 시작일에 따라 달이 어긋나 코드가 없을 때만 폴백).
+  blocks.forEach(b => {
+    b.label = null;
+    if (b.event < 0) return;
+    for (let i = 1; i < rows.length && !b.label; i++) {
+      b.label = rows[i] ? _megapoEventFromCode(rows[i][b.event]) : null;
+    }
+  });
   const merged = {};
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -665,8 +686,9 @@ function parseMegapoBlocks(rows) {
       if (inflow == null && cart == null && buy == null) return; // 아직 데이터 없는 블록
       if (!merged[prod]) merged[prod] = [];
       const extraDays = (b === firstBlock && teaserDates.has(date)) ? 3 : 2;
+      const ownLabel = b.event >= 0 ? _megapoEventFromCode(r[b.event]) : null;
       merged[prod].push({
-        date, inflow, cart, buy, event: _megapoEventLabel(date, extraDays),
+        date, inflow, cart, buy, event: ownLabel || b.label || _megapoEventLabel(date, extraDays),
         cartRate: (inflow > 0 && cart != null) ? cart / inflow * 100 : null,
         buyRate:  (cart > 0   && buy != null)  ? buy / cart * 100    : null,
       });
