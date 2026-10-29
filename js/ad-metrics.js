@@ -423,7 +423,10 @@ function _amLabelCreativeRounds() {
         // AC열 MainEvent가 있으면 본행사 첫날의 월, 없으면 시작일+3일의 월
         const flush = () => {
             const firstMain = _amTrustedMain(members, d => mainDates.has(code + '|' + d), d => teaserDates.has(code + '|' + d));
-            const ym = (firstMain || _amShiftDays(start, 3)).slice(0, 7);
+            // 메가포는 티저가 28일 이후(9/28·10/28 등)에 시작하면 다음 달 회차 — 31일 있는 달은 +3일로 못 넘김
+            const sd = parseInt(start.slice(8, 10), 10);
+            const guess = code === 'MEGAPO' ? (sd >= 28 ? _amShiftDays(start, 4) : start) : _amShiftDays(start, 3);
+            const ym = (firstMain || guess).slice(0, 7);
             const m = parseInt(ym.slice(5, 7), 10);
             const mainEnd = AM_MAIN_END[`${code}:${ym}`];
             // 본기간 종료일 이후(시트가 같은 이벤트로 태깅한 애프터 기간)는 'N월 AFTER-CODE'로 분리
