@@ -47,7 +47,7 @@ function _pfHas(arr, val) { return !arr.length || arr.includes((val || '').trim(
 function _pfKey() { return `${performanceEvents.join('+')}|${performanceProducts.join('+')}|${performanceCampaigns.join('+')}`; }
 
 // ★ MEGAPO는 매달 반복되는데 raw event 값이 전부 "Megapo"로 동일해 월별 구분이 안 된다.
-//   캠페인명 끝의 YYMMDD 날짜를 보고, 월말 3일(28~31일) 이내면 "다음 달 메가포"로,
+//   캠페인명 끝의 YYMMDD 날짜를 보고, 28일 이후(티징 시작 10/28·9/28·6/29 등)면 "다음 달 메가포"로,
 //   그 외에는 "해당 월 메가포"로 분류해 성과 분석 필터에서 월별로 선택할 수 있게 한다.
 //   (Megapo가 아닌 다른 이벤트는 원래 값 그대로 반환 — 영향 없음)
 function _megapoEventLabel(c) {
@@ -59,8 +59,7 @@ function _megapoEventLabel(c) {
     let month = parseInt(m[1].slice(2, 4), 10);
     const day = parseInt(m[1].slice(4, 6), 10);
     if (month < 1 || month > 12 || day < 1 || day > 31) return ev;
-    const daysInMonth = new Date(year, month, 0).getDate();
-    if (day >= daysInMonth - 2) {
+    if (day >= 28) {
         month += 1;
         if (month > 12) { month = 1; year += 1; }
     }
