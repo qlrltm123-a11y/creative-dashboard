@@ -114,8 +114,8 @@ function _amRoundsOf(retail, canon) {
     let teaserDays = 0;
     rounds.forEach(rd => {
         const r = _amMainStart(rd.events, rd.start, rd.end);
-        rd.mainStart = r.sure ? r.date
-            : (teaserDays && _amShiftDays(rd.start, teaserDays) <= rd.end ? _amShiftDays(rd.start, teaserDays) : rd.start);
+        // 추정 오픈일이 회차 마지막 데이터일 이후 = 아직 티저 진행 중 (오픈일은 미래 날짜로 둔다)
+        rd.mainStart = r.sure ? r.date : (teaserDays ? _amShiftDays(rd.start, teaserDays) : rd.start);
         const teaser = rd.events.find(e => _amEvPart(e.name) === 'teaser');
         if (teaser && rd.mainStart > teaser.start) teaserDays = _amDaysInclusive(teaser.start, rd.mainStart) - 1;
     });
@@ -132,7 +132,8 @@ function _amMainStart(evs, start, end) {
     const lbl = evs.map(e => (e.name.match(/^(\d{1,2})월\s/) || [])[1]).find(Boolean);
     if (lbl) {
         const first = `${_amShiftDays(start, 3).slice(0, 4)}-${String(lbl).padStart(2, '0')}-01`;
-        if (first >= start && first <= end) return { date: first, sure: true };
+        // 티저만 들어온 진행 중 회차(10/28~ → 11/1 오픈)도 오픈일을 특정한다
+        if (first >= start && (first <= end || _amDaysInclusive(start, first) - 1 <= 7)) return { date: first, sure: true };
     }
     return { date: start, sure: false };
 }
@@ -603,7 +604,7 @@ function _amRender() {
 
         const latest = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
         const inProgress = latest && evMeta.end >= latest;
-        const curMain = curRound && part === 'all' && curRound.mainStart >= evMeta.start && curRound.mainStart <= evMeta.end
+        const curMain = curRound && part === 'all' && curRound.mainStart >= evMeta.start
             ? curRound.mainStart : evMeta.start;
         const dayN = inProgress ? _amDaysInclusive(curMain, latest) : 0;
         const winEnd = sl => inProgress ? _amShiftDays(sl.mainStart, dayN - 1) : sl.end;
@@ -611,8 +612,23 @@ function _amRender() {
         const sliceRows = sl => brandAll.filter(r => sl.names.has(r.event) && r.date >= winStart(sl) && r.date <= winEnd(sl));
         const periodOf = sl => `${winStart(sl).slice(2)}~${winEnd(sl).slice(5)}`;
         if (inProgress && dayN <= 0) {
-            cmpLabel = `본행사 오픈(${curMain.slice(5)}) 전 티저 기간 — 오픈 후부터 직전·전년 비교`;
-            cmpNote = '본행사 오픈일 기준으로 비교하므로 티저 기간에는 비교 값을 표시하지 않습니다.';
+            // 본행사 오픈 전(티저 진행 중): 티저 첫날 기준으로 맞춰 직전·전년 회차의 티저와 비교.
+            // 상대 회차 티저가 더 짧으면 그 회차 오픈 전날까지만 (본행사 날짜가 섞이지 않게).
+            const curStart = rows.reduce((m, r) => !m || r.date < m ? r.date : m, '') || evMeta.start;
+            const tN = _amDaysInclusive(curStart, latest);
+            const tEnd = sl => {
+                const e = _amShiftDays(sl.start, tN - 1), cap = _amShiftDays(sl.mainStart, -1);
+                return e < cap ? e : cap;
+            };
+            const hasTeaser = sl => sl && sl.mainStart > sl.start;
+            const tRows = sl => brandAll.filter(r => sl.names.has(r.event) && r.date >= sl.start && r.date <= tEnd(sl));
+            const tPeriod = sl => hasTeaser(sl) ? `${sl.start.slice(2)}~${tEnd(sl).slice(5)}` : '티저 기록 없음';
+            curAgg = _amAgg(rows.filter(r => r.date >= curStart && r.date <= latest));
+            if (hasTeaser(prevSlice)) prevAgg = _amAgg(tRows(prevSlice));
+            if (hasTeaser(yoySlice)) yoyAgg = _amAgg(tRows(yoySlice));
+            cmpLabel = `직전: ${prevSlice ? `${_amEsc(prevSlice.name)} (${tPeriod(prevSlice)})` : '없음'} · 전년: ${yoySlice ? `${_amEsc(yoySlice.name)} (${tPeriod(yoySlice)})` : '없음'}`
+                + ` · <b>티저 ${tN}일차까지 기준</b>`;
+            cmpNote = `본행사 오픈(${curMain.slice(5)}) 전이라 티저 첫날 기준으로 맞춰 비교합니다 — 현재 ${curStart.slice(5)}~${latest.slice(5)}(티저 1~${tN}일차) vs 직전·전년 회차의 티저 첫날부터 ${tN}일(본행사 오픈 전까지).`;
         } else {
             if (inProgress) curAgg = _amAgg(rows.filter(r => r.date >= curMain && r.date <= latest));
             if (prevSlice) prevAgg = _amAgg(sliceRows(prevSlice));
