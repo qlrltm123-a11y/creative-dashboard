@@ -510,6 +510,7 @@ function _amAgg(list) {
     const s = { imp: 0, click: 0, cost: 0, cv: 0, rev: 0 };
     list.forEach(r => { s.imp += r.imp; s.click += r.click; s.cost += r.cost; s.cv += r.cv; s.rev += r.rev; });
     s.ctr = s.imp > 0 ? s.click / s.imp * 100 : 0;
+    s.cvr = s.click > 0 ? s.cv / s.click * 100 : 0;
     s.roas = s.cost > 0 ? s.rev / s.cost * 100 : 0;
     s.cpa = s.cv > 0 ? s.cost / s.cv : 0;
     return s;
@@ -647,8 +648,9 @@ function _amRender() {
         { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
         { l: '노출', f: v => _amInt(v.imp), g: true, k: 'imp' },
         { l: '클릭', f: v => _amInt(v.click), g: true, k: 'click' },
-        { l: 'CTR', f: v => v.ctr.toFixed(2) + '%', g: true, k: 'ctr' },
+        { l: 'CTR (클릭÷노출)', f: v => v.ctr.toFixed(2) + '%', g: true, k: 'ctr' },
         { l: '구매수', f: v => _amInt(v.cv), g: true, k: 'cv' },
+        { l: 'CVR (구매÷클릭)', f: v => v.cvr.toFixed(2) + '%', g: true, k: 'cvr' },
         { l: '매출', f: v => _amKRWshort(v.rev), g: true, k: 'rev' },
         { l: 'ROAS', f: v => _amPct(v.roas), g: true, k: 'roas' },
         { l: 'CPA', f: v => v.cv > 0 ? _amKRW(v.cpa) : '-', g: false, k: 'cpa' },
@@ -677,31 +679,64 @@ function _amRender() {
     if (evMeta) {
         const canon = _amCanonicalType(evMeta.name);
         const latestAll = brandAll.reduce((m, r) => r.date > m ? r.date : m, '');
-        roundSeries = _amRoundsOf(evMeta.retail, canon).map(rd => {
+        const allRounds = _amRoundsOf(evMeta.retail, canon);
+        // 진행 중 회차가 있으면 모든 회차를 같은 진행 일차로 잘라 비교 (합계 표의 직전 비교와 같은 규칙):
+        // 본행사 중이면 각 회차 오픈일부터 N일, 티저 중이면 각 회차 티저 첫날부터 N일(오픈 전날까지)
+        const ongoingRd = latestAll ? allRounds.find(rd => rd.end >= latestAll) : null;
+        let align = null;
+        if (ongoingRd) {
+            const onames = new Set(ongoingRd.events.map(e => e.name));
+            const orows = brandAll.filter(r => onames.has(r.event));
+            const ph = new Set(orows.map(r => r.phase));
+            const dN = _amDaysInclusive(ongoingRd.mainStart, latestAll);
+            if ((ph.has('teaser') && !ph.has('main')) || dN <= 0) {
+                const ostart = orows.reduce((m, r) => !m || r.date < m ? r.date : m, '') || ongoingRd.start;
+                align = { kind: 'teaser', n: _amDaysInclusive(ostart, latestAll), ostart };
+            } else align = { kind: 'main', n: dN };
+        }
+        const windowOf = rd => {
+            if (!align) return null;
+            if (align.kind === 'main') return { from: rd.mainStart, to: _amShiftDays(rd.mainStart, align.n - 1) };
+            const from = rd === ongoingRd ? align.ostart : rd.start;
+            if (rd.mainStart <= from) return { none: true };   // 티저 기록 없는 회차
+            const e = _amShiftDays(from, align.n - 1), cap = _amShiftDays(rd.mainStart, -1);
+            return { from, to: e < cap ? e : cap };
+        };
+        const buildSeries = aligned => allRounds.map(rd => {
             const names = new Set(rd.events.map(e => e.name));
-            const a = _amAgg(brandAll.filter(r => names.has(r.event)));
-            const ongoing = !!latestAll && rd.end >= latestAll;
+            const ongoing = rd === ongoingRd;
+            const w = aligned ? windowOf(rd) : null;
+            if (w && w.none) return null;
+            const a = _amAgg(brandAll.filter(r => names.has(r.event) && (!w || (r.date >= w.from && r.date <= w.to))));
+            const to = w ? (ongoing && w.to > latestAll ? latestAll : w.to) : (ongoing ? latestAll : rd.end);
             return {
                 ...a, ongoing,
                 label: rd.mainStart.slice(2, 7).replace('-', '.'),
-                period: `${rd.start.slice(5)}~${(ongoing ? latestAll : rd.end).slice(5)}`,
+                period: `${(w ? w.from : rd.start).slice(5)}~${to.slice(5)}`,
                 dayN: ongoing ? Math.max(0, _amDaysInclusive(rd.mainStart, latestAll)) : 0,
                 cur: rd.events.some(e => e.name === evMeta.name),
                 noRev: a.rev === 0,
             };
-        }).filter(s => s.cost > 0);
-        roundSeries.forEach(s => {
+        }).filter(s => s && s.cost > 0).map(s => {
             s.cvr = !s.noRev && s.click > 0 ? s.cv / s.click * 100 : null;
             s.cpc = s.click > 0 ? s.cost / s.click : 0;
+            return s;
         });
+        const full = buildSeries(false);
+        const aligned = align ? buildSeries(true) : null;
+        roundSeries = { full, aligned, alignLabel: align ? (align.kind === 'main' ? `본행사 D1~D${align.n}` : `티저 1~${align.n}일차`) : '' };
         const typeKo = { MEGAPO: '메가포', MEGAWARI: '메가와리' }[canon] || canon;
-        roundsHtml = roundSeries.length > 1 ? `
+        roundsHtml = full.length > 1 ? `
         <div class="am-card">
-            <div class="am-card-h"><i class="fas fa-chart-column"></i> 역대 ${_amEsc(typeKo)} 회차 추이 <span class="am-card-sub">진행 중 회차는 최신일까지 누적 · 전 기간 기준</span></div>
+            <div class="am-card-h"><i class="fas fa-chart-column"></i> 역대 ${_amEsc(typeKo)} 회차 추이 <span class="am-card-sub" id="am-rounds-sub"></span></div>
             <div class="am-seg">
                 <button data-v="inflow" onclick="_amSetRoundView('inflow')">유입</button>
                 <button data-v="conv" onclick="_amSetRoundView('conv')">전환</button>
             </div>
+            ${aligned ? `<div class="am-seg am-seg-align">
+                <button data-a="1" onclick="_amSetRoundAlign(true)">같은 일차 (${roundSeries.alignLabel})</button>
+                <button data-a="0" onclick="_amSetRoundAlign(false)">회차 전체 기간</button>
+            </div>` : ''}
             <div id="am-rounds-body"></div>
         </div>` : '';
     }
@@ -713,7 +748,7 @@ function _amRender() {
             <div class="am-card-h"><i class="fas fa-tower-broadcast"></i> 매체별 ROAS <span class="am-card-sub">광고비 큰 순</span></div>
             <div class="am-chart-wrap"><canvas id="am-media-chart"></canvas></div>
             <table class="am-table">
-                <thead><tr><th>매체</th><th>광고비</th><th>비중</th><th>매출</th><th>ROAS</th><th>CTR</th><th>구매</th></tr></thead>
+                <thead><tr><th>매체</th><th>광고비</th><th>비중</th><th>매출</th><th>ROAS</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>구매</th></tr></thead>
                 <tbody>${media.map(m => `<tr>
                     <td class="am-t-name">${_amEsc(m.key)}</td>
                     <td>${_amKRWshort(m.cost)}</td>
@@ -721,7 +756,8 @@ function _amRender() {
                     <td>${_amKRWshort(m.rev)}</td>
                     <td class="am-t-roas ${m.roas >= 200 ? 'am-good' : m.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(m.roas)}</td>
                     <td>${m.ctr.toFixed(2)}%</td>
-                    <td>${_amInt(m.cv)}</td></tr>`).join('') || `<tr><td colspan="7" class="am-empty">데이터 없음</td></tr>`}</tbody>
+                    <td>${m.cvr.toFixed(2)}%</td>
+                    <td>${_amInt(m.cv)}</td></tr>`).join('') || `<tr><td colspan="8" class="am-empty">데이터 없음</td></tr>`}</tbody>
             </table>
         </div>`;
 
@@ -732,7 +768,7 @@ function _amRender() {
             <summary><i class="fas fa-chevron-right am-etc-chev"></i> 일자별 상세 지표 ${byDayDetail.length}일 펼쳐보기</summary>
             <div class="am-daily-scroll">
             <table class="am-table am-daily-table">
-                <thead><tr><th>날짜</th><th>광고비</th><th>노출</th><th>클릭</th><th>CTR</th><th>구매</th><th>매출</th><th>ROAS</th><th>CPA</th></tr></thead>
+                <thead><tr><th>날짜</th><th>광고비</th><th>노출</th><th>클릭</th><th title="클릭 ÷ 노출">CTR</th><th>구매</th><th title="구매 ÷ 클릭">CVR</th><th>매출</th><th>ROAS</th><th>CPA</th></tr></thead>
                 <tbody>${byDayDetail.map(d => `<tr>
                     <td class="am-t-name">${d.key}</td>
                     <td>${_amKRWshort(d.cost)}</td>
@@ -740,6 +776,7 @@ function _amRender() {
                     <td>${_amInt(d.click)}</td>
                     <td>${d.ctr.toFixed(2)}%</td>
                     <td>${_amInt(d.cv)}</td>
+                    <td>${d.cvr.toFixed(2)}%</td>
                     <td>${_amKRWshort(d.rev)}</td>
                     <td class="am-t-roas ${d.roas >= 200 ? 'am-good' : d.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(d.roas)}</td>
                     <td>${d.cv > 0 ? _amKRW(d.cpa) : '-'}</td></tr>`).join('')}</tbody>
@@ -775,14 +812,16 @@ function _amRender() {
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-boxes-stacked"></i> 제품별 <span class="am-card-sub">매출 큰 순 · 광고명 키워드 기반 추정</span></div>
             <table class="am-table">
-                <thead><tr><th>제품</th><th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th>CPA</th></tr></thead>
+                <thead><tr><th>제품</th><th>광고비</th><th>매출</th><th>ROAS</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>구매</th><th>CPA</th></tr></thead>
                 <tbody>${products.map(p => `<tr${p.key === '기타' ? ' class="am-t-etc"' : ''}>
                     <td class="am-t-name">${_amEsc(p.key)}${p.key === '기타' ? ' <span class="am-etc-tag">↓ 아래 상세</span>' : ''}</td>
                     <td>${_amKRWshort(p.cost)}</td>
                     <td>${_amKRWshort(p.rev)}</td>
                     <td class="am-t-roas ${p.roas >= 200 ? 'am-good' : p.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(p.roas)}</td>
+                    <td>${p.ctr.toFixed(2)}%</td>
+                    <td>${p.cvr.toFixed(2)}%</td>
                     <td>${_amInt(p.cv)}</td>
-                    <td>${p.cv > 0 ? _amKRW(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="6" class="am-empty">데이터 없음</td></tr>`}</tbody>
+                    <td>${p.cv > 0 ? _amKRW(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="8" class="am-empty">데이터 없음</td></tr>`}</tbody>
             </table>
             ${etcHtml}
         </div>`;
@@ -802,23 +841,31 @@ function _amRender() {
 
 // ── 역대 회차 추이: 유입(노출·클릭·CTR·CPC) / 전환(광고비·매출·ROAS·구매·CVR) 토글 ──
 // 매출을 집계하지 않던 매체를 쓰던 과거 회차도 유입 지표로는 비교할 수 있게 나눈다.
-let _amRoundsChart = null, _amRoundSeries = null, _amRoundView = 'conv';
+let _amRoundsChart = null, _amRoundSeries = null, _amRoundView = 'conv', _amRoundAlign = true;
 window._amSetRoundView = function (v) { _amRoundView = v; _amRenderRoundsBody(); };
+window._amSetRoundAlign = function (v) { _amRoundAlign = v; _amRenderRoundsBody(); };
 const _amRoasCls = s => s.noRev ? '' : s.roas >= 200 ? 'am-good' : s.roas >= 100 ? 'am-mid' : 'am-low';
 function _amRenderRoundsBody() {
     const body = document.getElementById('am-rounds-body');
     if (!body || !_amRoundSeries) { if (_amRoundsChart) { _amRoundsChart.destroy(); _amRoundsChart = null; } return; }
-    document.querySelectorAll('.am-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === _amRoundView));
-    const series = _amRoundSeries;
+    document.querySelectorAll('.am-seg button[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === _amRoundView));
+    const useAlign = _amRoundAlign && !!_amRoundSeries.aligned;
+    document.querySelectorAll('.am-seg-align button').forEach(b => b.classList.toggle('on', (b.dataset.a === '1') === useAlign));
+    const sub = document.getElementById('am-rounds-sub');
+    if (sub) sub.textContent = useAlign
+        ? `진행 중 회차와 같은 진행 일차(${_amRoundSeries.alignLabel})로 맞춰 비교 · 기간 열 = 회차별 비교 구간`
+        : '회차 전체 기간 합계 · 진행 중 회차는 최신일까지 누적';
+    const series = useAlign ? _amRoundSeries.aligned : _amRoundSeries.full;
     const inflow = _amRoundView === 'inflow';
+    const cvrCell = s => `<td>${s.cvr == null ? '-' : s.cvr.toFixed(2) + '%'}</td>`;
     const head = inflow
-        ? '<th>광고비</th><th>노출</th><th>클릭</th><th>CTR</th><th>CPC</th>'
-        : '<th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th>CVR</th><th>CPA</th>';
+        ? '<th>광고비</th><th>노출</th><th>클릭</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>CPC</th>'
+        : '<th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>CPA</th>';
     const cells = s => inflow
-        ? `<td>${_amKRWshort(s.cost)}</td><td>${_amInt(s.imp)}</td><td>${_amInt(s.click)}</td><td class="am-t-roas">${s.ctr.toFixed(2)}%</td><td>${s.click > 0 ? _amKRW(s.cpc) : '-'}</td>`
+        ? `<td>${_amKRWshort(s.cost)}</td><td>${_amInt(s.imp)}</td><td>${_amInt(s.click)}</td><td class="am-t-roas">${s.ctr.toFixed(2)}%</td>${cvrCell(s)}<td>${s.click > 0 ? _amKRW(s.cpc) : '-'}</td>`
         : `<td>${_amKRWshort(s.cost)}</td><td>${s.noRev ? '-' : _amKRWshort(s.rev)}</td>`
           + `<td class="am-t-roas ${_amRoasCls(s)}">${s.noRev ? '-' : _amPct(s.roas)}</td><td>${s.noRev ? '-' : _amInt(s.cv)}</td>`
-          + `<td>${s.cvr == null ? '-' : s.cvr.toFixed(2) + '%'}</td><td>${s.cv > 0 ? _amKRW(s.cpa) : '-'}</td>`;
+          + `<td>${s.ctr.toFixed(2)}%</td>${cvrCell(s)}<td>${s.cv > 0 ? _amKRW(s.cpa) : '-'}</td>`;
     const hasNoRev = series.some(s => s.noRev);
     body.innerHTML = `
         <div class="am-chart-wrap am-chart-wrap--tall"><canvas id="am-rounds-chart"></canvas></div>
