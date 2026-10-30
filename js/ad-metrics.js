@@ -282,10 +282,10 @@ function _amEnsureData() {
             const idx = {};
             header.forEach((h, i) => { idx[(h || '').trim()] = i; });
             const col = {
-                date: idx['날짜'], brand: idx['브랜드'], retail: idx['Retail'], media: idx['매체'],
+                date: idx['날짜'] ?? idx['Date'], brand: idx['브랜드'], retail: idx['Retail'], media: idx['매체'],
                 obj: idx['목적'], ctype: idx['소재타입'], adname: idx['광고명'], camp: idx['캠페인'],
                 imp: idx['노출수'], click: idx['클릭수'], cost: idx['광고비(₩)'],
-                cv: idx['구매수'], rev: idx['구매전환값(₩)'],
+                cv: idx['구매수'], rev: idx['구매전환값(₩)'], cart: idx['장바구니'],
             };
             _amRows = [];
             // 1) 과거(CUTOFF 이전): ad-performance — 이벤트는 promotions 날짜+리테일 대조
@@ -302,7 +302,7 @@ function _amEnsureData() {
                     product: _amProduct(r[col.adname], (r[col.brand] || '').trim()),
                     event: _amEventFor(date, retail),
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
-                    cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
+                    cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]), cart: _amNum(r[col.cart]),
                 });
             }
             // 2) CUTOFF 이후: creatives 탭 — 행사는 AB열(event), 티저/본기간은 AC열. cost/sales 이미 원화.
@@ -327,7 +327,7 @@ function _amEnsureData() {
                     product: _amProduct(r[col.adname], brand),
                     event: code === 'AO' ? null : code, ao: code === 'AO', phase: '',
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
-                    cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]),
+                    cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]), cart: _amNum(r[col.cart]),
                 });
             }
             // 2-2) 행사 코드별 연속 구간 → 회차 라벨('10월 MEGAPO' 등). 보충 행까지 넣은 뒤에 묶어야 같은 회차로 합쳐짐
@@ -352,6 +352,7 @@ function _amAddCreativeRows(crows) {
         date: ci['date'], brand: ci['brand'], retail: ci['retail'], media: ci['media'],
         adname: ci['ad_name'], imp: ci['impressions'], click: ci['clicks'],
         cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'], camp: ci['campaign_name'],
+        cart: ci['add cart cv'],
     };
     if (cc.date == null) return;
     const phaseCol = _amFindPhaseCol(crows);
@@ -370,7 +371,7 @@ function _amAddCreativeRows(crows) {
             event: code === 'AO' ? null : code, ao: code === 'AO',
             phase: phaseCol < 0 ? '' : _amPhase(r[phaseCol]),
             imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
-            cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]),
+            cost: _amNum(r[cc.cost]), cv: _amNum(r[cc.cv]), rev: _amNum(r[cc.rev]), cart: _amNum(r[cc.cart]),
         });
     }
 }
@@ -507,13 +508,45 @@ function _amParseCSVFallback(text) {
 
 // ── 집계 ──
 function _amAgg(list) {
-    const s = { imp: 0, click: 0, cost: 0, cv: 0, rev: 0 };
-    list.forEach(r => { s.imp += r.imp; s.click += r.click; s.cost += r.cost; s.cv += r.cv; s.rev += r.rev; });
+    const s = { imp: 0, click: 0, cost: 0, cv: 0, rev: 0, cart: 0 };
+    list.forEach(r => { s.imp += r.imp; s.click += r.click; s.cost += r.cost; s.cv += r.cv; s.rev += r.rev; s.cart += r.cart || 0; });
     s.ctr = s.imp > 0 ? s.click / s.imp * 100 : 0;
+    s.cpc = s.click > 0 ? s.cost / s.click : 0;
     s.cvr = s.click > 0 ? s.cv / s.click * 100 : 0;
     s.roas = s.cost > 0 ? s.rev / s.cost * 100 : 0;
     s.cpa = s.cv > 0 ? s.cost / s.cv : 0;
+    s.cartRate = s.click > 0 ? s.cart / s.click * 100 : 0;
+    s.cartCpa = s.cart > 0 ? s.cost / s.cart : 0;
     return s;
+}
+
+// 광고 지표 탭 공통 지표 세트 — 모든 표가 같은 열·같은 순서로 보이게 한다.
+// g: 오르면 좋은 지표(증감 색), conv: 매출 집계가 없던 회차(noRev)에서 '-' 처리할 전환 지표
+const _amRoasCls2 = v => v >= 200 ? 'am-good' : v >= 100 ? 'am-mid' : 'am-low';
+const AM_METRICS = [
+    { k: 'cost', l: '광고비', g: false, f: v => _amKRWshort(v.cost) },
+    { k: 'imp', l: '노출', g: true, f: v => _amInt(v.imp) },
+    { k: 'click', l: '클릭', g: true, f: v => _amInt(v.click) },
+    { k: 'ctr', l: 'CTR', tip: '클릭 ÷ 노출', g: true, f: v => v.ctr.toFixed(2) + '%' },
+    { k: 'cpc', l: 'CPC', tip: '광고비 ÷ 클릭', g: false, f: v => v.click > 0 ? _amKRW(v.cpc) : '-' },
+    { k: 'cv', l: '구매', g: true, conv: true, f: v => _amInt(v.cv) },
+    { k: 'cvr', l: 'CVR', tip: '구매 ÷ 클릭', g: true, conv: true, f: v => v.cvr.toFixed(2) + '%' },
+    { k: 'cpa', l: 'CPA', tip: '광고비 ÷ 구매', g: false, conv: true, f: v => v.cv > 0 ? _amKRW(v.cpa) : '-' },
+    { k: 'roas', l: 'ROAS', tip: '매출 ÷ 광고비', g: true, conv: true, f: v => _amPct(v.roas), cls: v => _amRoasCls2(v.roas) },
+    { k: 'cart', l: '장바구니', g: true, f: v => _amInt(v.cart) },
+    { k: 'cartRate', l: '장바구니율', tip: '장바구니 ÷ 클릭', g: true, f: v => v.cartRate.toFixed(2) + '%' },
+    { k: 'cartCpa', l: '장바구니 CPA', tip: '광고비 ÷ 장바구니', g: false, f: v => v.cart > 0 ? _amKRW(v.cartCpa) : '-' },
+];
+function _amMetricHead() {
+    return AM_METRICS.map(m => `<th${m.tip ? ` title="${m.l} = ${m.tip}"` : ''}>${m.l}</th>`).join('');
+}
+function _amMetricCells(v, opt) {
+    const noRev = opt && opt.noRev;
+    return AM_METRICS.map(m => {
+        if (noRev && m.conv) return '<td>-</td>';
+        const cls = m.cls ? ` class="am-t-roas ${m.cls(v)}"` : '';
+        return `<td${cls}>${m.f(v)}</td>`;
+    }).join('');
 }
 function _amGroup(list, keyFn) {
     const m = new Map();
@@ -644,20 +677,10 @@ function _amRender() {
                 : '직전 행사·전년 동행사 = 같은 이벤트 유형의 이전 회차 / 1년 전 회차 전체 기간 기준.';
         }
     }
-    const metricDefs = [
-        { l: '광고비', f: v => _amKRWshort(v.cost), g: false, k: 'cost' },
-        { l: '노출', f: v => _amInt(v.imp), g: true, k: 'imp' },
-        { l: '클릭', f: v => _amInt(v.click), g: true, k: 'click' },
-        { l: 'CTR (클릭÷노출)', f: v => v.ctr.toFixed(2) + '%', g: true, k: 'ctr' },
-        { l: '구매수', f: v => _amInt(v.cv), g: true, k: 'cv' },
-        { l: 'CVR (구매÷클릭)', f: v => v.cvr.toFixed(2) + '%', g: true, k: 'cvr' },
-        { l: '매출', f: v => _amKRWshort(v.rev), g: true, k: 'rev' },
-        { l: 'ROAS', f: v => _amPct(v.roas), g: true, k: 'roas' },
-        { l: 'CPA', f: v => v.cv > 0 ? _amKRW(v.cpa) : '-', g: false, k: 'cpa' },
-    ];
+    const metricDefs = AM_METRICS.map(m => ({ ...m, l: m.tip ? `${m.l} (${m.tip.replace(/ /g, '')})` : m.l }));
     const hasCmp = !!evMeta;
     const cmpPair = (m, agg) => agg
-        ? `<td>${m.f(agg)}</td>${_amDeltaCell(curAgg[m.k], agg[m.k], m.g)}`
+        ? `<td>${m.f(agg)}</td>${m.f(curAgg) === '-' || m.f(agg) === '-' ? '<td class="am-d-na">-</td>' : _amDeltaCell(curAgg[m.k], agg[m.k], m.g)}`
         : `<td class="am-d-na">-</td><td class="am-d-na">-</td>`;
     const kpiHtml = `
         <div class="am-card am-sum-card">
@@ -730,8 +753,8 @@ function _amRender() {
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-chart-column"></i> 역대 ${_amEsc(typeKo)} 회차 추이 <span class="am-card-sub" id="am-rounds-sub"></span></div>
             <div class="am-seg">
-                <button data-v="inflow" onclick="_amSetRoundView('inflow')">유입</button>
-                <button data-v="conv" onclick="_amSetRoundView('conv')">전환</button>
+                <button data-v="inflow" onclick="_amSetRoundView('inflow')">유입 차트</button>
+                <button data-v="conv" onclick="_amSetRoundView('conv')">전환 차트</button>
             </div>
             ${aligned ? `<div class="am-seg am-seg-align">
                 <button data-a="1" onclick="_amSetRoundAlign(true)">같은 일차 (${roundSeries.alignLabel})</button>
@@ -747,18 +770,11 @@ function _amRender() {
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-tower-broadcast"></i> 매체별 ROAS <span class="am-card-sub">광고비 큰 순</span></div>
             <div class="am-chart-wrap"><canvas id="am-media-chart"></canvas></div>
-            <table class="am-table">
-                <thead><tr><th>매체</th><th>광고비</th><th>비중</th><th>매출</th><th>ROAS</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>구매</th></tr></thead>
+            <div class="am-table-scroll"><table class="am-table">
+                <thead><tr><th>매체</th>${_amMetricHead()}</tr></thead>
                 <tbody>${media.map(m => `<tr>
-                    <td class="am-t-name">${_amEsc(m.key)}</td>
-                    <td>${_amKRWshort(m.cost)}</td>
-                    <td>${total.cost > 0 ? (m.cost / total.cost * 100).toFixed(0) + '%' : '-'}</td>
-                    <td>${_amKRWshort(m.rev)}</td>
-                    <td class="am-t-roas ${m.roas >= 200 ? 'am-good' : m.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(m.roas)}</td>
-                    <td>${m.ctr.toFixed(2)}%</td>
-                    <td>${m.cvr.toFixed(2)}%</td>
-                    <td>${_amInt(m.cv)}</td></tr>`).join('') || `<tr><td colspan="8" class="am-empty">데이터 없음</td></tr>`}</tbody>
-            </table>
+                    <td class="am-t-name">${_amEsc(m.key)}</td>${_amMetricCells(m)}</tr>`).join('') || `<tr><td colspan="${AM_METRICS.length + 1}" class="am-empty">데이터 없음</td></tr>`}</tbody>
+            </table></div>
         </div>`;
 
     // 일자별 추이 (그래프 + 접이식 상세표)
@@ -768,18 +784,9 @@ function _amRender() {
             <summary><i class="fas fa-chevron-right am-etc-chev"></i> 일자별 상세 지표 ${byDayDetail.length}일 펼쳐보기</summary>
             <div class="am-daily-scroll">
             <table class="am-table am-daily-table">
-                <thead><tr><th>날짜</th><th>광고비</th><th>노출</th><th>클릭</th><th title="클릭 ÷ 노출">CTR</th><th>구매</th><th title="구매 ÷ 클릭">CVR</th><th>매출</th><th>ROAS</th><th>CPA</th></tr></thead>
+                <thead><tr><th>날짜</th>${_amMetricHead()}</tr></thead>
                 <tbody>${byDayDetail.map(d => `<tr>
-                    <td class="am-t-name">${d.key}</td>
-                    <td>${_amKRWshort(d.cost)}</td>
-                    <td>${_amInt(d.imp)}</td>
-                    <td>${_amInt(d.click)}</td>
-                    <td>${d.ctr.toFixed(2)}%</td>
-                    <td>${_amInt(d.cv)}</td>
-                    <td>${d.cvr.toFixed(2)}%</td>
-                    <td>${_amKRWshort(d.rev)}</td>
-                    <td class="am-t-roas ${d.roas >= 200 ? 'am-good' : d.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(d.roas)}</td>
-                    <td>${d.cv > 0 ? _amKRW(d.cpa) : '-'}</td></tr>`).join('')}</tbody>
+                    <td class="am-t-name">${d.key}</td>${_amMetricCells(d)}</tr>`).join('')}</tbody>
             </table></div>
         </details>` : '';
     const dailyHtml = `
@@ -797,32 +804,21 @@ function _amRender() {
     const etcHtml = etcByName.length ? `
         <details class="am-etc">
             <summary><i class="fas fa-chevron-right am-etc-chev"></i> 기타(미분류) 광고명 ${etcByName.length}개 펼쳐보기 <span class="am-card-sub">광고비 큰 순</span></summary>
-            <table class="am-table am-etc-table">
-                <thead><tr><th>광고명</th><th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th></tr></thead>
+            <div class="am-table-scroll"><table class="am-table am-etc-table">
+                <thead><tr><th>광고명</th>${_amMetricHead()}</tr></thead>
                 <tbody>${etcByName.slice(0, 60).map(e => `<tr>
-                    <td class="am-t-name am-etc-name" title="${_amEsc(e.key)}">${_amEsc(e.key)}</td>
-                    <td>${_amKRWshort(e.cost)}</td>
-                    <td>${_amKRWshort(e.rev)}</td>
-                    <td class="am-t-roas ${e.roas >= 200 ? 'am-good' : e.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(e.roas)}</td>
-                    <td>${_amInt(e.cv)}</td></tr>`).join('')}</tbody>
-            </table>
+                    <td class="am-t-name am-etc-name" title="${_amEsc(e.key)}">${_amEsc(e.key)}</td>${_amMetricCells(e)}</tr>`).join('')}</tbody>
+            </table></div>
             ${etcByName.length > 60 ? `<div class="am-etc-more">상위 60개만 표시 (전체 ${etcByName.length}개)</div>` : ''}
         </details>` : '';
     const prodHtml = `
         <div class="am-card">
             <div class="am-card-h"><i class="fas fa-boxes-stacked"></i> 제품별 <span class="am-card-sub">매출 큰 순 · 광고명 키워드 기반 추정</span></div>
-            <table class="am-table">
-                <thead><tr><th>제품</th><th>광고비</th><th>매출</th><th>ROAS</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>구매</th><th>CPA</th></tr></thead>
+            <div class="am-table-scroll"><table class="am-table">
+                <thead><tr><th>제품</th>${_amMetricHead()}</tr></thead>
                 <tbody>${products.map(p => `<tr${p.key === '기타' ? ' class="am-t-etc"' : ''}>
-                    <td class="am-t-name">${_amEsc(p.key)}${p.key === '기타' ? ' <span class="am-etc-tag">↓ 아래 상세</span>' : ''}</td>
-                    <td>${_amKRWshort(p.cost)}</td>
-                    <td>${_amKRWshort(p.rev)}</td>
-                    <td class="am-t-roas ${p.roas >= 200 ? 'am-good' : p.roas >= 100 ? 'am-mid' : 'am-low'}">${_amPct(p.roas)}</td>
-                    <td>${p.ctr.toFixed(2)}%</td>
-                    <td>${p.cvr.toFixed(2)}%</td>
-                    <td>${_amInt(p.cv)}</td>
-                    <td>${p.cv > 0 ? _amKRW(p.cpa) : '-'}</td></tr>`).join('') || `<tr><td colspan="8" class="am-empty">데이터 없음</td></tr>`}</tbody>
-            </table>
+                    <td class="am-t-name">${_amEsc(p.key)}${p.key === '기타' ? ' <span class="am-etc-tag">↓ 아래 상세</span>' : ''}</td>${_amMetricCells(p)}</tr>`).join('') || `<tr><td colspan="${AM_METRICS.length + 1}" class="am-empty">데이터 없음</td></tr>`}</tbody>
+            </table></div>
             ${etcHtml}
         </div>`;
 
@@ -844,7 +840,6 @@ function _amRender() {
 let _amRoundsChart = null, _amRoundSeries = null, _amRoundView = 'conv', _amRoundAlign = true;
 window._amSetRoundView = function (v) { _amRoundView = v; _amRenderRoundsBody(); };
 window._amSetRoundAlign = function (v) { _amRoundAlign = v; _amRenderRoundsBody(); };
-const _amRoasCls = s => s.noRev ? '' : s.roas >= 200 ? 'am-good' : s.roas >= 100 ? 'am-mid' : 'am-low';
 function _amRenderRoundsBody() {
     const body = document.getElementById('am-rounds-body');
     if (!body || !_amRoundSeries) { if (_amRoundsChart) { _amRoundsChart.destroy(); _amRoundsChart = null; } return; }
@@ -857,15 +852,8 @@ function _amRenderRoundsBody() {
         : '회차 전체 기간 합계 · 진행 중 회차는 최신일까지 누적';
     const series = useAlign ? _amRoundSeries.aligned : _amRoundSeries.full;
     const inflow = _amRoundView === 'inflow';
-    const cvrCell = s => `<td>${s.cvr == null ? '-' : s.cvr.toFixed(2) + '%'}</td>`;
-    const head = inflow
-        ? '<th>광고비</th><th>노출</th><th>클릭</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>CPC</th>'
-        : '<th>광고비</th><th>매출</th><th>ROAS</th><th>구매</th><th title="클릭 ÷ 노출">CTR</th><th title="구매 ÷ 클릭">CVR</th><th>CPA</th>';
-    const cells = s => inflow
-        ? `<td>${_amKRWshort(s.cost)}</td><td>${_amInt(s.imp)}</td><td>${_amInt(s.click)}</td><td class="am-t-roas">${s.ctr.toFixed(2)}%</td>${cvrCell(s)}<td>${s.click > 0 ? _amKRW(s.cpc) : '-'}</td>`
-        : `<td>${_amKRWshort(s.cost)}</td><td>${s.noRev ? '-' : _amKRWshort(s.rev)}</td>`
-          + `<td class="am-t-roas ${_amRoasCls(s)}">${s.noRev ? '-' : _amPct(s.roas)}</td><td>${s.noRev ? '-' : _amInt(s.cv)}</td>`
-          + `<td>${s.ctr.toFixed(2)}%</td>${cvrCell(s)}<td>${s.cv > 0 ? _amKRW(s.cpa) : '-'}</td>`;
+    const head = _amMetricHead();
+    const cells = s => _amMetricCells(s, { noRev: s.noRev });
     const hasNoRev = series.some(s => s.noRev);
     body.innerHTML = `
         <div class="am-chart-wrap am-chart-wrap--tall"><canvas id="am-rounds-chart"></canvas></div>
@@ -875,7 +863,7 @@ function _amRenderRoundsBody() {
                 <td class="am-t-name">${s.label}${s.ongoing ? ` <span class="am-etc-tag">진행 중${s.dayN ? ` D${s.dayN}` : ' 티저'}</span>` : ''}</td>
                 <td>${s.period}</td>${cells(s)}</tr>`).join('')}</tbody>
         </table></div>
-        ${!inflow && hasNoRev ? `<p class="am-sum-note">'-'인 회차는 당시 운영 매체가 매출(전환)을 집계하지 않던 기간 — 광고비만 표시합니다. 이 회차들은 [유입] 탭의 CTR·CPC로 비교하세요.</p>` : ''}`;
+        ${hasNoRev ? `<p class="am-sum-note">구매·CVR·CPA·ROAS가 '-'인 회차는 당시 운영 매체가 매출(전환)을 집계하지 않던 기간입니다 — CTR·CPC·장바구니 지표로 비교하세요.</p>` : ''}`;
     _amDrawRoundsChart(series, inflow);
 }
 
