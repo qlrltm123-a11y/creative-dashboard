@@ -611,7 +611,10 @@ function _amRender() {
         const winStart = sl => inProgress ? sl.mainStart : sl.start;
         const sliceRows = sl => brandAll.filter(r => sl.names.has(r.event) && r.date >= winStart(sl) && r.date <= winEnd(sl));
         const periodOf = sl => `${winStart(sl).slice(2)}~${winEnd(sl).slice(5)}`;
-        if (inProgress && dayN <= 0) {
+        // 시트 AC열이 Teaser만 있고 MainEvent가 아직 없으면 날짜 추정과 무관하게 티저 진행 중
+        const curPhases = new Set(rows.map(r => r.phase));
+        const teaserOnly = curPhases.has('teaser') && !curPhases.has('main');
+        if (inProgress && (dayN <= 0 || teaserOnly)) {
             // 본행사 오픈 전(티저 진행 중): 티저 첫날 기준으로 맞춰 직전·전년 회차의 티저와 비교.
             // 상대 회차 티저가 더 짧으면 그 회차 오픈 전날까지만 (본행사 날짜가 섞이지 않게).
             const curStart = rows.reduce((m, r) => !m || r.date < m ? r.date : m, '') || evMeta.start;
