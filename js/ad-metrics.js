@@ -34,6 +34,8 @@ let _amRows = null;          // [{date, brand, retail, media, product, event, im
 let _amEvents = null;        // [{start, end, name, grade, retail}]
 let _amLoadPromise = null;
 let _amSelectedEvent = '전체';
+let _amSelectedProducts = [];
+let _amProductPopOpen = false;
 let _amDailyChart = null;
 let _amMediaChart = null;
 
@@ -192,7 +194,9 @@ const AM_PRODUCTS = [
     { name: '래스팅 글로우 스틱', brand: 'CG', kw: ['LastingGlowStick', 'LastingGlow', '래스팅글로우', 'ラスティンググロウ'] },
     { name: '짱구 콜라보', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
     // ── WM (웨이크메이크) ──
+    { name: '오프체리 콜라보', brand: 'WM', kw: ['OFFCHERRY', 'OffCherry', 'オフチェリー', '오프체리'] },
     { name: '소프트블러링 아이팔레트', brand: 'WM', kw: ['소블아', '소프트블러', 'ソフトブラー', 'SoftBlurEye', 'SoftBlur'] },
+    { name: '글레이즈 글로스', brand: 'WM', kw: ['GlazeGloss', 'グレーズグロス', '글레이즈'] },
     { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless', 'SeamlessFd'] },
     { name: '퍼펙팅 쿠션', brand: 'WM', kw: ['PerfectingCushion', '퍼펙팅쿠션', '퍼펙팅 쿠션', 'パーフェクティングクッション'] },
     { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
@@ -200,7 +204,7 @@ const AM_PRODUCTS = [
     { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur', 'Shebulchi'] },
     { name: '스테이픽서 파우더', brand: 'WM', kw: ['ステイフィクサー', 'StayFixer'] },
     { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ', 'GyaruKittySET'] },
-    { name: '브러시 듀오 기획', brand: 'WM', kw: ['SpatulaMiniDuo', 'spatulaminiduo', '스파츌라미니듀오'] },
+    { name: '파데브러시 미니듀오', brand: 'WM', kw: ['SpatulaMiniDuo', 'spatulaminiduo', '스파츌라미니듀오', 'MiniDuo', '미니듀오'] },
     { name: '파데브러시', brand: 'WM', kw: ['FdBrush', 'FDbrush', 'FDBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド'] },
     { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', '스파츌라', '스파출라', 'SilverCrush'] },
     { name: '베이스락 세트', brand: 'WM', kw: ['BaseLockSET', 'BaseLock'] },
@@ -222,12 +226,54 @@ const AM_PRODUCTS = [
     { name: '클렌징밤', brand: 'BOH', kw: ['클렌징밤', 'クレンジングバーム'] },
     { name: '기획박스(세트)', brand: 'BOH', kw: ['GiftBox', '기획박스'] },
 ];
-function _amProduct(adName, brand) {
-    const s = adName || '';
+// 시트 Product 열 표기 → 표준 제품명. 같은 제품의 표기 흔들림(FDBrush/FdBrush/Brush 등)을 하나로 묶는다.
+const AM_SHEET_PRODUCT_ALIAS = {
+    WM: {
+        softblureye: '소프트블러링 아이팔레트',
+        'offcherry-softblureye': '오프체리 콜라보', 'offcherry-collection': '오프체리 콜라보',
+        seamless: '심리스 파운데이션', seamlessfd: '심리스 파운데이션',
+        perfectingcushion: '퍼펙팅 쿠션',
+        fdbrush: '파데브러시', foundationbrush: '파데브러시', brush: '파데브러시',
+        spatulaminiduo: '파데브러시 미니듀오',
+        lastingglowstick: '래스팅 글로우 스틱', gyarukittyset: '갸루키티 세트', 'h-glowbalm': '하이글로우밤',
+        baselockset: '베이스락 세트', shebulchi: '셰이킹블러 치크', sheermulti: '소프트시어 멀티팔레트',
+        glazegloss: '글레이즈 글로스', fixer: '스테이픽서 파우더',
+    },
+    CG: {
+        colorcovertint: '컬러커버틴트', nudyblur: '누디블러 틴트', nudyblurtint: '누디블러 틴트', noody: '누디블러 틴트',
+        shadingstick: '입체창조 쉐딩스틱', 't-deepglaze': '탕후루 딥글레이즈', 't-milk': '탕후루 밀크', tanghuru: '탕후루 틴트',
+        aegyomaker: '애교살 메이커', lipduoset: '립듀오 세트', shinchanset: '짱구 콜라보',
+        'cg-gift': '기프트 세트', gift: '기프트 세트',
+    },
+    BOH: {
+        cleansingoil: '클렌징오일', mask: '마스크팩', bubbleserum: '버블세럼',
+        toner: '콜라겐 토너', coltoner: '콜라겐 토너', coltonerset: '콜라겐 토너',
+        megawaribox: '기획박스(세트)', 'box-set': '기획박스(세트)', gift: '기획박스(세트)', giftbox: '기획박스(세트)',
+        fukubukuro: '기획박스(세트)', calendar: '기획박스(세트)', mixed: '기획박스(세트)', 'mixed-line': '기획박스(세트)',
+        'mainset-1': '기획박스(세트)', 'mainset-2-1': '기획박스(세트)', 'mainset-2-2': '기획박스(세트)', 'mainset-2-3': '기획박스(세트)',
+    },
+};
+// 제품이 아닌 운영 표기(타깃·목적·브랜드 단위·경쟁사 키워드 등) — 광고명·캠페인명 키워드로 다시 판정
+const AM_PRODUCT_PLACEHOLDERS = new Set(['', '-', 'ao', 'all', 'ad1', 'ad2', 'ad3', 'best', 'best3', 'best color', 'color',
+    'promo', 'traffic', 'conversion(retargeting)', 'new', 'wm', 'cg', 'boh', 'coupon', 'daily', 'base', 'pocket',
+    'teaser', 'naracps', 'vt', 'skin1004', 'serum']);
+function _amProductByKeyword(s, brand) {
     for (const p of AM_PRODUCTS) {
         if (p.brand && p.brand !== brand) continue;   // 같은 브랜드에서만 매칭
         if (p.kw.some(k => s.includes(k))) return p.name;
     }
+    return '';
+}
+// 우선순위: 시트 Product 표준화 → 광고명 키워드 → 캠페인명 키워드 → 시트 표기 그대로 → 기타
+function _amProduct(adName, brand, sheetProduct, camp) {
+    const raw = (sheetProduct || '').trim();
+    const key = raw.toLowerCase();
+    const alias = (AM_SHEET_PRODUCT_ALIAS[brand] || {})[key];
+    if (alias) return alias;
+    const kw = _amProductByKeyword(adName || '', brand) || _amProductByKeyword(camp || '', brand);
+    if (kw) return kw;
+    // 시트 표기를 그대로 쓰는 건 영문 제품 코드 형태일 때만 (검색 키워드·자동 캠페인명 등이 섞여 있음)
+    if (/^[A-Za-z][A-Za-z0-9-]*$/.test(raw) && !AM_PRODUCT_PLACEHOLDERS.has(key)) return raw;
     return '기타';
 }
 
@@ -285,7 +331,7 @@ function _amEnsureData() {
                 date: idx['날짜'] ?? idx['Date'], brand: idx['브랜드'], retail: idx['Retail'], media: idx['매체'],
                 obj: idx['목적'], ctype: idx['소재타입'], adname: idx['광고명'], camp: idx['캠페인'],
                 imp: idx['노출수'], click: idx['클릭수'], cost: idx['광고비(₩)'],
-                cv: idx['구매수'], rev: idx['구매전환값(₩)'], cart: idx['장바구니'],
+                cv: idx['구매수'], rev: idx['구매전환값(₩)'], cart: idx['장바구니'], product: idx['Product'],
             };
             _amRows = [];
             // 1) 과거(CUTOFF 이전): ad-performance — 이벤트는 promotions 날짜+리테일 대조
@@ -299,7 +345,7 @@ function _amEnsureData() {
                     date, brand: (r[col.brand] || '').trim(), retail,
                     media: _amMedia(r[col.media]),
                     adname: (r[col.adname] || '').trim() || '(광고명 없음)',
-                    product: _amProduct(r[col.adname], (r[col.brand] || '').trim()),
+                    product: _amProduct(r[col.adname], (r[col.brand] || '').trim(), r[col.product], r[col.camp]),
                     event: _amEventFor(date, retail),
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]), cart: _amNum(r[col.cart]),
@@ -324,7 +370,7 @@ function _amEnsureData() {
                     date, brand, retail: (r[col.retail] || '').trim(), camp,
                     media: _amMedia(r[col.media]),
                     adname: (r[col.adname] || '').trim() || '(광고명 없음)',
-                    product: _amProduct(r[col.adname], brand),
+                    product: _amProduct(r[col.adname], brand, r[col.product], r[col.camp]),
                     event: code === 'AO' ? null : code, ao: code === 'AO', phase: '',
                     imp: _amNum(r[col.imp]), click: _amNum(r[col.click]),
                     cost: _amNum(r[col.cost]), cv: _amNum(r[col.cv]), rev: _amNum(r[col.rev]), cart: _amNum(r[col.cart]),
@@ -352,7 +398,7 @@ function _amAddCreativeRows(crows) {
         date: ci['date'], brand: ci['brand'], retail: ci['retail'], media: ci['media'],
         adname: ci['ad_name'], imp: ci['impressions'], click: ci['clicks'],
         cost: ci['cost'], rev: ci['sales'], cv: ci['conversions'], event: ci['event'], camp: ci['campaign_name'],
-        cart: ci['add cart cv'],
+        cart: ci['add cart cv'], product: ci['product'],
     };
     if (cc.date == null) return;
     const phaseCol = _amFindPhaseCol(crows);
@@ -367,7 +413,7 @@ function _amAddCreativeRows(crows) {
             camp: (r[cc.camp] || '').trim().toLowerCase(),
             media: _amMedia(r[cc.media]),
             adname: (r[cc.adname] || '').trim() || '(광고명 없음)',
-            product: _amProduct(r[cc.adname], brand),
+            product: _amProduct(r[cc.adname], brand, r[cc.product], r[cc.camp]),
             event: code === 'AO' ? null : code, ao: code === 'AO',
             phase: phaseCol < 0 ? '' : _amPhase(r[phaseCol]),
             imp: _amNum(r[cc.imp]), click: _amNum(r[cc.click]),
@@ -586,10 +632,22 @@ function _amRender() {
     const root = document.getElementById('admetrics-root');
     if (!root) return;
     const brand = _amBrand();
-    const brandAll = brand ? _amRows.filter(r => r.brand === brand) : _amRows; // 직전/전년 비교용(날짜필터 무관)
+    const brandAll0 = brand ? _amRows.filter(r => r.brand === brand) : _amRows;
     // 우측 상단 전역 날짜 필터 반영 (dateFrom/dateTo는 main.js 전역)
     const _df = (typeof dateFrom !== 'undefined' && dateFrom) ? dateFrom : '';
     const _dt = (typeof dateTo !== 'undefined' && dateTo) ? dateTo : '';
+    // 제품 옵션: 현재 브랜드·기간·이벤트에서 광고비가 있는 제품 (광고비 큰 순, 기타는 맨 뒤)
+    const prodCost = new Map();
+    brandAll0.forEach(r => {
+        if ((_df && r.date < _df) || (_dt && r.date > _dt)) return;
+        if (_amSelectedEvent !== '전체' && r.event !== _amSelectedEvent) return;
+        prodCost.set(r.product, (prodCost.get(r.product) || 0) + r.cost);
+    });
+    const productOptions = [...prodCost].filter(([, c]) => c > 0)
+        .sort((a, b) => (a[0] === '기타') - (b[0] === '기타') || b[1] - a[1]).map(([p]) => p);
+    _amSelectedProducts = _amSelectedProducts.filter(p => productOptions.includes(p));
+    // 직전/전년 비교·역대 회차도 선택 제품 기준 (날짜필터 무관)
+    const brandAll = _amSelectedProducts.length ? brandAll0.filter(r => _amSelectedProducts.includes(r.product)) : brandAll0;
     let brandRows = brandAll;
     if (_df) brandRows = brandRows.filter(r => r.date >= _df);
     if (_dt) brandRows = brandRows.filter(r => r.date <= _dt);
@@ -608,6 +666,8 @@ function _amRender() {
             <select id="am-event-sel" class="am-select">
                 ${options.map(o => `<option value="${_amEsc(o)}"${o === _amSelectedEvent ? ' selected' : ''}>${_amEsc(o)}${o === '전체' ? ` (전체 기간)` : ''}</option>`).join('')}
             </select>
+            <span class="am-tl-lbl"><i class="fas fa-box"></i> 제품</span>
+            <div id="am-product-ms"></div>
             ${(_df || _dt) ? `<span class="am-date-chip"><i class="fas fa-calendar-day"></i> ${_df || '처음'} ~ ${_dt || '끝'}</span>` : ''}
             ${evMeta ? `<span class="am-ev-meta">${evMeta.start} ~ ${evMeta.end} · ${_amEsc(evMeta.retail)}${evMeta.grade ? ` · ${evMeta.grade}급` : ''}</span>`
             : (_amSelectedEvent === '상시광고' ? `<span class="am-ev-meta">이벤트 기간에 걸리지 않는 상시 운영 광고</span>` : `<span class="am-ev-meta">${brand || '전체 브랜드'} · ${(_df || _dt) ? '선택 기간' : '전 기간'} 합산</span>`)}
@@ -828,6 +888,16 @@ function _amRender() {
         _amSelectedEvent = e.target.value;
         _amRender();
     });
+    const msEl = document.getElementById('am-product-ms');
+    if (msEl && typeof createMultiSelect === 'function') {
+        const ms = createMultiSelect(msEl, { placeholder: '제품', allLabel: '전체 제품', onChange: sel => {
+            _amSelectedProducts = sel;
+            _amProductPopOpen = true;   // 다시 그린 뒤에도 드롭다운을 열어둬 연속 선택 가능
+            _amRender();
+        } });
+        ms.setOptions(productOptions, _amSelectedProducts);
+        if (_amProductPopOpen) { const pop = msEl.querySelector('.ms-pop'); if (pop) pop.hidden = false; _amProductPopOpen = false; }
+    }
 
     _amRoundSeries = roundSeries;
     _amRenderRoundsBody();
