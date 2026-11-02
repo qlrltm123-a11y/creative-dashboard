@@ -184,12 +184,19 @@ const AM_PRODUCTS = [
     { name: '탕후루 밀크', brand: 'CG', kw: ['タンフルグラスティントミルク', 'タンフルーティント ミルク', 'タンフルミルク', 'T-Milk'] },
     { name: '탕후루 딥글레이즈', brand: 'CG', kw: ['タンフルグラスティントディープグレーズ', 'タンフルディープグレーズ', 'T-DeepGlaze', 'DeepGlaze', 'ディープグレーズ'] },
     { name: '탕후루 틴트', brand: 'CG', kw: ['タンフルグラスティント', 'タンフルーティント', 'タンフル', 'Tanghuru', 'Tanfru', 'Tanful'] },
-    { name: '컬러커버틴트', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー'] },
+    { name: '컬러커버틴트', brand: 'CG', kw: ['ColorCoverTint', 'カラーカバー', 'ギークヌードカラーカバー', 'color_cover', 'Color_Cover', 'Cover-ko', 'Cover-product'] },
     { name: '누디블러 틴트', brand: 'CG', kw: ['ヌーディーブラー', 'ヌーディブラー', 'NudeBlur', 'NudieBlur', 'NudyBlur', 'Noody', '누디블러'] },
     { name: '쥬시잼 블러틴트', brand: 'CG', kw: ['ジューシージャム', 'JuicyJam'] },
     { name: '입체창조 쉐딩스틱', brand: 'CG', kw: ['ShadingStick', 'シェーディングスティック', '쉐딩스틱'] },
     { name: '젤리빔 스틱', brand: 'CG', kw: ['ジェリービーム', 'JellyBeam'] },
-    { name: '애교살 메이커', brand: 'CG', kw: ['AegyoMaker', '애교살', '애교메이커', '目元チュートリアル', 'チュートリアルアイパレット'] },
+    { name: '애교살 메이커', brand: 'CG', kw: ['AegyoMaker', '애교살', '애교메이커', '目元チュートリアル', 'チュートリアルアイパレット', '涙袋'] },
+    { name: '눈물점 메이커', brand: 'CG', kw: ['涙ぼくろ'] },
+    { name: '오버립 메이커', brand: 'CG', kw: ['オーバーリップ'] },
+    { name: 'wiggle wiggle 콜라보', brand: 'CG', kw: ['wiggle wiggle', 'wigglewiggle', 'WiggleWiggle'] },
+    { name: '틴트리 아이팔레트', brand: 'CG', kw: ['ティントリーアイパレット', 'ティントリー アイパレット'] },
+    { name: '틴트리 코튼 치크', brand: 'CG', kw: ['ティントリー コットン', 'ティントリーコットン'] },
+    { name: '싱글 큐브 섀도우', brand: 'CG', kw: ['シングルキューブ'] },
+    { name: '스쿨메이크 세트', brand: 'CG', kw: ['スクールメイク'] },
     { name: '립듀오 세트', brand: 'CG', kw: ['LipDuoSet', 'LipDuo', '립듀오', 'リップデュオ'] },
     { name: '래스팅 글로우 스틱', brand: 'CG', kw: ['LastingGlowStick', 'LastingGlow', '래스팅글로우', 'ラスティンググロウ'] },
     { name: '짱구 콜라보', brand: 'CG', kw: ['クレヨンしんちゃん', 'Shinchan', '짱구'] },
@@ -199,16 +206,17 @@ const AM_PRODUCTS = [
     { name: '글레이즈 글로스', brand: 'WM', kw: ['GlazeGloss', 'グレーズグロス', '글레이즈'] },
     { name: '심리스 파운데이션', brand: 'WM', kw: ['심리스웨어', '심리스위어', 'シームレス', 'Seamless', 'SeamlessFd'] },
     { name: '퍼펙팅 쿠션', brand: 'WM', kw: ['PerfectingCushion', '퍼펙팅쿠션', '퍼펙팅 쿠션', 'パーフェクティングクッション'] },
-    { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'WaterfulGlow'] },
-    { name: '소프트시어 멀티팔레트', brand: 'WM', kw: ['ソフトシアーマルチパレット', 'シアーマルチパレット', 'SoftSheer', 'SheerMulti'] },
+    { name: '워터풀글로우 틴트', brand: 'WM', kw: ['워터풀글로우', 'ウォータフルグロウ', 'ウォーターフルグロウ', 'WaterfulGlow'] },
+    { name: '소프트시어 멀티팔레트', brand: 'WM', kw: ['ソフトシアーマルチパレット', 'シアーマルチパレット', 'SoftSheer', 'SheerMulti', '쉬멀파', '쉬어멀티'] },
     { name: '셰이킹블러 치크', brand: 'WM', kw: ['シェイキングブラーチーク', 'シェイキング', 'ShakingBlur', 'Shebulchi'] },
     { name: '스테이픽서 파우더', brand: 'WM', kw: ['ステイフィクサー', 'StayFixer'] },
     { name: '갸루키티 세트', brand: 'WM', kw: ['갸루키티', 'GyaruKitty', 'ギャルキティ', 'GyaruKittySET'] },
     { name: '파데브러시 미니듀오', brand: 'WM', kw: ['SpatulaMiniDuo', 'spatulaminiduo', '스파츌라미니듀오', 'MiniDuo', '미니듀오'] },
-    { name: '파데브러시', brand: 'WM', kw: ['FdBrush', 'FDbrush', 'FDBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド'] },
+    { name: '파데브러시', brand: 'WM', kw: ['FdBrush', 'FDbrush', 'FDBrush', 'FoundationBrush', 'ファンデーションブラシ', 'スパチュラワイド', 'スパチュラ'] },
     { name: '실버크러쉬 브러쉬', brand: 'WM', kw: ['실버크러쉬', '스파츌라', '스파출라', 'SilverCrush'] },
     { name: '베이스락 세트', brand: 'WM', kw: ['BaseLockSET', 'BaseLock'] },
     { name: '하이글로우밤', brand: 'WM', kw: ['H-GlowBalm', 'GlowBalm', '글로우밤'] },
+    { name: '워터글로우 코팅밤', brand: 'WM', kw: ['ウォーターグロウコーティング', 'ウォーターグロウ コーティング'] },
     { name: '래스팅 글로우 스틱', brand: 'WM', kw: ['LastingGlowStick', 'LastingGlow', '래스팅글로우'] },
     { name: '립듀오 세트', brand: 'WM', kw: ['LipDuoSet', 'LipDuo', '립듀오'] },
     { name: '6색 팔레트', brand: 'WM', kw: ['6色パレット', '6색팔레트'] },
@@ -257,6 +265,12 @@ const AM_SHEET_PRODUCT_ALIAS = {
 const AM_PRODUCT_PLACEHOLDERS = new Set(['', '-', 'ao', 'all', 'ad1', 'ad2', 'ad3', 'best', 'best3', 'best color', 'color',
     'promo', 'traffic', 'conversion(retargeting)', 'new', 'wm', 'cg', 'boh', 'coupon', 'daily', 'base', 'pocket',
     'teaser', 'naracps', 'vt', 'skin1004', 'serum']);
+// 특정 제품이 아닌 소재 묶음 — 제품 키워드가 없을 때만 적용
+const AM_NON_PRODUCT_GROUPS = [
+    { name: '리타겟팅·카탈로그', re: /Conversion\(Retargeting\)|^Traffic_Qoo10|criteo|Dynamic -/i },
+    { name: '프로모션·쿠폰(공통)', re: /クーポン|贈呈品|特典|本日限定|1日限定|限定セット|限定企画|企画セット|メガポセット|初売り|price_coupon|Fukubukuro|福袋|破格|特価|일일특가|캘린더|메가와리 전체|메가와리한정|메가포 전체|GIFT_Benefit|ポストカード|エコバッグ|プレゼント/i },
+    { name: '인플루언서(제품 미표기)', re: /インフルエンサー|influencer/i },
+];
 function _amProductByKeyword(s, brand) {
     for (const p of AM_PRODUCTS) {
         if (p.brand && p.brand !== brand) continue;   // 같은 브랜드에서만 매칭
@@ -274,6 +288,13 @@ function _amProduct(adName, brand, sheetProduct, camp) {
     if (kw) return kw;
     // 시트 표기를 그대로 쓰는 건 영문 제품 코드 형태일 때만 (검색 키워드·자동 캠페인명 등이 섞여 있음)
     if (/^[A-Za-z][A-Za-z0-9-]*$/.test(raw) && !AM_PRODUCT_PLACEHOLDERS.has(key)) return raw;
+    const s = `${adName || ''} ${camp || ''}`;
+    // 다른 브랜드 제품명이 들어간 소재 = 시트 브랜드 표기 확인 필요 (짧은 영문 키워드는 오탐이 많아 한·일 표기만)
+    for (const p of AM_PRODUCTS) {
+        if (!p.brand || p.brand === brand) continue;
+        if (p.kw.some(k => /[^\x00-\x7F]/.test(k) && k.length >= 3 && s.includes(k))) return `타브랜드 소재(${p.brand})`;
+    }
+    for (const g of AM_NON_PRODUCT_GROUPS) if (g.re.test(s)) return g.name;
     return '기타';
 }
 
